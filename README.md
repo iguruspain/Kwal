@@ -1,4 +1,4 @@
-# Aplicación Kirigami con Python
+# Aplicación Kwal con Python
 
 Esta aplicación utiliza Kirigami como framework UI y Python para la lógica de negocio.
 
