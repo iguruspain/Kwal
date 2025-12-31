@@ -157,10 +157,16 @@ Kirigami.ApplicationWindow {
     }
 
     Kirigami.Page {
-        id: initPage
+        id: wallpaperPage
         title: qsTr("Wallpapers")
 
         actions: [
+            Kirigami.Action {
+                id: showAction
+                text: qsTr("Folders") //i18nc("@action:button", "Refresh")
+                icon.name: "view-list-details"
+                onTriggered: {}
+            },
             Kirigami.Action {
                 id: addAction
                 text: qsTr("Add Folder") //i18nc("@action:button", "Add Folder")
@@ -169,7 +175,6 @@ Kirigami.ApplicationWindow {
             }
         ]
 
-        // Todo el contenido visual DEBE ir dentro de la Page
         RowLayout {
             anchors.fill: parent
             spacing: 10
@@ -183,12 +188,12 @@ Kirigami.ApplicationWindow {
                     item.parent = leftPanelLoader
                     console.log("Panel izquierdo cargado")
                 }
-                active: true
+                active: active
             }
             Item {
                 Layout.preferredWidth: Kirigami.Units.smallSpacing
             }
-            // Espacio central con grid de thumbnails correspondiente a los wallpapers de la carpeta seleccionada
+            // Panel con grid de thumbnails correspondiente a los wallpapers de la carpeta seleccionada
             Loader {
                 id: contentPreviewLoader
                 sourceComponent: contentPreviewComponent
@@ -202,5 +207,23 @@ Kirigami.ApplicationWindow {
             }
         }
     }
-    pageStack.initialPage: initPage
+
+    pageStack.initialPage: wallpaperPage
+
+    globalDrawer: Kirigami.GlobalDrawer {
+        id: globalDrawer
+        title: qsTr("Kwal")
+        titleIcon: "preferences-desktop-wallpaper"
+        width: parent.width / 4
+   
+        actions: [
+            Kirigami.Action {
+                text: qsTr("Wallpapers")
+                icon.name: "preferences-desktop-wallpaper"
+                onTriggered: {
+                    pageStack.push(wallpaperPage)
+                }
+            }
+        ]
+    }
 }
