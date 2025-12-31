@@ -10,4 +10,5 @@ Esta aplicación utiliza Kirigami como framework UI y Python para la lógica de 
     - `main.qml`: Diseño de la ventana principal
   - `controllers/`: Controladores para la lógica de la aplicación
   - `models/`: Modelos de datos
-- `resources/`: Recursos como imágenes, iconos, etc.
+- `resources/`: Recursos como imágenes, iconos, plantillas, etc.
+- `README.md`: Readme

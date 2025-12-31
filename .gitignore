@@ -1,0 +1,76 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+eggs/
+parts/
+sdist/
+*.egg-info/
+*.egg
+wheelhouse/
+pip-wheel-metadata/
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Translations
+*.mo
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# C extensions
+*.so
+
+# Pyre / mypy
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local settings
+local_settings.py
+instance/
+
+# Misc
+*.pyc
+*.pyo
+*.pyd
+*.swp
+
+# QML build/artifacts (if any)
+qmlcache/
+
