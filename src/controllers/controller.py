@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 import logging
 import os
+import json
 
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths
@@ -17,7 +18,18 @@ class Controller(QObject):
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
-		self._model = WallpaperFolderModel([Folder(name="Local", path="/usr/share/wallpapers")])
+		# Load persisted folders or fallback to default
+		folders: list[Folder] = []
+		try:
+			loaded = self._load_config()
+			if loaded:
+				folders = [Folder(name=f.get("name", ""), path=f.get("path", "")) for f in loaded]
+		except Exception:
+			self._logger = logging.getLogger(__name__)
+			self._logger.exception("Failed loading saved folders; using defaults")
+		if not folders:
+			folders = [Folder(name="Local", path="/usr/share/wallpapers")]
+		self._model = WallpaperFolderModel(folders)
 		self._image_model = ImageModel()
 		self._logger = logging.getLogger(__name__)
 		self._selected_folder: str = ""
@@ -35,7 +47,17 @@ class Controller(QObject):
 	@Slot(str, str)
 	def addFolder(self, name: str, path: str) -> None:
 		self._logger.debug(QCoreApplication.translate("Controller", "addFolder called: %s %s"), name, path)
+		# avoid duplicates by path
+		for f in self._model._folders:
+			if f.path == path:
+				self._logger.info("Folder %s already present, skipping add", path)
+				return
 		self._model.addFolder(name, path)
+		# persist
+		try:
+			self._save_config()
+		except Exception:
+			self._logger.exception("Failed saving config after addFolder")
 
 	@Slot()
 	def openFolderDialog(self) -> None:
@@ -68,7 +90,12 @@ class Controller(QObject):
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Invalid index received for removeFolder: %r"), index)
 			return
+		# perform removal and persist
 		self._model.removeFolder(idx)
+		try:
+			self._save_config()
+		except Exception:
+			self._logger.exception("Failed saving config after removeFolder")
 
 	@Slot(int)
 	def selectFolder(self, index: int) -> None:
@@ -86,5 +113,34 @@ class Controller(QObject):
 
 	def _get_selected_folder(self) -> str:
 		return self._selected_folder
+
+	def _config_path(self) -> Path:
+		from pathlib import Path
+		cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal"
+		cfg_dir.mkdir(parents=True, exist_ok=True)
+		return cfg_dir / "folders.json"
+
+	def _load_config(self) -> list[dict]:
+		"""Load persisted folders list from config file. Returns list of dicts.
+		If file missing or invalid, returns empty list.
+		"""
+		cfg = self._config_path()
+		if not cfg.exists():
+			return []
+		try:
+			with open(cfg, "r", encoding="utf-8") as fh:
+				return json.load(fh)
+		except Exception:
+			self._logger.exception("Failed reading config file %s", cfg)
+			return []
+
+	def _save_config(self) -> None:
+		"""Save current folder list into config file as JSON.
+		Format: [{"name": str, "path": str}, ...]
+		"""
+		cfg = self._config_path()
+		data = [{"name": f.name, "path": f.path} for f in self._model._folders]
+		with open(cfg, "w", encoding="utf-8") as fh:
+			json.dump(data, fh, ensure_ascii=False, indent=2)
 
 	selectedFolder = Property(str, _get_selected_folder, notify=selectedFolderChanged)
