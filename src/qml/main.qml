@@ -84,9 +84,43 @@ Kirigami.ApplicationWindow {
             radius: 8
             
             ColumnLayout {
+                id: sidebarLayout
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
-                //spacing: 0
+                spacing: Kirigami.Units.smallSpacing // Espaciado consistente entre botón y lista
+
+                // Contenedor del Botón para alineación precisa
+                Item {
+                    id: buttonContainer
+                    Layout.fillWidth: true
+                    // Altura preferida basada en el tamaño estándar de controles de Kirigami
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                    
+                    // Usamos márgenes que coincidan con los de CardsListView
+                    Layout.leftMargin: Kirigami.Units.smallSpacing * 2
+                    Layout.rightMargin: Kirigami.Units.smallSpacing * 2
+                    Layout.topMargin: Kirigami.Units.smallSpacing
+
+                    Kirigami.ActionToolBar {
+                        anchors.fill: parent
+                        flat: true // Le da un aspecto de botón real que rellena el espacio
+                        actions: [
+                            Kirigami.Action {
+                                text: qsTr("Add Folder")
+                                icon.name: "folder-new"
+                                onTriggered: {
+                                    wallpaperFolderModel.append({
+                                        "name": "New Folder", 
+                                        "path": "/path/to/folder"
+                                    })
+                                }
+                            }
+                        ]
+                    }
+                }
+
+                Kirigami.Separator {
+                    Layout.fillWidth: true
+                }
 
                 Kirigami.CardsListView {
                     id: wallpaperCards
@@ -107,9 +141,8 @@ Kirigami.ApplicationWindow {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: "transparent"
-            //Kirigami.Theme.colorSet: Kirigami.Theme.View
-            //color: Kirigami.Theme.alternateBackgroundColor
+            Kirigami.Theme.colorSet: Kirigami.Theme.View
+            color: Kirigami.Theme.alternateBackgroundColor
             //border.width: 1
             //radius: 8
 
@@ -117,9 +150,6 @@ Kirigami.ApplicationWindow {
                 id: scrollView
                 anchors.fill: parent
                 clip: true
-                // Layout.fillWidth: parent
-                // Layout.fillHeight: parent
-                // anchors.fill: parent
 
                 GridView {
                     id: thumbnailGrid
@@ -127,7 +157,9 @@ Kirigami.ApplicationWindow {
                     height: scrollView.availableHeight
 
                     // Calculate how many columns fit (minimum 150px per thumbnail)
-                    readonly property int columns: Math.max(2, Math.floor(width / 150))
+                    readonly property real minItemWidth: Kirigami.Units.gridUnit * 10
+    
+                    readonly property int columns: Math.max(2, Math.floor(width / minItemWidth))
                     readonly property real cellSize: width / columns
                     
                     cellWidth: cellSize
@@ -142,13 +174,14 @@ Kirigami.ApplicationWindow {
                         Rectangle {
                             anchors.fill: parent
                             anchors.margins: Kirigami.Units.smallSpacing
-
-                            color: Kirigami.Theme.alternateBackgroundColor
+                            Kirigami.Theme.colorSet: Kirigami.Theme.View
+                            color: Kirigami.Theme.backgroundColor
                             border.width: 1
-                            border.color: Kirigami.Theme.textColor
+                            border.color: Kirigami.Theme.highlightColor
                             radius: 6
                             Text {
-                                color: parent.border.color
+                                
+                                color: Kirigami.Theme.textColor
                                 anchors.centerIn: parent
                                 text: "Thumb " + (index + 1)
                             }
@@ -169,34 +202,48 @@ Kirigami.ApplicationWindow {
                 id: showAction
                 text: qsTr("Folders") //i18nc("@action:button", "Refresh")
                 icon.name: "view-list-details"
+                checkable: true // Hacemos que el botón sea un interruptor
+                checked: false   // Por defecto no visible
                 onTriggered: {}
-            },
-            Kirigami.Action {
-                id: addAction
-                text: qsTr("Add Folder") //i18nc("@action:button", "Add Folder")
-                icon.name: "folder-new"
-                onTriggered: wallpaperFolderModel.append({"name": "New Folder", "path": "/path/to/new/folder"})
             }
         ]
 
         RowLayout {
             anchors.fill: parent
-            spacing: 10
+            spacing: 0
 
+            // Panel lateral con la lista de carpetas de wallpapers
             Loader {
                 id: leftPanelLoader
-                sourceComponent: leftPanelComponent
+                
+                // 1. Layout & Positioning
+                // Si el botón está marcado, mostramos el panel, si no, ancho 0
+                Layout.preferredWidth: showAction.checked ? Kirigami.Units.gridUnit * 10 : 0
                 Layout.fillHeight: true
-                Layout.preferredWidth: 200
-                onLoaded: {
-                    item.parent = leftPanelLoader
-                    console.log("Panel izquierdo cargado")
+                
+                // 2. Visuals
+                visible: Layout.preferredWidth > 0
+                opacity: showAction.checked ? 1 : 0
+                
+                // 3. Logic
+                sourceComponent: leftPanelComponent
+                active: true
+                
+                // Animación fluida para el panel
+                Behavior on Layout.preferredWidth {
+                    NumberAnimation {
+                        duration: Kirigami.Units.shortDuration
+                        easing.type: Easing.InOutQuad
+                    }
                 }
-                active: active
             }
-            Item {
-                Layout.preferredWidth: Kirigami.Units.smallSpacing
-            }
+            
+            // Separador que solo aparece si el panel está abierto
+            Kirigami.Separator {
+                Layout.fillHeight: true
+                visible: showAction.checked
+            }                     
+
             // Panel con grid de thumbnails correspondiente a los wallpapers de la carpeta seleccionada
             Loader {
                 id: contentPreviewLoader
