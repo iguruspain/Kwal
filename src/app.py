@@ -23,7 +23,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     return parser.parse_args(argv)
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -48,7 +48,8 @@ def main():
     logger = logging.getLogger(__name__)
     logger.debug("Log level set to %s", logging.getLevelName(level))
 
-    app = QGuiApplication(sys.argv)
+    # Use QApplication because we use Qt Widgets (QFileDialog) in controller
+    app = QApplication(sys.argv)
     engine = QQmlApplicationEngine()
 
     # Needed to close the app with Ctrl+C

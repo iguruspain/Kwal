@@ -26,7 +26,7 @@ ColumnLayout {
                     text: qsTr("Add Folder")
                     icon.name: "folder-new"
                     onTriggered: {
-                        pyController.addFolder("New Folder", "/path/to/folder")
+                        pyController.openFolderDialog()
                     }
                 }
             ]

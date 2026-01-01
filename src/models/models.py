@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import hashlib
 import os
+import shutil
 from PySide6.QtGui import QImage
 from PySide6.QtCore import QObject, Signal, Slot, QThread, Property
 
@@ -57,13 +58,43 @@ class WallpaperFolderModel(QAbstractListModel):
 		logger = logging.getLogger(__name__)
 		logger.debug("removeFolder called with index=%d; rowCount=%d", index, self.rowCount())
 		if 0 <= index < self.rowCount():
-			self.beginRemoveRows(QModelIndex(), index, index)
+			# determine which folder will be removed
 			removed = self._folders[index]
+			# attempt to clear thumbnail cache for that folder
+			try:
+				self._clear_cache_for_folder(removed.path)
+			except Exception:
+				logger.exception("Failed clearing cache for folder %s", removed.path)
+			# remove from model
+			self.beginRemoveRows(QModelIndex(), index, index)
 			del self._folders[index]
 			self.endRemoveRows()
 			logger.info("Removed folder %s; remaining=%s", removed, [(f.name, f.path) for f in self._folders])
 		else:
 			logger.warning("removeFolder: invalid index %s", index)
+
+	def _clear_cache_for_folder(self, folder_path: str) -> None:
+		"""Remove thumbnail cache files that belong to a given folder path.
+		Thumbnail file names are SHA1 of the full file path (as used by ThumbnailWorker).
+		"""
+		logger = logging.getLogger(__name__)
+		p = Path(folder_path)
+		if not p.exists() or not p.is_dir():
+			logger.debug("_clear_cache_for_folder: folder does not exist %s", folder_path)
+			return
+		cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
+		# folder-specific cache dir is the sha1 of the folder path
+		folder_digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()
+		folder_cache = cache_root / folder_digest
+		if not folder_cache.exists():
+			logger.debug("_clear_cache_for_folder: no cache directory for folder %s", folder_cache)
+			return
+		# remove the entire folder cache tree
+		try:
+			shutil.rmtree(folder_cache)
+			logger.info("Cleared thumbnail cache directory %s for folder %s", folder_cache, folder_path)
+		except Exception:
+			logger.exception("Failed to remove cache directory %s", folder_cache)
 
 
 class ThumbnailWorker(QObject):
@@ -98,7 +129,10 @@ class ThumbnailWorker(QObject):
 					continue
 				files.append(f)
 
-			cache_base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
+			# Organize thumbnails per-source-folder to make cleanup simple
+			cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
+			folder_digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()
+			cache_base = cache_root / folder_digest
 			cache_base.mkdir(parents=True, exist_ok=True)
 
 			thumbs: List[str] = []
