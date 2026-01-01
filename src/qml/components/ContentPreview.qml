@@ -4,6 +4,8 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 Item {
+    id: root
+    property bool drawerOpen: false
     Layout.fillWidth: true
     Layout.fillHeight: true
 
@@ -22,6 +24,7 @@ Item {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
         }
         Label {
             id: selectedResolutionLabel
@@ -31,6 +34,10 @@ Item {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+        }
+        Kirigami.Separator {
+            Layout.fillWidth: true
         }
         Connections {
             target: pyController
@@ -39,6 +46,8 @@ Item {
             }
             function onSelectedWallpaperChanged() {
                 console.log("QML: pyController.selectedWallpaper changed ->", pyController.selectedWallpaper)
+                // Open drawer when a wallpaper is selected programmatically
+                root.drawerOpen = pyController.selectedWallpaper !== ""
             }
         }
 
@@ -68,37 +77,50 @@ Item {
                 // Real image model provided by Python
                 model: imageModel
                 delegate: Item {
+                    id: delegateItem
                     width: thumbnailGrid.cellWidth
                     height: thumbnailGrid.cellHeight
 
                     property bool isSelected: filePath === pyController.selectedWallpaper
 
-                    Image {
-                        id: imgDelegate
+                    // Container Frame
+                    Rectangle {
                         anchors.fill: parent
                         anchors.margins: Kirigami.Units.smallSpacing
-                        source: thumbPath ? "file://" + thumbPath : (filePath ? "file://" + filePath : "")
-                        sourceSize.width: width
-                        sourceSize.height: height
-                        fillMode: Image.PreserveAspectFit
-                        cache: true
-                        asynchronous: true
+                        
+                        // Subtle background to define the cell area
+                        color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
+                        radius: Kirigami.Units.smallSpacing
 
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: imgDelegate.paintedWidth
-                            height: imgDelegate.paintedHeight
-                            color: "transparent"
-                            border.color: isSelected ? Kirigami.Theme.highlightColor : "transparent"
-                            border.width: isSelected ? 3 : 0
-                            radius: Kirigami.Units.smallSpacing
+                        // Border: Standard (subtle) vs Highlighted (accent)
+                        border.color: isSelected ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.15)
+                        border.width: isSelected ? 3 : 1
+                        
+                        // Image inside
+                        Image {
+                            anchors.fill: parent
+                            // Padding inside the frame so image doesn't touch border
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            
+                            source: thumbPath ? "file://" + thumbPath : (filePath ? "file://" + filePath : "")
+                            
+                            // Optimize loading
+                            sourceSize.width: thumbPath ? 0 : width
+                            sourceSize.height: 0
+
+                            fillMode: Image.PreserveAspectCrop //PreserveAspectFit
+                            cache: true
+                            asynchronous: true
+                            mipmap: true // Smoother scaling
                         }
-                    }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            pyController.selectWallpaper(filePath)
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                pyController.selectWallpaper(filePath)
+                                root.drawerOpen = true
+                            }
                         }
                     }
                 }
@@ -119,13 +141,13 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width * 0.9, actionsRow.implicitWidth + Kirigami.Units.smallSpacing * 4)
         height: Math.max(actionsRow.implicitHeight + Kirigami.Units.smallSpacing * 2, Kirigami.Units.gridUnit * 3)
-        // slide in/out by changing y
-        y: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? parent.height - height : parent.height
-        opacity: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? 1.0 : 0.0
+        // slide in/out by changing y (drawerOpen controls visibility without clearing selection)
+        y: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? parent.height - height : parent.height
+        opacity: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? 1.0 : 0.0
         color: Qt.rgba(0, 0, 0, 0.6)
         border.color: Qt.rgba(1, 1, 1, 0.08)
         border.width: 1
-        visible: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0)
+        visible: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen)
         Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
 
@@ -146,17 +168,18 @@ Item {
                         text: qsTr("Set as wallpaper")
                         icon.name: "dialog-ok-apply"
                         enabled: pyController.selectedWallpaper !== ""
-                            onClicked: {
-                                pyController.setAsWallpaper(pyController.selectedWallpaper)
-                                // hide drawer after action
-                                pyController.selectWallpaper("")
-                            }
+                        onClicked: {
+                            pyController.setAsWallpaper(pyController.selectedWallpaper)
+                            // close drawer but keep selection
+                            root.drawerOpen = false
+                        }
                     }
                     ToolButton {
                         text: qsTr("Close")
                         icon.name: "window-close"
                         onClicked: {
-                            pyController.selectWallpaper("")
+                            // only close drawer; keep selection
+                            root.drawerOpen = false
                         }
                     }
                 }

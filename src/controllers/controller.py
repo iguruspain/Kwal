@@ -4,6 +4,7 @@ from typing import Optional
 import logging
 import os
 import json
+from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtGui import QImage
@@ -138,9 +139,12 @@ class Controller(QObject):
 	@Slot(str, str)
 	def addFolder(self, name: str, path: str) -> None:
 		self._logger.debug(QCoreApplication.translate("Controller", "addFolder called: %s %s"), name, path)
+		
+		path = os.path.normpath(path)
+
 		# avoid duplicates by path
 		for f in self._model._folders:
-			if f.path == path:
+			if os.path.normpath(f.path) == path:
 				self._logger.info("Folder %s already present, skipping add", path)
 				return
 		self._model.addFolder(name, path)
@@ -227,7 +231,6 @@ class Controller(QObject):
 		return self._selected_folder
 
 	def _config_path(self) -> Path:
-		from pathlib import Path
 		cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal"
 		cfg_dir.mkdir(parents=True, exist_ok=True)
 		return cfg_dir / "folders.json"
