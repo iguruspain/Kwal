@@ -37,3 +37,7 @@ El agente debe respetar rigurosamente la estructura del proyecto:
 - **Stack:** Python (PySide6) + QML (Kirigami) para KDE Plasma.
 - **Libreria** Usa exclusivamente `PySide6`. Prohibido el uso de `PyQt6`.
 - **Documentación:** Seguir estándares de [Qt](https://doc.qt.io), [KDE Develop](https://develop.kde.org) y[Kirigami](https://develop.kde.org/docs/getting-started/kirigami/).
+
+## 7. Rigor técnico
+- **Integridad Técnica:** No realices `fallbacks` a conveniencia. Si el código no pasa el análisis de Pylance o hay un conflicto de tipos entre Python y QML, o alguna funcionalidad no está implementada correctamente, no uses atajos que degraden la calidad del código (como tipado dinámico o supresión de advertencias).
+- **Prioridad de Arreglos:** Prioriza la corrección de errores y advertencias antes de agregar nuevas funcionalidades o realizar refactorizaciones. Si una implementación sugerida falla, el siguiente paso debe ser corregirla bajo los mismos estándares de calidad originales, no simplificarla eliminando las restricciones de seguridad.
