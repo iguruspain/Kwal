@@ -14,7 +14,7 @@ Kirigami.ApplicationWindow {
 
     // Delegate and panels moved to separate QML files:
     // - WallpaperDelegate.qml
-    // - LeftPanel.qml
+    // - SideBar.qml
     // - ContentPreview.qml
 
     Kirigami.Page {
@@ -42,7 +42,7 @@ Kirigami.ApplicationWindow {
                 Layout.fillHeight: true
                 visible: Layout.preferredWidth > 0
                 opacity: showAction.checked ? 1 : 0
-                source: "components/LeftPanel.qml"
+                source: "components/SideBar.qml"
                 active: true
                 Behavior on Layout.preferredWidth {
                     NumberAnimation {
