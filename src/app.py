@@ -23,6 +23,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 
 from controllers.controller import Controller
 
@@ -61,6 +62,29 @@ def main():
     engine.rootContext().setContextProperty("pyController", controller)
     engine.rootContext().setContextProperty("wallpaperFolderModel", controller.wallpaperModel())
     engine.rootContext().setContextProperty("imageModel", controller.imageModel())
+
+    # Route Qt/QML messages into Python logging and respect application log level.
+    def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
+        # Map Qt message types to Python logging levels
+        mapping = {
+            QtMsgType.QtDebugMsg: logging.DEBUG,
+            QtMsgType.QtInfoMsg: logging.INFO,
+            QtMsgType.QtWarningMsg: logging.WARNING,
+            QtMsgType.QtCriticalMsg: logging.ERROR,
+            QtMsgType.QtFatalMsg: logging.CRITICAL,
+        }
+        lvl = mapping.get(msg_type, logging.INFO)
+        qt_logger = logging.getLogger("qt")
+        # include context info when available
+        try:
+            ctx_info = f"{context.file}:{context.line}"
+        except Exception:
+            ctx_info = ""
+        qt_logger.log(lvl, "%s %s", message, ctx_info)
+
+    qInstallMessageHandler(_qt_message_handler)
+    # Ensure qt logger follows configured level so messages can be hidden like regular logging
+    logging.getLogger("qt").setLevel(level)
 
     base_path = os.path.abspath(os.path.dirname(__file__))
     url = QUrl(f"file://{base_path}/qml/main.qml")
