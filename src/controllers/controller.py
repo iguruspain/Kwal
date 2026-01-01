@@ -112,8 +112,28 @@ class Controller(QObject):
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Invalid index received for removeFolder: %r"), index)
 			return
-		# perform removal and persist
+		
+		# Check if we are removing the currently selected folder
+		folder_to_remove = self._model._folders[idx] if 0 <= idx < self._model.rowCount() else None
+		was_selected = (folder_to_remove is not None and folder_to_remove.path == self._selected_folder)
+
+		# perform removal
 		self._model.removeFolder(idx)
+		
+		# Handle selection update if needed
+		if was_selected:
+			new_count = self._model.rowCount()
+			if new_count > 0:
+				# Select the same index if it still exists, or the last one
+				new_index = min(idx, new_count - 1)
+				self.selectFolder(new_index)
+			else:
+				# No folders left
+				self._selected_folder = ""
+				self._image_model.setFolder("")
+				self.selectedFolderChanged.emit()
+		
+		# persist
 		try:
 			self._save_config()
 		except Exception:

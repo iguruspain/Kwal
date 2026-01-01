@@ -74,14 +74,10 @@ class WallpaperFolderModel(QAbstractListModel):
 			logger.warning("removeFolder: invalid index %s", index)
 
 	def _clear_cache_for_folder(self, folder_path: str) -> None:
-		"""Remove thumbnail cache files that belong to a given folder path.
-		Thumbnail file names are SHA1 of the full file path (as used by ThumbnailWorker).
-		"""
+		"""Remove thumbnail cache files that belong to a given folder path."""
 		logger = logging.getLogger(__name__)
 		p = Path(folder_path)
-		if not p.exists() or not p.is_dir():
-			logger.debug("_clear_cache_for_folder: folder does not exist %s", folder_path)
-			return
+		# Even if folder doesn't exist on disk anymore, we might have cache
 		cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
 		# folder-specific cache dir is the sha1 of the folder path
 		folder_digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()
