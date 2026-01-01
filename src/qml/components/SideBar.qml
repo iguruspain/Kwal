@@ -20,10 +20,11 @@ ColumnLayout {
 
         Kirigami.ActionToolBar {
             anchors.fill: parent
+            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
             flat: true
             actions: [
                 Kirigami.Action {
-                    text: qsTr("Add Folder")
+                    text: qsTr("Folders:")
                     icon.name: "folder-new"
                     onTriggered: {
                         pyController.openFolderDialog()

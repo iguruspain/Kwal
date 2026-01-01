@@ -11,12 +11,13 @@ Item {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
+
         Label {
             id: selectedLabel
-            text: (pyController.selectedFolder && pyController.selectedFolder.length > 0)
-                    ? qsTr("Selected folder:") + " " + pyController.selectedFolder
-                    : qsTr("Selected folder: none")
-            //Kirigami.Theme.colorSet: Kirigami.Theme.View
+            // Show full selected image path when present; otherwise show the selected folder path
+            text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0)
+                    ? pyController.selectedWallpaper
+                    : ((pyController.selectedFolder && pyController.selectedFolder.length > 0) ? pyController.selectedFolder : qsTr("none"))
             color: Kirigami.Theme.textColor
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
@@ -27,9 +28,9 @@ Item {
             target: pyController
             function onSelectedFolderChanged() {
                 console.log("QML: pyController.selectedFolder changed ->", pyController.selectedFolder)
-                selectedLabel.text = (pyController.selectedFolder && pyController.selectedFolder.length > 0)
-                                        ? qsTr("Selected folder:") + " " + pyController.selectedFolder
-                                        : qsTr("Selected folder: none")
+            }
+            function onSelectedWallpaperChanged() {
+                console.log("QML: pyController.selectedWallpaper changed ->", pyController.selectedWallpaper)
             }
         }
 

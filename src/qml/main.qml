@@ -24,7 +24,7 @@ Kirigami.ApplicationWindow {
         actions: [
             Kirigami.Action {
                 id: showAction
-                text: qsTr("Folders")
+                //text: qsTr("Folders")
                 icon.name: "view-list-details"
                 checkable: true
                 checked: false
@@ -84,7 +84,7 @@ Kirigami.ApplicationWindow {
         actions: [
             Kirigami.Action {
                 text: qsTr("Wallpapers")
-                icon.name: "preferences-desktop-wallpaper"
+                icon.name: "edit-image"
                 onTriggered: {
                     pageStack.push(wallpaperPage)
                 }

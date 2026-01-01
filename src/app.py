@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-Aplicación Kirigami con Python
-"""
 import os
 import sys
 import signal
