@@ -15,7 +15,7 @@
 
 ## 3. QML y UI (Kirigami)
 - **Sintaxis:** Revisión estricta de jerarquía y cierre de llaves.
-- **Modularización:** Divide la UI en componentes lógicos. Los componentes nuevos deben ir en `src/qml/` (ej: `CustomComponent.qml`).
+- **Modularización:** Divide la UI en componentes lógicos, `main.qml` es el archivo principal. Los componentes nuevos deben ir en `src/qml/` (ej: `CustomComponent.qml`).
 - **Orden de Propiedades:** `id` > layout > visuales > señales/funciones.
 - **Rendimiento:** Evita bindings circulares y usa `Connections` para señales de Python.
 
