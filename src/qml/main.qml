@@ -180,7 +180,6 @@ Kirigami.ApplicationWindow {
                             border.color: Kirigami.Theme.highlightColor
                             radius: 6
                             Text {
-                                
                                 color: Kirigami.Theme.textColor
                                 anchors.centerIn: parent
                                 text: "Thumb " + (index + 1)
