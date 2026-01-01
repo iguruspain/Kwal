@@ -40,6 +40,7 @@ Kirigami.ApplicationWindow {
                 id: leftPanelLoader
                 Layout.preferredWidth: showAction.checked ? Kirigami.Units.gridUnit * 10 : 0
                 Layout.fillHeight: true
+                Layout.rightMargin: showAction.checked ? Kirigami.Units.smallSpacing : 0
                 visible: Layout.preferredWidth > 0
                 opacity: showAction.checked ? 1 : 0
                 source: "components/SideBar.qml"
@@ -62,6 +63,7 @@ Kirigami.ApplicationWindow {
                 source: "components/ContentPreview.qml"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.leftMargin: showAction.checked ? Kirigami.Units.smallSpacing : 0
                 onLoaded: {
                     item.parent = contentPreviewLoader
                     console.log("Panel de previsualización cargado")
