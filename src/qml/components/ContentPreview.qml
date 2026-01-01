@@ -41,11 +41,17 @@ Rectangle {
             Layout.fillHeight: true
             clip: true
 
+            BusyIndicator {
+                id: busy
+                anchors.centerIn: parent
+                visible: imageModel.loading
+            }
+
             GridView {
                 id: thumbnailGrid
                 width: scrollView.availableWidth
                 height: scrollView.availableHeight
-                visible: pyController.selectedFolder && pyController.selectedFolder.length > 0
+                visible: pyController.selectedFolder && pyController.selectedFolder.length > 0 && !imageModel.loading
 
                 readonly property real minItemWidth: Kirigami.Units.gridUnit * 10
                 readonly property int columns: Math.max(2, Math.floor(width / minItemWidth))
@@ -55,8 +61,8 @@ Rectangle {
                 cellHeight: cellSize * 0.75
                 Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
 
-                // Placeholder model for now; replace with real image model later
-                model: 50
+                // Real image model provided by Python
+                model: imageModel
                 delegate: Item {
                     width: thumbnailGrid.cellWidth
                     height: thumbnailGrid.cellHeight
@@ -64,15 +70,18 @@ Rectangle {
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: Kirigami.Units.smallSpacing
-                        Kirigami.Theme.colorSet: Kirigami.Theme.View
                         color: Kirigami.Theme.backgroundColor
                         border.width: 1
                         border.color: Kirigami.Theme.highlightColor
                         radius: 6
-                        Text {
-                            color: Kirigami.Theme.textColor
-                            anchors.centerIn: parent
-                            text: "Thumb " + (index + 1)
+
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            source: thumbPath ? "file://" + thumbPath : (filePath ? "file://" + filePath : "")
+                            fillMode: Image.PreserveAspectCrop
+                            cache: true
+                            asynchronous: true
                         }
                     }
                 }

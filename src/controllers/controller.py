@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import Optional
 import logging
 
-from PySide6.QtCore import QObject, Slot, Signal, Property
+from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication
 
-from models.models import WallpaperFolderModel, Folder
+from models.models import WallpaperFolderModel, Folder, ImageModel
 
 
 class Controller(QObject):
@@ -16,15 +16,19 @@ class Controller(QObject):
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
 		self._model = WallpaperFolderModel([Folder(name="Local", path="/usr/share/wallpapers")])
+		self._image_model = ImageModel()
 		self._logger = logging.getLogger(__name__)
 		self._selected_folder: str = ""
 		# Select the first folder by default if available
-		if self._model.rowCount() > 0:
+		if self._model.rowCount() > 0 and QCoreApplication.instance() is not None:
 			# use selectFolder to ensure notify signal is emitted
 			self.selectFolder(0)
 
 	def wallpaperModel(self) -> WallpaperFolderModel:
 		return self._model
+
+	def imageModel(self) -> ImageModel:
+		return self._image_model
 
 	@Slot(str, str)
 	def addFolder(self, name: str, path: str) -> None:
@@ -50,6 +54,8 @@ class Controller(QObject):
 				folder = self._model._folders[index]
 				self._selected_folder = folder.path
 				self._logger.debug("Selected folder set to %s", self._selected_folder)
+				# update image model for the selected folder
+				self._image_model.setFolder(self._selected_folder)
 				self.selectedFolderChanged.emit()
 		except Exception:
 			self._logger.exception("Error selecting folder")

@@ -62,6 +62,7 @@ def main():
     controller = Controller()
     engine.rootContext().setContextProperty("pyController", controller)
     engine.rootContext().setContextProperty("wallpaperFolderModel", controller.wallpaperModel())
+    engine.rootContext().setContextProperty("imageModel", controller.imageModel())
 
     base_path = os.path.abspath(os.path.dirname(__file__))
     url = QUrl(f"file://{base_path}/qml/main.qml")
