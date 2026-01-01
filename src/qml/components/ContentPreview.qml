@@ -8,6 +8,7 @@ Item {
     Layout.fillHeight: true
 
     ColumnLayout {
+        id: contentArea
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
@@ -109,5 +110,57 @@ Item {
         anchors.centerIn: parent
         running: imageModel.loading
         visible: running
+    }
+
+    // Inline bottom drawer-like panel shown when an image is selected
+    Rectangle {
+        id: bottomDrawer
+        // size to fit actions
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(parent.width * 0.9, actionsRow.implicitWidth + Kirigami.Units.smallSpacing * 4)
+        height: Math.max(actionsRow.implicitHeight + Kirigami.Units.smallSpacing * 2, Kirigami.Units.gridUnit * 3)
+        // slide in/out by changing y
+        y: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? parent.height - height : parent.height
+        opacity: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? 1.0 : 0.0
+        color: Qt.rgba(0, 0, 0, 0.6)
+        border.color: Qt.rgba(1, 1, 1, 0.08)
+        border.width: 1
+        visible: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0)
+        Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
+        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                RowLayout {
+                    id: actionsRow
+                    Layout.alignment: Qt.AlignRight
+                    // do not force fill; we size the drawer to this row
+                    ToolButton {
+                        text: qsTr("Set as wallpaper")
+                        icon.name: "dialog-ok-apply"
+                        enabled: pyController.selectedWallpaper !== ""
+                            onClicked: {
+                                pyController.setAsWallpaper(pyController.selectedWallpaper)
+                                // hide drawer after action
+                                pyController.selectWallpaper("")
+                            }
+                    }
+                    ToolButton {
+                        text: qsTr("Close")
+                        icon.name: "window-close"
+                        onClicked: {
+                            pyController.selectWallpaper("")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
