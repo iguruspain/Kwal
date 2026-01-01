@@ -15,6 +15,7 @@ class Controller(QObject):
 	"""Controller that bridges Python models and QML UI."""
 
 	selectedFolderChanged = Signal()
+	selectedWallpaperChanged = Signal()
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -33,6 +34,7 @@ class Controller(QObject):
 		self._image_model = ImageModel()
 		self._logger = logging.getLogger(__name__)
 		self._selected_folder: str = ""
+		self._selected_wallpaper: str = ""
 		# Select the first folder by default if available
 		if self._model.rowCount() > 0 and QCoreApplication.instance() is not None:
 			# use selectFolder to ensure notify signal is emitted
@@ -43,6 +45,17 @@ class Controller(QObject):
 
 	def imageModel(self) -> ImageModel:
 		return self._image_model
+
+	@Slot(str)
+	def selectWallpaper(self, path: str) -> None:
+		if self._selected_wallpaper != path:
+			self._selected_wallpaper = path
+			self.selectedWallpaperChanged.emit()
+
+	def _get_selected_wallpaper(self) -> str:
+		return self._selected_wallpaper
+
+	selectedWallpaper = Property(str, _get_selected_wallpaper, notify=selectedWallpaperChanged)
 
 	@Slot(str, str)
 	def addFolder(self, name: str, path: str) -> None:

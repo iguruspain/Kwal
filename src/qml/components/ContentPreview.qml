@@ -55,13 +55,31 @@ ColumnLayout {
                 width: thumbnailGrid.cellWidth
                 height: thumbnailGrid.cellHeight
 
-                Image {
+                property bool isSelected: filePath === pyController.selectedWallpaper
+
+                Rectangle {
                     anchors.fill: parent
                     anchors.margins: Kirigami.Units.smallSpacing
-                    source: thumbPath ? "file://" + thumbPath : (filePath ? "file://" + filePath : "")
-                    fillMode: Image.PreserveAspectCrop
-                    cache: true
-                    asynchronous: true
+                    color: "transparent"
+                    border.color: isSelected ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: isSelected ? 3 : 0
+                    radius: Kirigami.Units.smallSpacing
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: isSelected ? 3 : 0
+                        source: thumbPath ? "file://" + thumbPath : (filePath ? "file://" + filePath : "")
+                        fillMode: Image.PreserveAspectCrop
+                        cache: true
+                        asynchronous: true
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            pyController.selectWallpaper(filePath)
+                        }
+                    }
                 }
             }
         }
