@@ -19,26 +19,35 @@ class Controller(QObject):
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
-		# Load persisted folders or fallback to default
-		folders: list[Folder] = []
-		try:
-			loaded = self._load_config()
-			if loaded:
-				folders = [Folder(name=f.get("name", ""), path=f.get("path", "")) for f in loaded]
-		except Exception:
-			self._logger = logging.getLogger(__name__)
-			self._logger.exception("Failed loading saved folders; using defaults")
-		if not folders:
-			folders = [Folder(name="Local", path="/usr/share/wallpapers")]
-		self._model = WallpaperFolderModel(folders)
-		self._image_model = ImageModel()
 		self._logger = logging.getLogger(__name__)
 		self._selected_folder: str = ""
 		self._selected_wallpaper: str = ""
-		# Select the first folder by default if available
+
+		# Load persisted config
+		config = self._load_config()
+		loaded_folders = config.get("folders", [])
+		last_selected = config.get("selected_folder", "")
+
+		folders: list[Folder] = []
+		if loaded_folders:
+			folders = [Folder(name=f.get("name", ""), path=f.get("path", "")) for f in loaded_folders]
+		
+		if not folders:
+			folders = [Folder(name="Local", path="/usr/share/wallpapers")]
+			
+		self._model = WallpaperFolderModel(folders)
+		self._image_model = ImageModel()
+
+		# Restore selection or default to first
+		initial_index = 0
+		if last_selected:
+			for i, f in enumerate(folders):
+				if f.path == last_selected:
+					initial_index = i
+					break
+		
 		if self._model.rowCount() > 0 and QCoreApplication.instance() is not None:
-			# use selectFolder to ensure notify signal is emitted
-			self.selectFolder(0)
+			self.selectFolder(initial_index)
 
 	def wallpaperModel(self) -> WallpaperFolderModel:
 		return self._model
@@ -121,6 +130,7 @@ class Controller(QObject):
 				# update image model for the selected folder
 				self._image_model.setFolder(self._selected_folder)
 				self.selectedFolderChanged.emit()
+				self._save_config()
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Error selecting folder"))
 
@@ -133,26 +143,32 @@ class Controller(QObject):
 		cfg_dir.mkdir(parents=True, exist_ok=True)
 		return cfg_dir / "folders.json"
 
-	def _load_config(self) -> list[dict]:
-		"""Load persisted folders list from config file. Returns list of dicts.
-		If file missing or invalid, returns empty list.
-		"""
+	def _load_config(self) -> dict:
+		"""Load persisted config. Returns dict with keys 'folders' (list) and 'selected_folder' (str)."""
 		cfg = self._config_path()
+		default_config = {"folders": [], "selected_folder": ""}
 		if not cfg.exists():
-			return []
+			return default_config
 		try:
 			with open(cfg, "r", encoding="utf-8") as fh:
-				return json.load(fh)
+				data = json.load(fh)
+				if isinstance(data, list):
+					# Migration from old list-only format
+					return {"folders": data, "selected_folder": ""}
+				if isinstance(data, dict):
+					return data
+				return default_config
 		except Exception:
 			self._logger.exception("Failed reading config file %s", cfg)
-			return []
+			return default_config
 
 	def _save_config(self) -> None:
-		"""Save current folder list into config file as JSON.
-		Format: [{"name": str, "path": str}, ...]
-		"""
+		"""Save current state into config file."""
 		cfg = self._config_path()
-		data = [{"name": f.name, "path": f.path} for f in self._model._folders]
+		data = {
+			"folders": [{"name": f.name, "path": f.path} for f in self._model._folders],
+			"selected_folder": self._selected_folder
+		}
 		with open(cfg, "w", encoding="utf-8") as fh:
 			json.dump(data, fh, ensure_ascii=False, indent=2)
 
