@@ -42,12 +42,4 @@ Kirigami.AbstractCard {
             }
         }
     }
-    // Use the card's background property so styling is applied to the card itself
-    background: Rectangle {
-        anchors.fill: parent
-        radius: 6
-        color: isSelected ? Kirigami.Theme.alternateBackgroundColor : Kirigami.Theme.backgroundColor
-        //border.width: isSelected ? 2 : 1
-        border.color: isSelected ? Kirigami.Theme.highlightColor : Kirigami.Theme.alternateBackgroundColor
-    }
 }
