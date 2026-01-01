@@ -14,16 +14,25 @@ Item {
 
         Label {
             id: selectedLabel
-            // Show full selected image path when present; otherwise show the selected folder path
-            text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0)
-                    ? pyController.selectedWallpaper
-                    : ((pyController.selectedFolder && pyController.selectedFolder.length > 0) ? pyController.selectedFolder : qsTr("none"))
+            // Show name of selected file
+            text: pyController.selectedWallpaper ? qsTr("%1").arg(pyController.selectedWallpaper.split("/").pop()) : qsTr("")
             color: Kirigami.Theme.textColor
-            wrapMode: Text.WordWrap
+            font.bold: true
+            font.pointSize: Kirigami.Units.largeFontSize
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
+            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
         }
-
+        Label {
+            id: selectedResolutionLabel
+            // Show resolution of selected file
+            text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? (pyController.selectedWallpaperResolution && pyController.selectedWallpaperResolution.length > 0 ? pyController.selectedWallpaperResolution : qsTr("Unknown")) : qsTr("")
+            color: Kirigami.Theme.disabledTextColor
+            font.pointSize: Kirigami.Units.defaultFontSize
+            Layout.fillWidth: true
+            Layout.margins: Kirigami.Units.smallSpacing
+            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+        }
         Connections {
             target: pyController
             function onSelectedFolderChanged() {

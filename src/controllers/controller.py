@@ -6,6 +6,7 @@ import os
 import json
 
 from PySide6.QtWidgets import QFileDialog
+from PySide6.QtGui import QImage
 from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths
 
 from models.models import WallpaperFolderModel, Folder, ImageModel
@@ -22,6 +23,7 @@ class Controller(QObject):
 		self._logger = logging.getLogger(__name__)
 		self._selected_folder: str = ""
 		self._selected_wallpaper: str = ""
+		self._selected_wallpaper_resolution: str = ""
 
 		# Load persisted config
 		config = self._load_config()
@@ -57,14 +59,32 @@ class Controller(QObject):
 
 	@Slot(str)
 	def selectWallpaper(self, path: str) -> None:
-		if self._selected_wallpaper != path:
-			self._selected_wallpaper = path
-			self.selectedWallpaperChanged.emit()
+		# Set selected wallpaper and compute its resolution
+		try:
+			if self._selected_wallpaper != path:
+				self._selected_wallpaper = path
+				# compute resolution
+				if path:
+					img = QImage(path)
+					if not img.isNull():
+						self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
+					else:
+						self._selected_wallpaper_resolution = ""
+				else:
+					self._selected_wallpaper_resolution = ""
+				self.selectedWallpaperChanged.emit()
+		except Exception:
+			self._logger.exception("Error selecting wallpaper %r", path)
 
 	def _get_selected_wallpaper(self) -> str:
 		return self._selected_wallpaper
 
+	def _get_selected_wallpaper_resolution(self) -> str:
+		return self._selected_wallpaper_resolution
+
 	selectedWallpaper = Property(str, _get_selected_wallpaper, notify=selectedWallpaperChanged)
+
+	selectedWallpaperResolution = Property(str, _get_selected_wallpaper_resolution, notify=selectedWallpaperChanged)
 
 	@Slot(str, str)
 	def addFolder(self, name: str, path: str) -> None:
