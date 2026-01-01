@@ -10,15 +10,17 @@ Kirigami.ApplicationWindow {
     height: 600
     title: "Kwal"
 
-
+    //Models
+    // Definimos el modelo para las carpetas de wallpapers
     ListModel {
         id: wallpaperFolderModel
         // Aquí se agregarán los elementos del modelo dinámicamente
         ListElement { name: "Local"; path: "/usr/share/wallpapers" }
         //ListElement { name: "Custom"; path: "/home/user/Pictures/Wallpapers" }
-    } 
-
-    // Definimos el delegado para los elementos del modelo
+    }
+    
+    // Delegates
+    // Definimos el delegado para los elementos del modelo de carpetas de wallpapers
     Component {
         id: wallpaperDelegate
         Kirigami.AbstractCard {
@@ -67,6 +69,8 @@ Kirigami.ApplicationWindow {
             }
         }
     }
+
+    // Components de los paneles
     // Definimos los componentes de los paneles fuera para que sean reusables
     Component {
         id: leftPanelComponent
@@ -122,7 +126,7 @@ Kirigami.ApplicationWindow {
                     width: scrollView.availableWidth
                     height: scrollView.availableHeight
 
-                    // Calculate how many columns fit (minimum 100px per thumbnail)
+                    // Calculate how many columns fit (minimum 150px per thumbnail)
                     readonly property int columns: Math.max(2, Math.floor(width / 150))
                     readonly property real cellSize: width / columns
                     
@@ -210,6 +214,7 @@ Kirigami.ApplicationWindow {
 
     pageStack.initialPage: wallpaperPage
 
+    // Global Drawer
     globalDrawer: Kirigami.GlobalDrawer {
         id: globalDrawer
         title: qsTr("Kwal")
