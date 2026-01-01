@@ -74,3 +74,6 @@ instance/
 # QML build/artifacts (if any)
 qmlcache/
 
+# Copilot instructions
+.github/
+.github/copilot-instructions.md
