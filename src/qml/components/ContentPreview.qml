@@ -54,6 +54,11 @@ Item {
                 onClicked: root.panelOpen = !root.panelOpen
                 Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 Layout.leftMargin: Kirigami.Units.smallSpacing
+                hoverEnabled: true
+                // 3. ToolTip (IMPORTANTE: habilitar hover)
+                ToolTip.text: qsTr("Show folders")
+                ToolTip.visible: hovered
+                ToolTip.delay: Kirigami.Units.toolTipDelay
             }
 
             // left flexible spacer (keeps header button area clear)
@@ -249,6 +254,10 @@ Item {
                             // close drawer but keep selection
                             root.drawerOpen = false
                         }
+                        hoverEnabled: true
+                        ToolTip.text: qsTr("Set selected image as wallpaper")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
                     }
                     ToolButton {
                         text: qsTr("Close")
@@ -257,6 +266,10 @@ Item {
                             // only close drawer; keep selection
                             root.drawerOpen = false
                         }
+                        hoverEnabled: true
+                        ToolTip.text: qsTr("Close this panel")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
                     }
                 }
             }

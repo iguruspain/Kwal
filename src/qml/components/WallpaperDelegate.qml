@@ -52,6 +52,10 @@ Kirigami.AbstractCard {
                     if (!enabled) return
                     pyController.removeFolder(index)
                 }
+                hoverEnabled: true
+                ToolTip.text: qsTr("Remove this folder")
+                ToolTip.visible: hovered
+                ToolTip.delay: Kirigami.Units.toolTipDelay
             }
         }
     }

@@ -25,6 +25,10 @@ ColumnLayout {
                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                 //text: qsTr("Add Folder")
                 onClicked: {pyController.openFolderDialog()}
+                hoverEnabled: true
+                ToolTip.text: qsTr("Add a wallpapers folder")
+                ToolTip.visible: hovered
+                ToolTip.delay: Kirigami.Units.toolTipDelay
             }            
         }
     }
