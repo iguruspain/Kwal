@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import org.kde.kirigami as Kirigami
 
 Item {
@@ -145,12 +146,33 @@ Item {
         y: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? parent.height - height : parent.height
         opacity: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? 1.0 : 0.0
 
-        color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.8)
-        border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.1)
-        border.width: 1
+        color: "transparent"
         visible: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen)
         Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
+
+        ShaderEffectSource {
+            id: backgroundSource
+            anchors.fill: parent
+            sourceItem: contentArea
+            sourceRect: Qt.rect(bottomDrawer.x, bottomDrawer.y, bottomDrawer.width, bottomDrawer.height)
+            visible: false
+        }
+
+        MultiEffect {
+            anchors.fill: parent
+            source: backgroundSource
+            blurEnabled: true
+            blurMax: 32
+            blur: 1.0
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.7)
+            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.1)
+            border.width: 1
+        }
 
         RowLayout {
             anchors.fill: parent
