@@ -3,10 +3,14 @@
 import os
 import sys
 import signal
-
 import logging
 from typing import Optional
 import argparse
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QUrl
+from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtCore import qInstallMessageHandler, QtMsgType
+from controllers.controller import Controller
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -19,14 +23,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
     )
     return parser.parse_args(argv)
-
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QUrl
-from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtCore import qInstallMessageHandler, QtMsgType
-
-from controllers.controller import Controller
-
 
 def main():
     """Initializes and manages the application execution

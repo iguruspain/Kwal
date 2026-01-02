@@ -144,8 +144,9 @@ Item {
         // slide in/out by changing y (drawerOpen controls visibility without clearing selection)
         y: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? parent.height - height : parent.height
         opacity: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen) ? 1.0 : 0.0
-        color: Qt.rgba(0, 0, 0, 0.6)
-        border.color: Qt.rgba(1, 1, 1, 0.08)
+
+        color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.8)
+        border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.1)
         border.width: 1
         visible: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0 && root.drawerOpen)
         Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
