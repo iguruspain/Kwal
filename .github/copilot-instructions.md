@@ -2,7 +2,7 @@
 
 ## 1. Calidad y Limpieza de Código
 - **Prohibido el Código Muerto:** Elimina funciones, variables o bloques obsoletos inmediatamente. No dejes código comentado.
-- **Comentarios Relevantes:** Solo lógica compleja o decisiones técnicas. Documentación en **INGLÉS**.
+- **Comentarios Relevantes:** Solo lógica compleja o decisiones técnicas. Documentación en **INGLÉS**. Nada de comentarios que reemplacen a funcionalidad eliminada o placeholders.
 - **Sin Omisiones:** Proporciona siempre el código completo. Prohibido usar `// ... rest of code ...`.
 - **Consistencia:** Actualiza todas las referencias al refactorizar o renombrar.
 
