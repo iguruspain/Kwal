@@ -34,9 +34,9 @@ ColumnLayout {
         }
     }
 
-    Kirigami.Separator {
-        Layout.fillWidth: true
-    }
+    // Kirigami.Separator {
+    //     Layout.fillWidth: true
+    // }
 
     Kirigami.CardsListView {
         id: wallpaperCards

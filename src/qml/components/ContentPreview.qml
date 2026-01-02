@@ -7,39 +7,80 @@ import org.kde.kirigami as Kirigami
 Item {
     id: root
     property bool drawerOpen: false
+    property bool panelOpen: false
     Layout.fillWidth: true
     Layout.fillHeight: true
 
-    ColumnLayout {
-        id: contentArea
+    RowLayout {
+        id: mainRow
         anchors.fill: parent
+        anchors.margins: Kirigami.Units.smallSpacing
         spacing: Kirigami.Units.smallSpacing
 
+        // Left side panel loader
+        Loader {
+            id: leftPanelLoader
+            Layout.preferredWidth: root.panelOpen ? Kirigami.Units.gridUnit * 10 : 0
+            Layout.fillHeight: true
+            Layout.rightMargin: root.panelOpen ? Kirigami.Units.smallSpacing : 0
+            visible: Layout.preferredWidth > 0
+            opacity: root.panelOpen ? 1 : 0
+            source: "SideBar.qml"
+            active: root.panelOpen
+            Behavior on Layout.preferredWidth { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.InOutQuad } }
+        }
 
-        Label {
-            id: selectedLabel
-            // Show name of selected file
-            text: pyController.selectedWallpaper ? qsTr("%1").arg(pyController.selectedWallpaper.split("/").pop()) : qsTr("")
-            color: Kirigami.Theme.textColor
-            font.bold: true
+        // Main content column
+        ColumnLayout {
+            id: contentArea
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: Kirigami.Units.smallSpacing
+
+        RowLayout {
+            id: headerRow
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
+            spacing: Kirigami.Units.smallSpacing
+
+            // Tool button stays on the left
+            ToolButton {
+                id: showAction
+                icon.name: "view-list-details"
+                checkable: true
+                checked: root.panelOpen
+                onCheckedChanged: root.panelOpen = checked
+            }
+
+            // left flexible spacer
+            Item { Layout.fillWidth: true }
+
+            // Centered labels column
+            ColumnLayout {
+                id: headerLabels
+                spacing: Kirigami.Units.smallSpacing / 2
+                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+
+                Label {
+                    id: selectedLabel
+                    text: pyController.selectedWallpaper ? qsTr("%1").arg(pyController.selectedWallpaper.split("/").pop()) : qsTr("")
+                    color: Kirigami.Theme.textColor
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Label {
+                    id: selectedResolutionLabel
+                    text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? (pyController.selectedWallpaperResolution && pyController.selectedWallpaperResolution.length > 0 ? pyController.selectedWallpaperResolution : qsTr("Unknown")) : qsTr("")
+                    color: Kirigami.Theme.disabledTextColor
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Kirigami.Units.smallSpacing * 2
+                }
+            }
+
+            // right flexible spacer
+            Item { Layout.fillWidth: true }
         }
-        Label {
-            id: selectedResolutionLabel
-            // Show resolution of selected file
-            text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? (pyController.selectedWallpaperResolution && pyController.selectedWallpaperResolution.length > 0 ? pyController.selectedWallpaperResolution : qsTr("Unknown")) : qsTr("")
-            color: Kirigami.Theme.disabledTextColor
-            Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-        }
+        //Kirigami.Separator { Layout.fillWidth: true }
         Connections {
             target: pyController
             function onSelectedFolderChanged() {
@@ -127,6 +168,8 @@ Item {
                 }
             }
         }
+        }
+
     }
 
     BusyIndicator {
