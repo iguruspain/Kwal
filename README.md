@@ -1,70 +1,61 @@
-# Aplicación Kwal con Python
-# Kwal
 
-Proyecto pequeño llamado Kwal. Contiene una aplicación Python con
-componentes QML y una estructura mínima para comenzar a desarrollar.
+# Kwal — Python Application
 
-Estado: trabajo en progreso.
+Kwal is a small Python application that includes QML components and a
+minimal structure to start development.
 
-Estructura
----------
+Status: work in progress.
 
-- `src/` - Código fuente de la aplicación
-  - `app.py` - Punto de entrada
-  - `controllers/` - Controladores
-  - `models/` - Modelos
-  - `qml/` - Archivos QML
-- `resources/` - Recursos y ejemplos
+Requirements
+------------
 
-Requisitos
----------
+- Python 3.10+
 
-- Python 3.8+
-
-Instalación rápida
+Quick installation
 ------------------
 
-1. Crear y activar un entorno virtual (recomendado):
+1. Create and activate a virtual environment (recommended):
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Instalar dependencias (si existiera `requirements.txt`):
+2. Install dependencies (if a `requirements.txt` is provided):
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Ejecutar la aplicación
-----------------------
+Running the application
+-----------------------
 
 ```bash
 python src/app.py
 ```
 
-Notas
+Notes
 -----
 
-- El proyecto incluye QML en `src/qml/` y puede necesitar dependencias
-  específicas del sistema para ejecutar interfaces QML.
-- Añade un `requirements.txt` si quieres fijar dependencias Python.
+- The project includes QML files under `src/qml/` and may require system
+  packages to run QML-based UIs (Qt, PySide6, Kirigami runtime, etc.).
+- Add a `requirements.txt` if you want to pin Python dependencies.
 
-Contribuir
-----------
+Contributing
+------------
 
-Por favor abre issues o pull requests con mejoras o correcciones.
+Please open issues or pull requests with improvements or fixes.
 
-Esta aplicación utiliza Kirigami como framework UI y Python para la lógica de negocio.
+This application uses Kirigami for the UI and Python for business logic.
 
-## Estructura del Proyecto
+Project layout
+--------------
 
-- `src/`: Código fuente principal
-  - `app.py`: Punto de entrada de la aplicación
-  - `qml/`: Archivos QML para la interfaz de usuario
-    - `main.qml`: Diseño de la ventana principal
-  - `controllers/`: Controladores para la lógica de la aplicación
-  - `models/`: Modelos de datos
-- `resources/`: Recursos como imágenes, iconos, plantillas, etc.
-- `README.md`: Readme
+- `src/`: Main source code
+  - `app.py`: Application entry point
+  - `qml/`: QML files for the user interface
+    - `main.qml`: Main window layout
+  - `controllers/`: Controllers bridging Python and QML
+  - `models/`: Data models and business logic
+- `resources/`: Assets such as images, icons, and templates
+- `README.md`: This file
