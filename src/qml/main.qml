@@ -24,20 +24,6 @@ Kirigami.ApplicationWindow {
         id: wallpaperPage
         title: qsTr("Wallpapers")
 
-        // // 2. OPCIÓN NATIVA: Sobrescribir el Tema de esta página
-        // // Esto fuerza a que la cabecera por defecto use este color semitransparente
-        // Kirigami.Theme.headerBackgroundColor: Qt.rgba(root.baseThemeColor.r, root.baseThemeColor.g, root.baseThemeColor.b, 0.8)
-        
-        // // También actualizamos el color de fondo base de la página para que coincida
-        // Kirigami.Theme.backgroundColor: Qt.rgba(root.baseThemeColor.r, root.baseThemeColor.g, root.baseThemeColor.b, 0.8)
-        
-        // // Custom background using the theme color we just defined
-        // background: Rectangle {
-        //     // Usamos el color del tema que acabamos de modificar (ya incluye la transparencia)
-        //     color: Kirigami.Theme.backgroundColor
-        //     // Nota: Ya no necesitamos 'opacity: 0.8' aquí porque el color en sí mismo es translúcido
-        // }
-
         // Custom background to ensure content is opaque but header can be transparent
         background: Rectangle {
             color: Kirigami.Theme.backgroundColor
@@ -48,42 +34,35 @@ Kirigami.ApplicationWindow {
             opacity: 0.8 
         }
 
-        // actions: [
-        //     Kirigami.Action {
-        //         id: showAction
-        //         //text: qsTr("Folders")
-        //         icon.name: "view-list-details"
-        //         checkable: true
-        //         checked: false
-        //         onTriggered: {}
-        //     }
-        // ]
+        // Header: place the sidebar toggle in the page header so it's consistent
+        header: ToolBar {
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.smallSpacing
+
+                ToolButton {
+                    id: headerShowButton
+                    icon.name: "view-list-details"
+                    checkable: true
+                    // reflect panel state when content is loaded
+                    checked: contentPreviewLoader.item ? contentPreviewLoader.item.panelOpen : false
+                    onClicked: {
+                        if (contentPreviewLoader.item) {
+                            contentPreviewLoader.item.panelOpen = !contentPreviewLoader.item.panelOpen
+                        }
+                    }
+                }
+
+                // push the rest of the toolbar items to the right
+                Item { Layout.fillWidth: true }
+
+                // optionally mirror other actions here
+            }
+        }
 
         RowLayout {
             anchors.fill: parent
             spacing: 0
-
-            // Loader {
-            //     id: leftPanelLoader
-            //     Layout.preferredWidth: showAction.checked ? Kirigami.Units.gridUnit * 10 : 0
-            //     Layout.fillHeight: true
-            //     Layout.rightMargin: showAction.checked ? Kirigami.Units.smallSpacing : 0
-            //     visible: Layout.preferredWidth > 0
-            //     opacity: showAction.checked ? 1 : 0
-            //     source: "components/SideBar.qml"
-            //     active: true
-            //     Behavior on Layout.preferredWidth {
-            //         NumberAnimation {
-            //             duration: Kirigami.Units.shortDuration
-            //             easing.type: Easing.InOutQuad
-            //         }
-            //     }
-            // }
-
-            // Kirigami.Separator {
-            //     Layout.fillHeight: true
-            //     visible: showAction.checked
-            // }
 
             Loader {
                 id: contentPreviewLoader

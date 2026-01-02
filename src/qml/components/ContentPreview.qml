@@ -43,19 +43,10 @@ Item {
             Layout.margins: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
 
-            // Tool button stays on the left
-            ToolButton {
-                id: showAction
-                icon.name: "view-list-details"
-                checkable: true
-                checked: root.panelOpen
-                onCheckedChanged: root.panelOpen = checked
-            }
-
-            // left flexible spacer
+            // left flexible spacer (keeps header button area clear)
             Item { Layout.fillWidth: true }
 
-            // Centered labels column
+            // Centered labels column only (button is now in page header)
             ColumnLayout {
                 id: headerLabels
                 spacing: Kirigami.Units.smallSpacing / 2
