@@ -14,30 +14,26 @@ ColumnLayout {
         id: buttonContainer
         Layout.fillWidth: true
         Layout.preferredHeight: Kirigami.Units.gridUnit * 2
-        Layout.leftMargin: Kirigami.Units.smallSpacing * 2
-        Layout.rightMargin: Kirigami.Units.smallSpacing * 2
-        Layout.topMargin: Kirigami.Units.smallSpacing
+        //Layout.leftMargin: Kirigami.Units.smallSpacing * 2
+        //Layout.rightMargin: Kirigami.Units.smallSpacing * 2
+        //Layout.topMargin: Kirigami.Units.smallSpacing
 
-        Kirigami.ActionToolBar {
-            anchors.fill: parent
-            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-            flat: true
-            actions: [
-                Kirigami.Action {
-                    text: qsTr("Folders:")
-                    icon.name: "folder-new"
-                    onTriggered: {
-                        pyController.openFolderDialog()
-                    }
-                }
-            ]
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            ToolButton {
+                text: qsTr("Add Folder")
+                icon.name: "folder-new"
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                //text: qsTr("Add Folder")
+                onClicked: {pyController.openFolderDialog()}
+            }            
         }
     }
-
-    // Kirigami.Separator {
-    //     Layout.fillWidth: true
-    // }
-
+    Kirigami.Separator {
+        Layout.fillWidth: true
+    }
     Kirigami.CardsListView {
         id: wallpaperCards
         Layout.fillWidth: true
@@ -49,4 +45,3 @@ ColumnLayout {
         rightMargin: Kirigami.Units.smallSpacing
     }
 }
-

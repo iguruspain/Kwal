@@ -15,7 +15,7 @@ Item {
         id: mainRow
         anchors.fill: parent
         anchors.margins: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
+        //spacing: Kirigami.Units.smallSpacing
 
         // Left side panel loader
         Loader {
@@ -35,13 +35,13 @@ Item {
             id: contentArea
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: Kirigami.Units.smallSpacing
+            //spacing: Kirigami.Units.smallSpacing
 
         RowLayout {
             id: headerRow
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
-            spacing: Kirigami.Units.smallSpacing
+            //spacing: Kirigami.Units.smallSpacing
 
             // header toggle button (restored here)
             ToolButton {
@@ -60,22 +60,27 @@ Item {
             // Centered labels column only (button is now in page header)
             ColumnLayout {
                 id: headerLabels
-                spacing: Kirigami.Units.smallSpacing / 2
-                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 0
 
                 Label {
                     id: selectedLabel
+                    Layout.fillWidth: true
                     text: pyController.selectedWallpaper ? qsTr("%1").arg(pyController.selectedWallpaper.split("/").pop()) : qsTr("")
                     color: Kirigami.Theme.textColor
                     font.bold: true
                     font.pixelSize: Kirigami.Units.smallSpacing * 4
-                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideMiddle                    
                 }
                 Label {
                     id: selectedResolutionLabel
+                    Layout.fillWidth: true
                     text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? (pyController.selectedWallpaperResolution && pyController.selectedWallpaperResolution.length > 0 ? pyController.selectedWallpaperResolution : qsTr("Unknown")) : qsTr("")
-                    color: Kirigami.Theme.disabledTextColor
-                    font.pixelSize: Kirigami.Units.smallSpacing * 2
+                    font.pixelSize: Kirigami.Units.smallSpacing * 3
+                    opacity: 0.7
+                    horizontalAlignment: Text.AlignHCenter
                 }
             }
 
