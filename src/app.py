@@ -45,8 +45,8 @@ def main():
     # Use QApplication because we use Qt Widgets (QFileDialog) in controller
     app = QApplication(sys.argv)
     app.setApplicationName("kwal")
-    app.setOrganizationName("KDE")
-    app.setDesktopFileName("org.kde.kwal")
+    app.setOrganizationName("Kwal")
+    app.setDesktopFileName("kwal")
     engine = QQmlApplicationEngine()
 
     # Needed to close the app with Ctrl+C
