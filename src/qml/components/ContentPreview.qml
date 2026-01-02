@@ -43,6 +43,17 @@ Item {
             Layout.margins: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
 
+            // header toggle button (restored here)
+            ToolButton {
+                id: headerShowButton
+                icon.name: "view-list-details"
+                checkable: true
+                checked: root.panelOpen
+                onClicked: root.panelOpen = !root.panelOpen
+                Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+            }
+
             // left flexible spacer (keeps header button area clear)
             Item { Layout.fillWidth: true }
 
@@ -57,13 +68,13 @@ Item {
                     text: pyController.selectedWallpaper ? qsTr("%1").arg(pyController.selectedWallpaper.split("/").pop()) : qsTr("")
                     color: Kirigami.Theme.textColor
                     font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Kirigami.Units.smallSpacing * 4
+                    wrapMode: Text.WordWrap
                 }
                 Label {
                     id: selectedResolutionLabel
                     text: (pyController.selectedWallpaper && pyController.selectedWallpaper.length > 0) ? (pyController.selectedWallpaperResolution && pyController.selectedWallpaperResolution.length > 0 ? pyController.selectedWallpaperResolution : qsTr("Unknown")) : qsTr("")
                     color: Kirigami.Theme.disabledTextColor
-                    horizontalAlignment: Text.AlignHCenter
                     font.pixelSize: Kirigami.Units.smallSpacing * 2
                 }
             }
@@ -221,6 +232,7 @@ Item {
                     id: actionsRow
                     Layout.alignment: Qt.AlignRight
                     // do not force fill; we size the drawer to this row
+
                     ToolButton {
                         text: qsTr("Set as wallpaper")
                         icon.name: "dialog-ok-apply"

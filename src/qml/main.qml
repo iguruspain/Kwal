@@ -34,32 +34,6 @@ Kirigami.ApplicationWindow {
             opacity: 0.8 
         }
 
-        // Header: place the sidebar toggle in the page header so it's consistent
-        header: ToolBar {
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
-
-                ToolButton {
-                    id: headerShowButton
-                    icon.name: "view-list-details"
-                    checkable: true
-                    // reflect panel state when content is loaded
-                    checked: contentPreviewLoader.item ? contentPreviewLoader.item.panelOpen : false
-                    onClicked: {
-                        if (contentPreviewLoader.item) {
-                            contentPreviewLoader.item.panelOpen = !contentPreviewLoader.item.panelOpen
-                        }
-                    }
-                }
-
-                // push the rest of the toolbar items to the right
-                Item { Layout.fillWidth: true }
-
-                // optionally mirror other actions here
-            }
-        }
-
         RowLayout {
             anchors.fill: parent
             spacing: 0
@@ -81,20 +55,22 @@ Kirigami.ApplicationWindow {
 
     pageStack.initialPage: wallpaperPage
 
-    // globalDrawer: Kirigami.GlobalDrawer {
-    //     id: globalDrawer
-    //     title: qsTr("Kwal")
-    //     titleIcon: "preferences-desktop-wallpaper"
-    //     width: parent.width / 4
+    globalDrawer: Kirigami.GlobalDrawer {
+        id: globalDrawer
+        title: qsTr("Kwal")
+        titleIcon: "preferences-desktop-wallpaper"
+        width: parent.width / 4
+        opacity: 0.8
 
-    //     actions: [
-    //         Kirigami.Action {
-    //             text: qsTr("Wallpapers")
-    //             icon.name: "edit-image"
-    //             onTriggered: {
-    //                 pageStack.push(wallpaperPage)
-    //             }
-    //         }
-    //     ]
-    // }
+
+        actions: [
+            Kirigami.Action {
+                text: qsTr("Wallpapers")
+                icon.name: "edit-image"
+                onTriggered: {
+                    pageStack.push(wallpaperPage)
+                }
+            }
+        ]
+    }
 }
