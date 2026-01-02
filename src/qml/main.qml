@@ -27,10 +27,6 @@ Kirigami.ApplicationWindow {
         // Custom background to ensure content is opaque but header can be transparent
         background: Rectangle {
             color: Kirigami.Theme.backgroundColor
-            // Start the opaque background below the header if we want the header to be see-through to desktop
-            // But Kirigami Page background usually covers everything.
-            // Let's make the page background transparent and handle content background separately?
-            // Or just make the whole page background slightly translucent?
             opacity: 0.8 
         }
 
@@ -69,6 +65,7 @@ Kirigami.ApplicationWindow {
                 text: qsTr("Wallpapers")
                 icon.name: "edit-image"
                 onTriggered: {
+                    pageStack.clear();
                     pageStack.replace(wallpaperPage)
                 }
             },
@@ -76,6 +73,7 @@ Kirigami.ApplicationWindow {
                 text: qsTr("Settings")
                 icon.name: "settings"
                 onTriggered: {
+                    pageStack.clear();
                     var settingsPageComponent = Qt.createComponent("components/Settings.qml");
                     if (settingsPageComponent.status === Component.Ready) {
                         var settingsPage = settingsPageComponent.createObject(root);
