@@ -14,9 +14,6 @@ ColumnLayout {
         id: buttonContainer
         Layout.fillWidth: true
         Layout.preferredHeight: Kirigami.Units.gridUnit * 2
-        //Layout.leftMargin: Kirigami.Units.smallSpacing * 2
-        //Layout.rightMargin: Kirigami.Units.smallSpacing * 2
-        //Layout.topMargin: Kirigami.Units.smallSpacing
 
         RowLayout {
             Layout.fillWidth: true

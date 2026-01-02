@@ -36,6 +36,7 @@ Kirigami.ApplicationWindow {
 
         RowLayout {
             anchors.fill: parent
+            anchors.margins: Kirigami.Units.smallSpacing
             spacing: 0
 
             Loader {

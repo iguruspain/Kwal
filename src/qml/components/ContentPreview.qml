@@ -40,8 +40,10 @@ Item {
         RowLayout {
             id: headerRow
             Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            //spacing: Kirigami.Units.smallSpacing
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            Layout.bottomMargin: Kirigami.Units.smallSpacing
 
             // header toggle button (restored here)
             ToolButton {
