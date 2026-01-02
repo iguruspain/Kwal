@@ -27,19 +27,36 @@ Kirigami.AbstractCard {
             onClicked: pyController.selectFolder(index)
             cursorShape: Qt.PointingHandCursor
         }
-
-        RowLayout {
+        
+        GridLayout {
             id: delegateLayout
             anchors.fill: parent
-            spacing: Kirigami.Units.smallSpacing
-
-            Label {
-                text: name
-                font.bold: true
-                Layout.fillWidth: true
-                verticalAlignment: Text.AlignVCenter
-                Layout.alignment: Qt.AlignVCenter
+            columns: 2
+            columnSpacing: Kirigami.Units.smallSpacing
+            rowSpacing: Kirigami.Units.smallSpacing
+            ColumnLayout {
+                Kirigami.Heading {
+                    level: 2
+                    text: name
+                }
+                Kirigami.Separator {
+                    Layout.fillWidth: true
+                }
+                Label {
+                    Layout.fillWidth: true
+                    // wrapMode: Text.WordWrap
+                    text: {
+                        if (name !== "Local") {
+                            return path.replace(pyController.homePath, "~\/")
+                        } else {
+                            return path
+                        }
+                    }
+                    color: Kirigami.Theme.disabledTextColor
+                    font.pixelSize: Kirigami.Units.smallSpacing * 3
+                }
             }
+
             ToolButton {
                 id: removeFolderButton
                 icon.name: "edit-delete"

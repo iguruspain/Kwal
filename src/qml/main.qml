@@ -60,16 +60,29 @@ Kirigami.ApplicationWindow {
         id: globalDrawer
         title: qsTr("Kwal")
         titleIcon: "preferences-desktop-wallpaper"
-        width: parent.width / 4
-        opacity: 0.8
-
+        //width: parent.width / 4
+        //opacity: 0.8
+        isMenu: true
 
         actions: [
             Kirigami.Action {
                 text: qsTr("Wallpapers")
                 icon.name: "edit-image"
                 onTriggered: {
-                    pageStack.push(wallpaperPage)
+                    pageStack.replace(wallpaperPage)
+                }
+            },
+            Kirigami.Action {
+                text: qsTr("Settings")
+                icon.name: "settings"
+                onTriggered: {
+                    var settingsPageComponent = Qt.createComponent("components/Settings.qml");
+                    if (settingsPageComponent.status === Component.Ready) {
+                        var settingsPage = settingsPageComponent.createObject(root);
+                        pageStack.replace(settingsPage);
+                    } else {
+                        console.error("Failed to load Settings page:", settingsPageComponent.errorString());
+                    }
                 }
             }
         ]

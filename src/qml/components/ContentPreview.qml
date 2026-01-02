@@ -171,12 +171,18 @@ Item {
                         }
 
                         MouseArea {
+                            id: imageMouseArea
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 pyController.selectWallpaper(filePath)
                                 root.drawerOpen = true
                             }
+                            // enable hover and show filename tooltip
+                            hoverEnabled: true
+                            ToolTip.text: fileName ? fileName : (filePath ? filePath.split("/").pop() : "")
+                            ToolTip.visible: imageMouseArea.containsMouse
+                            ToolTip.delay: Kirigami.Units.toolTipDelay
                         }
                     }
                 }

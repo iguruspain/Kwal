@@ -29,6 +29,9 @@ class Controller(QObject):
 		self._last_set_wallpaper: str = ""
 		self._selected_wallpaper_resolution: str = ""
 
+		# expose home path for QML convenience (ensure trailing slash)
+		self._home_path: str = str(Path.home()).rstrip("/") + "/"
+
 		# Load persisted config
 		config = self._load_config()
 		loaded_folders = config.get("folders", [])
@@ -59,6 +62,12 @@ class Controller(QObject):
 
 	def wallpaperModel(self) -> WallpaperFolderModel:
 		return self._model
+
+	def _get_home_path(self) -> str:
+		return self._home_path
+
+	# homePath is immutable for the lifetime of the app -> mark as constant to avoid binding warnings
+	homePath = Property(str, _get_home_path, constant=True)
 
 	def imageModel(self) -> ImageModel:
 		return self._image_model
