@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Kwal
+Comment=Wallpaper Manager for KDE Plasma
+Exec=kwal
+Icon=preferences-desktop-wallpaper
+Type=Application
+Categories=Qt;KDE;Utility;
+Terminal=false
+StartupNotify=true
