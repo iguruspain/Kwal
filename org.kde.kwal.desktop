@@ -1,9 +1,10 @@
 [Desktop Entry]
 Name=Kwal
-Comment=Wallpaper Manager for KDE Plasma
+Comment=Kwal — simple wallpaper manager (Kirigami)
 Exec=kwal
-Icon=preferences-desktop-wallpaper
+Icon=kwal
 Type=Application
-Categories=Qt;KDE;Utility;
+Categories=Utility;Graphics;
 Terminal=false
-StartupNotify=true
+X-KDE-Keywords=wallpaper;background;image
+StartupWMClass=python3

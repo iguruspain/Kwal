@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+
+name = "kwal"
+
+version = "0.1"
+authors = [
+    {name = "Konqi", email = "konqi@example.com"}
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Utilities",
+    "Programming Language :: Python",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.scripts]
+
+kwal = "kwal.app:main"
+
+
+[tool.setuptools]
+
+
+packages = ["kwal"]
+
+package-dir = {kwal = "src"}
+
+include-package-data = true
+
+[tool.setuptools.data-files]
+"share/applications" = ["org.kde.kwal.desktop"]
+"share/icons/hicolor/256x256/apps" = ["resources/images/kwal.png"]

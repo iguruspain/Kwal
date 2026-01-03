@@ -47,7 +47,7 @@ def main():
     app.setApplicationName("kwal")
     app.setApplicationDisplayName("Kwal")
     app.setOrganizationName("Kwal")
-    app.setDesktopFileName("kwal")
+    app.setDesktopFileName("org.kde.kwal")
     engine = QQmlApplicationEngine()
 
     # Needed to close the app with Ctrl+C
