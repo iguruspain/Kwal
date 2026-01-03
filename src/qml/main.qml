@@ -71,7 +71,7 @@ Kirigami.ApplicationWindow {
             },
             Kirigami.Action {
                 text: qsTr("Settings")
-                icon.name: "settings"
+                icon.name: "settings-configure-symbolic"
                 onTriggered: {
                     pageStack.clear();
                     var settingsPageComponent = Qt.createComponent("components/Settings.qml");

@@ -8,22 +8,25 @@ Kirigami.AbstractCard {
     Layout.fillWidth: true
     // Visually indicate selection by comparing the folder path with controller.selectedFolder
     property bool isSelected: path === pyController.selectedFolder
+    property bool isHovered: mouseArea.containsMouse
 
     // Selection border
     Rectangle {
         anchors.fill: parent
         color: "transparent"
-        border.color: Kirigami.Theme.highlightColor
-        border.width: card.isSelected ? 2 : 0
+        border.color: isHovered ? Kirigami.Theme.focusColor : (isSelected ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.1))
+        border.width: isSelected ? 3 : 1
         radius: Kirigami.Units.smallSpacing
-        visible: card.isSelected
+        visible: card.isSelected || card.isHovered
     }
 
     contentItem: Item {
         implicitHeight: delegateLayout.implicitHeight
 
         MouseArea {
+            id: mouseArea
             anchors.fill: parent
+            hoverEnabled: true
             onClicked: pyController.selectFolder(index)
             cursorShape: Qt.PointingHandCursor
         }

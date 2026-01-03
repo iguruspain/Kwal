@@ -138,6 +138,7 @@ Item {
                     height: thumbnailGrid.cellHeight
 
                     property bool isSelected: filePath === pyController.selectedWallpaper
+                    property bool isHovered: imageMouseArea.containsMouse
 
                     // Container Frame
                     Rectangle {
@@ -148,8 +149,8 @@ Item {
                         color: Qt.alpha(Kirigami.Theme.textColor, 0.03)
                         radius: Kirigami.Units.smallSpacing
 
-                        // Border: Standard (subtle) vs Highlighted (accent)
-                        border.color: isSelected ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.15)
+                        // Border: Standard (subtle) vs Highlighted (selected) vs Hovered
+                        border.color: isHovered ? Kirigami.Theme.focusColor : (isSelected ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.1))
                         border.width: isSelected ? 3 : 1
                         
                         // Image inside
