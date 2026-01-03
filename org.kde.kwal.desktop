@@ -7,4 +7,4 @@ Type=Application
 Categories=Utility;Graphics;
 Terminal=false
 X-KDE-Keywords=wallpaper;background;image
-StartupWMClass=python3
+StartupWMClass=kwal
