@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
-from controllers.controller import Controller
+from .controllers.controller import Controller
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:

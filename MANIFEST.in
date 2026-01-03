@@ -1,0 +1,7 @@
+include org.kde.kwal.desktop
+include LICENSE.txt
+include README.md
+recursive-include src/qml *
+recursive-include src/controllers *.py
+recursive-include src/models *.py
+recursive-include src/resources *

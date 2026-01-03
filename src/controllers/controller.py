@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QS
 import subprocess
 import shutil
 
-from models.models import WallpaperFolderModel, Folder, ImageModel
+from ..models.models import WallpaperFolderModel, Folder, ImageModel
 
 
 class Controller(QObject):

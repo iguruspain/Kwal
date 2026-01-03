@@ -8,8 +8,13 @@ name = "kwal"
 
 version = "0.1"
 authors = [
-    {name = "Konqi", email = "konqi@example.com"}
+    {name = "iguruspain", email = "iguruspain@example.com"}
 ]
+description = "Kwal — a small Kirigami-based wallpaper manager (PySide6 + QML)."
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+keywords = ["kirigami", "kwin", "wallpaper", "qml", "pyside6"]
+urls = { "Homepage" = "https://github.com/iguruspain/kwal", "Repository" = "https://github.com/iguruspain/kwal" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
@@ -35,4 +40,4 @@ include-package-data = true
 
 [tool.setuptools.data-files]
 "share/applications" = ["org.kde.kwal.desktop"]
-"share/icons/hicolor/256x256/apps" = ["resources/images/kwal.png"]
+"share/icons/hicolor/scalable/apps" = ["src/resources/icon/kwal.svg"]
