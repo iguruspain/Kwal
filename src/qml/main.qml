@@ -56,16 +56,15 @@ Kirigami.ApplicationWindow {
         id: globalDrawer
         title: qsTr("Kwal")
         titleIcon: "preferences-desktop-wallpaper"
-        //width: parent.width / 4
-        //opacity: 0.8
-        isMenu: true
+        width: parent.width / 4
+        opacity: 0.8
+        //isMenu: true
 
         actions: [
             Kirigami.Action {
                 text: qsTr("Wallpapers")
                 icon.name: "edit-image"
                 onTriggered: {
-                    pageStack.clear();
                     pageStack.replace(wallpaperPage)
                 }
             },
@@ -73,7 +72,6 @@ Kirigami.ApplicationWindow {
                 text: qsTr("Settings")
                 icon.name: "settings-configure-symbolic"
                 onTriggered: {
-                    pageStack.clear();
                     var settingsPageComponent = Qt.createComponent("components/Settings.qml");
                     if (settingsPageComponent.status === Component.Ready) {
                         var settingsPage = settingsPageComponent.createObject(root);

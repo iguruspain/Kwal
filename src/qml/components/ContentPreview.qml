@@ -67,7 +67,7 @@ Item {
                 icon.name: "view-list-details"
                 checkable: true
                 checked: root.panelOpen
-                onClicked: root.panelOpen = !root.panelOpen
+                onToggled: root.panelOpen = checked
                 Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 hoverEnabled: true
