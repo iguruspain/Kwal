@@ -55,7 +55,7 @@ Kirigami.ApplicationWindow {
     globalDrawer: Kirigami.GlobalDrawer {
         id: globalDrawer
         title: qsTr("Kwal")
-        titleIcon: "kwal"
+        //titleIcon: Qt.resolvedUrl("../resources/images/kwal.png")
         width: parent.width / 4
         opacity: 0.8
         //isMenu: true

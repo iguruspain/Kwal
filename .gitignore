@@ -77,3 +77,6 @@ qmlcache/
 # Copilot instructions
 .github/
 .github/copilot-instructions.md
+
+# Run
+run.py
