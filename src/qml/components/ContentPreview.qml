@@ -8,6 +8,22 @@ Item {
     id: root
     property bool drawerOpen: false
     property bool panelOpen: false
+    property int lockedColumns: -1
+
+    onPanelOpenChanged: {
+        if (panelOpen) {
+            lockedColumns = thumbnailGrid.currentCalculatedColumns
+        } else {
+            lockedColumns = -1
+        }
+    }
+
+    onWidthChanged: {
+        if (panelOpen) {
+            lockedColumns = -1
+        }
+    }
+
     Layout.fillWidth: true
     Layout.fillHeight: true
 
@@ -120,7 +136,8 @@ Item {
                 visible: pyController.selectedFolder && pyController.selectedFolder.length > 0
 
                 readonly property real minItemWidth: Kirigami.Units.gridUnit * 10
-                readonly property int columns: Math.max(2, Math.floor(width / minItemWidth))
+                readonly property int currentCalculatedColumns: Math.max(2, Math.floor(width / minItemWidth))
+                readonly property int columns: (root.lockedColumns !== -1) ? root.lockedColumns : currentCalculatedColumns
                 readonly property real cellSize: width / columns
 
                 cellWidth: cellSize

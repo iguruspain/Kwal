@@ -156,7 +156,15 @@ class Controller(QObject):
 			if os.path.normpath(f.path) == path:
 				self._logger.info("Folder %s already present, skipping add", path)
 				return
+		# add to model
 		self._model.addFolder(name, path)
+		# select the newly added folder
+		try:
+			new_index = self._model.rowCount() - 1
+			if new_index >= 0:
+				self.selectFolder(new_index)
+		except Exception:
+			self._logger.exception("Failed selecting newly added folder %s", path)
 		# persist
 		try:
 			self._save_config()
