@@ -8,8 +8,9 @@ Kirigami.Page{
     title: qsTr("Fastfetch Settings")
 
     background: Rectangle {
-        color: Kirigami.Theme.backgroundColor
-        opacity: 0.8 
+        // color: Kirigami.Theme.backgroundColor
+        // opacity: 0.8
+        color: "transparent"
     }
 
     ColumnLayout {
@@ -29,7 +30,7 @@ Kirigami.Page{
             icon.name: "go-previous"
             text: qsTr("Back")
             onTriggered: {
-                    mainRow.pop()
+                    StackView.view.pop()
             }
         }
     ]

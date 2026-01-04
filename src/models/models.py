@@ -314,6 +314,17 @@ class SettingsAppModel(QAbstractListModel):
 			return default_flags | Qt.ItemIsDragEnabled
 		return default_flags
 
+	@Slot(int, result="QVariantMap")
+	def get(self, row: int) -> dict:
+		if 0 <= row < self.rowCount():
+			app = self._apps[row]
+			return {
+				"title": app.title,
+				"section": app.section,
+				"qmlpage": app.qml_page
+			}
+		return {}
+
 	@Slot(int, int, int)
 	def move(self, source: int, destination: int, count: int = 1) -> None:
 		if source == destination:
