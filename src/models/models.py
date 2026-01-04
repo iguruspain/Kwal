@@ -307,3 +307,25 @@ class SettingsAppModel(QAbstractListModel):
 			SettingsAppModel.SectionRole: b"section",
 			SettingsAppModel.PageRole: b"qmlpage",
 		}
+
+	def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+		default_flags = super().flags(index)
+		if index.isValid():
+			return default_flags | Qt.ItemIsDragEnabled
+		return default_flags
+
+	@Slot(int, int, int)
+	def move(self, source: int, destination: int, count: int = 1) -> None:
+		if source == destination:
+			return
+		
+		# Calculate destination for beginMoveRows
+		# When moving down (source < destination), the item is removed first, 
+		# so the insertion index in the *original* list (which beginMoveRows expects as destinationChild)
+		# needs to be destination + 1.
+		qt_dest = destination + 1 if source < destination else destination
+		
+		if self.beginMoveRows(QModelIndex(), source, source, QModelIndex(), qt_dest):
+			item = self._apps.pop(source)
+			self._apps.insert(destination, item)
+			self.endMoveRows()

@@ -56,6 +56,7 @@ Kirigami.PageRow {
                     }
                     
                     delegate: SettingsDelegate {
+                        targetListView: mainList
                         onRequestPage: (pageUrl) => {
                             mainRow.push(pageUrl);
                         }
