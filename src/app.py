@@ -46,7 +46,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("kwal")
     app.setApplicationDisplayName("Kwal")
-    app.setOrganizationName("Kwal")
+    app.setOrganizationName("kwal")
     app.setDesktopFileName("org.kde.kwal")
     engine = QQmlApplicationEngine()
 

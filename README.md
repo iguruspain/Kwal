@@ -17,7 +17,7 @@ Quick installation
 1. Create and activate a virtual environment (recommended):
 
 ```bash
-python -m venv .venv
+python -m venv --system-site-packages .venv
 source .venv/bin/activate
 ```
 
@@ -25,6 +25,11 @@ source .venv/bin/activate
 
 ```bash
 pip install -r requirements.txt
+```
+
+3. Install app (dev):
+```bash
+pip install -e.
 ```
 
 Running the application

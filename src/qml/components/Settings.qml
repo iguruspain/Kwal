@@ -13,48 +13,8 @@ Kirigami.PageRow{
     //height: parent.height
     anchors.fill: parent
 
-    ListModel {
-        id: listModel
-
-        // apps for testing
-        Component.onCompleted: {
-            const apps = [
-                "ulauncher",
-                "starship",
-                "fastfetch"
-            ]
-            for (let i = 0; i < apps.length; i++) {
-                listModel.append({
-                    title: apps[i],
-                    section: "Apps",
-                    qmlpage: "apps/" + apps[i] + ".qml"
-                    });
-            }
-        }
-    }
-
     globalToolBar.style: Kirigami.ApplicationHeaderStyle.Auto
-    initialPage: [settingsPage,settingsContentPage]
 
-    Kirigami.Page {
-        id: settingsContentPage
-        title: qsTr("Welcome to settings")
-        //Kirigami.Theme.colorSet: Kirigami.Theme.View
-        background: Rectangle {
-            color: Kirigami.Theme.backgroundColor
-            opacity: 0.8 
-        }
-        actions: [
-            Kirigami.Action {
-                icon.name: "go-previous"
-                text: qsTr("Back")
-                onTriggered: {
-                    mainRow.pop()
-                }
-            }
-        ]
-    }
-    
     Kirigami.Page {
         id: settingsPage
         title: qsTr("Settings")
@@ -107,13 +67,58 @@ Kirigami.PageRow{
             }
         }
     }
-Component {
+    Component {
+        id: welcomeComponent
+        Kirigami.Page {
+            id: settingsContentPage
+            title: qsTr("Welcome to settings")
+
+            background: Rectangle {
+                color: Kirigami.Theme.backgroundColor
+                opacity: 0.8 
+            }
+            actions: [
+                Kirigami.Action {
+                    icon.name: "go-previous"
+                    text: qsTr("Back")
+                    onTriggered: {
+                        mainRow.pop()
+                    }
+                }
+            ]
+        }
+    }
+    initialPage: [settingsPage, welcomeComponent]
+
+    //Model
+    ListModel {
+        id: listModel
+        // apps for testing
+        Component.onCompleted: {
+            const apps = [
+                "ulauncher",
+                "starship",
+                "fastfetch"
+            ]
+            for (let i = 0; i < apps.length; i++) {
+                listModel.append({
+                    title: apps[i],
+                    section: "Apps",
+                    qmlpage: "apps/" + apps[i] + ".qml",
+                    loader: apps[i] + "Loader"
+                    });
+            }
+        }
+    }
+    //Delegate
+    Component {
         id: delegateComponent
         Kirigami.SwipeListItem {
             id: listItem
             required property int index
             required property string title
             required property string qmlpage
+            required property string loader
 
             contentItem: RowLayout {
                 Kirigami.ListItemDragHandle {
@@ -139,5 +144,11 @@ Component {
         }
     }
     // Open second page on load for testing
-    //Component.onCompleted: {mainRow.push(secondPage);}
+    // Component.onCompleted: {
+    //         Qt.callLater(() => {
+    //             // Seteamos las páginas cuando el PageRow ya "existe" visualmente
+    //             mainRow.initialPage = [settingsPage, settingsContentPage];
+    //             globalToolBar.style = Kirigami.ApplicationHeaderStyle.Auto;
+    //         });
+    //     }
 }

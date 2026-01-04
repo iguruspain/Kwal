@@ -4,8 +4,8 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 Kirigami.Page{
-    id: ulauncherPage
-    title: qsTr("Ulauncher Settings")
+    id: starshipPage
+    title: qsTr("Starship Settings")
 
     background: Rectangle {
         color: Kirigami.Theme.backgroundColor
@@ -19,7 +19,7 @@ Kirigami.Page{
 
         Text {
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            text: qsTr("Ulauncher settings will go here.")
+            text: qsTr("Starship settings will go here.")
             font.pointSize: 14
             color: Kirigami.Theme.textColor
         }
