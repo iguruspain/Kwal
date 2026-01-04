@@ -75,6 +75,24 @@ class Controller(QObject):
 	def settingsAppModel(self) -> SettingsAppModel:
 		return self._settings_app_model
 
+	@Slot(result=str)
+	def longestSettingsTitle(self) -> str:
+		"""Return the longest settings app title (by character count)."""
+		try:
+			apps_model = getattr(self, "_settings_app_model", None)
+			if apps_model is None:
+				return ""
+			apps = getattr(apps_model, "_apps", []) or []
+			longest = ""
+			for a in apps:
+				t = getattr(a, "title", "") or ""
+				if len(t) > len(longest):
+					longest = t
+			return longest
+		except Exception:
+			self._logger.exception("Error computing longest settings title")
+			return ""
+
 	def _get_home_path(self) -> str:
 		return self._home_path
 

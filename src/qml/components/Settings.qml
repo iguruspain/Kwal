@@ -20,10 +20,16 @@ Kirigami.Page {
         
         // Left Pane: Settings List
         Item {
-            SplitView.preferredWidth: 300
+            id: leftPane
+
+            // preferredWidth computed from the longest title measured by `titleMeasure`
+            SplitView.preferredWidth: Math.min(Math.max(titleMeasure.implicitWidth + Kirigami.Units.smallSpacing, 200), 500)
             SplitView.minimumWidth: 200
             SplitView.maximumWidth: 500
-            
+
+            // longest title provided by controller; measurement remains in QML
+            property string longestTitle: ""
+
             ColumnLayout {
                 anchors.fill: parent
 
@@ -41,6 +47,8 @@ Kirigami.Page {
 
                     ListView {
                         id: mainList
+                        onCountChanged: leftPane.longestTitle = pyController.longestSettingsTitle()
+                        onModelChanged: leftPane.longestTitle = pyController.longestSettingsTitle()
                         Timer {
                             id: refreshRequestTimer
                             interval: 3000
@@ -51,8 +59,9 @@ Kirigami.Page {
                         
                         model: pyController.settingsAppModel
 
-                        // Auto-select first item logic
+                        // Auto-select first item logic + compute title measurement
                         Component.onCompleted: {
+                            leftPane.longestTitle = pyController.longestSettingsTitle()
                             if (count > 0) {
                                 currentIndex = 0
                                 var itemData = model.get(0)
@@ -86,6 +95,18 @@ Kirigami.Page {
                         }
                     }
                 }
+            }
+
+            // Invisible text used to measure the width of the longest title.
+            // Keep visible so implicitWidth is calculated; use transparent color.
+            Text {
+                id: titleMeasure
+                text: leftPane.longestTitle
+                wrapMode: Text.NoWrap
+                color: "transparent"
+                anchors.left: parent.left
+                anchors.top: parent.top
+                horizontalAlignment: Text.AlignLeft
             }
         }
 
