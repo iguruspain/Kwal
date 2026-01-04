@@ -7,7 +7,7 @@ Kirigami.ApplicationWindow {
     id: root
     visible: true
     width: 800
-    height: 600
+    height: 550
     title: "Kwal"
     
     // Enable transparency for the main window
