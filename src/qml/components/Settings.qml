@@ -9,8 +9,9 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.PageRow{
     id: mainRow
-    width: parent.width
-    height: parent.height
+    //width: parent.width
+    //height: parent.height
+    anchors.fill: parent
 
     ListModel {
         id: listModel
@@ -25,19 +26,38 @@ Kirigami.PageRow{
             for (let i = 0; i < apps.length; i++) {
                 listModel.append({
                     title: apps[i],
-                    section: "Apps"
+                    section: "Apps",
+                    qmlpage: "apps/" + apps[i] + ".qml"
                     });
             }
         }
     }
 
     globalToolBar.style: Kirigami.ApplicationHeaderStyle.Auto
-    initialPage: settingsPage
+    initialPage: [settingsPage,settingsContentPage]
+
+    Kirigami.Page {
+        id: settingsContentPage
+        title: qsTr("Welcome to settings")
+        //Kirigami.Theme.colorSet: Kirigami.Theme.View
+        background: Rectangle {
+            color: Kirigami.Theme.backgroundColor
+            opacity: 0.8 
+        }
+        actions: [
+            Kirigami.Action {
+                icon.name: "go-previous"
+                text: qsTr("Back")
+                onTriggered: {
+                    mainRow.pop()
+                }
+            }
+        ]
+    }
     
     Kirigami.Page {
         id: settingsPage
         title: qsTr("Settings")
-        //Kirigami.Theme.colorSet: Kirigami.Theme.View
         background: Rectangle {
             color: Kirigami.Theme.backgroundColor
             opacity: 0.8 
@@ -45,14 +65,12 @@ Kirigami.PageRow{
             
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: Kirigami.Units.smallSpacing
-            spacing: Kirigami.Units.smallSpacing
 
             ScrollView {
                 id: scrollListView
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.margins: Kirigami.Units.smallSpacing
+
                 clip: true
 
                 background: Rectangle {
@@ -82,7 +100,6 @@ Kirigami.PageRow{
                         delegate: Kirigami.ListSectionHeader {
                             required property string section
                             text: qsTr(section)
-                            //text: qsTr("Section %1").arg(parseInt(section) + 1)
                             width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                         }
                     }
@@ -90,87 +107,37 @@ Kirigami.PageRow{
             }
         }
     }
-    Component {
+Component {
         id: delegateComponent
-        Item {
-            id: listItemRoot
-
+        Kirigami.SwipeListItem {
+            id: listItem
             required property int index
             required property string title
+            required property string qmlpage
 
-            width: mainList.width - mainList.leftMargin - mainList.rightMargin
-            height: listItem.implicitHeight
+            contentItem: RowLayout {
+                Kirigami.ListItemDragHandle {
+                    listItem: listItem
+                    listView: mainList
+                    onMoveRequested: (old, curr) => listModel.move(old, curr, 1)
+                }
 
-            Kirigami.SwipeListItem {
-                id: listItem
-                width: listItemRoot.width
-                contentItem: RowLayout {
-                    Kirigami.ListItemDragHandle {
-                        listItem: listItem
-                        listView: mainList
-                        onMoveRequested: (oldIndex, newIndex) => {
-                            console.log('!!!', oldIndex, newIndex)
-                            listModel.move(oldIndex, newIndex, 1);
-                        }
-                        onDropped: (oldIndex, newIndex) => {
-                            console.log(">>>", oldIndex, newIndex)
-                        }
-                    }
-
-                    Label {
-                        id: itemLabel
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Math.max(implicitHeight, Kirigami.Units.iconSizes.smallMedium)
-                        text: listItemRoot.title
-                        color: listItem.checked || (listItem.pressed && !listItem.checked && !listItem.sectionDelegate) ? listItem.activeTextColor : listItem.textColor
-                    }
-
+                Label {
+                    id: itemLabel
+                    text: listItem.title
+                    Layout.fillWidth: true
+                    
                     MouseArea {
-                        id: mouseArea
-                        anchors.fill: itemLabel
-                        hoverEnabled: true
-                        onClicked: { mainRow.push(secondPage) }
-                        cursorShape: Qt.PointingHandCursor
-                    }                    
-                }
-                actions: [
-                    Kirigami.Action {
-                        icon.name: "document-decrypt"
-                        text: qsTr("Action 1")
-                        onTriggered: {
-                            console.log("Action 1 triggered on item:", listItemRoot.title)
-                        }
-                    },
-                    Kirigami.Action {
-                        icon.name: "mail-reply-sender"
-                        text: qsTr("Action 2")
-                        onTriggered: {
-                            console.log("Action 2 triggered on item:", listItemRoot.title)
+                        anchors.fill: parent
+                        onClicked: {
+                            let pageURL = Qt.resolvedUrl(listItem.qmlpage);
+                            mainRow.push(pageURL);
                         }
                     }
-                ]
+                }
             }
         }
     }
-    Component {
-        id: secondPage
-        Kirigami.Page {
-            id: secondSettingsPage
-            title: qsTr("Second Page")
-            //Kirigami.Theme.colorSet: Kirigami.Theme.View
-            background: Rectangle {
-                color: Kirigami.Theme.backgroundColor
-                opacity: 0.8 
-            }
-            actions: [
-                Kirigami.Action {
-                    icon.name: "go-previous"
-                    text: qsTr("Back")
-                    onTriggered: {
-                        mainRow.pop()
-                    }
-                }
-            ]
-        }
-    }
+    // Open second page on load for testing
+    //Component.onCompleted: {mainRow.push(secondPage);}
 }
