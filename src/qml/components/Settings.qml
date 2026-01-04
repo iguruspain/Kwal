@@ -6,18 +6,16 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 
-
-Kirigami.PageRow{
+Kirigami.PageRow {
     id: mainRow
-    //width: parent.width
-    //height: parent.height
     anchors.fill: parent
 
     globalToolBar.style: Kirigami.ApplicationHeaderStyle.Auto
 
     Kirigami.Page {
-        id: settingsPage
+        id: settingsListPage
         title: qsTr("Settings")
+        
         background: Rectangle {
             color: Kirigami.Theme.backgroundColor
             opacity: 0.8 
@@ -47,14 +45,22 @@ Kirigami.PageRow{
                             scrollListView.refreshing = false;
                         }
                     }
-                    model: listModel
+                    
+                    model: pyController.settingsAppModel
+                    
                     moveDisplaced: Transition {
                         YAnimator {
                             duration: Kirigami.Units.longDuration
                             easing.type: Easing.InOutQuad
                         }
                     }
-                    delegate: delegateComponent
+                    
+                    delegate: SettingsDelegate {
+                        onRequestPage: (pageUrl) => {
+                            mainRow.push(pageUrl);
+                        }
+                    }
+                    
                     section {
                         property: "section"
                         delegate: Kirigami.ListSectionHeader {
@@ -67,88 +73,16 @@ Kirigami.PageRow{
             }
         }
     }
+
     Component {
         id: welcomeComponent
-        Kirigami.Page {
-            id: settingsContentPage
-            title: qsTr("Welcome to settings")
-
-            background: Rectangle {
-                color: Kirigami.Theme.backgroundColor
-                opacity: 0.8 
-            }
-            actions: [
-                Kirigami.Action {
-                    icon.name: "go-previous"
-                    text: qsTr("Back")
-                    onTriggered: {
-                        mainRow.pop()
-                    }
-                }
-            ]
-        }
-    }
-    initialPage: [settingsPage, welcomeComponent]
-
-    //Model
-    ListModel {
-        id: listModel
-        // apps for testing
-        Component.onCompleted: {
-            const apps = [
-                "ulauncher",
-                "starship",
-                "fastfetch"
-            ]
-            for (let i = 0; i < apps.length; i++) {
-                listModel.append({
-                    title: apps[i],
-                    section: "Apps",
-                    qmlpage: "apps/" + apps[i] + ".qml",
-                    loader: apps[i] + "Loader"
-                    });
+        SettingsWelcome {
+            onRequestGoBack: {
+                mainRow.pop()
             }
         }
     }
-    //Delegate
-    Component {
-        id: delegateComponent
-        Kirigami.SwipeListItem {
-            id: listItem
-            required property int index
-            required property string title
-            required property string qmlpage
-            required property string loader
-
-            contentItem: RowLayout {
-                Kirigami.ListItemDragHandle {
-                    listItem: listItem
-                    listView: mainList
-                    onMoveRequested: (old, curr) => listModel.move(old, curr, 1)
-                }
-
-                Label {
-                    id: itemLabel
-                    text: listItem.title
-                    Layout.fillWidth: true
-                    
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            let pageURL = Qt.resolvedUrl(listItem.qmlpage);
-                            mainRow.push(pageURL);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    // Open second page on load for testing
-    // Component.onCompleted: {
-    //         Qt.callLater(() => {
-    //             // Seteamos las páginas cuando el PageRow ya "existe" visualmente
-    //             mainRow.initialPage = [settingsPage, settingsContentPage];
-    //             globalToolBar.style = Kirigami.ApplicationHeaderStyle.Auto;
-    //         });
-    //     }
+    
+    initialPage: [settingsListPage, welcomeComponent]
 }
+

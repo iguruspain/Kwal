@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QS
 import subprocess
 import shutil
 
-from ..models.models import WallpaperFolderModel, Folder, ImageModel
+from ..models.models import WallpaperFolderModel, Folder, ImageModel, SettingsAppModel, SettingsApp
 
 
 class Controller(QObject):
@@ -49,6 +49,14 @@ class Controller(QObject):
 		self._model = WallpaperFolderModel(folders)
 		self._image_model = ImageModel()
 
+		# Initialize Settings App Model
+		apps = [
+			SettingsApp(title="ulauncher", section="Apps", qml_page="apps/ulauncher.qml"),
+			SettingsApp(title="starship", section="Apps", qml_page="apps/starship.qml"),
+			SettingsApp(title="fastfetch", section="Apps", qml_page="apps/fastfetch.qml"),
+		]
+		self._settings_app_model = SettingsAppModel(apps)
+
 		# Restore selection or default to first
 		initial_index = 0
 		if last_selected:
@@ -62,6 +70,10 @@ class Controller(QObject):
 
 	def wallpaperModel(self) -> WallpaperFolderModel:
 		return self._model
+
+	@Property(QObject, constant=True)
+	def settingsAppModel(self) -> SettingsAppModel:
+		return self._settings_app_model
 
 	def _get_home_path(self) -> str:
 		return self._home_path

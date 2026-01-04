@@ -19,6 +19,13 @@ class Folder:
 	path: str
 
 
+@dataclass
+class SettingsApp:
+	title: str
+	section: str
+	qml_page: str
+
+
 class WallpaperFolderModel(QAbstractListModel):
 	NameRole = Qt.UserRole + 1
 	PathRole = Qt.UserRole + 2
@@ -268,3 +275,35 @@ class ImageModel(QAbstractListModel):
 		finally:
 			self._loading = False
 			self.loadingChanged.emit()
+
+
+class SettingsAppModel(QAbstractListModel):
+	TitleRole = Qt.UserRole + 1
+	SectionRole = Qt.UserRole + 2
+	PageRole = Qt.UserRole + 3
+
+	def __init__(self, apps: List[SettingsApp] | None = None, parent: Optional[QObject] = None):
+		super().__init__(parent)
+		self._apps = apps or []
+
+	def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # type: ignore[override]
+		return len(self._apps)
+
+	def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
+		if not index.isValid() or index.row() < 0 or index.row() >= self.rowCount():
+			return None
+		app = self._apps[index.row()]
+		if role == SettingsAppModel.TitleRole:
+			return app.title
+		if role == SettingsAppModel.SectionRole:
+			return app.section
+		if role == SettingsAppModel.PageRole:
+			return app.qml_page
+		return None
+
+	def roleNames(self) -> dict[int, bytes]:
+		return {
+			SettingsAppModel.TitleRole: b"title",
+			SettingsAppModel.SectionRole: b"section",
+			SettingsAppModel.PageRole: b"qmlpage",
+		}
