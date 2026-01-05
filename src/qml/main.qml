@@ -32,7 +32,7 @@ Kirigami.ApplicationWindow {
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: Kirigami.Units.smallSpacing
+            //anchors.margins: Kirigami.Units.smallSpacing
             spacing: 0
 
             Loader {
@@ -56,9 +56,9 @@ Kirigami.ApplicationWindow {
         id: globalDrawer
         title: qsTr("Kwal")
         //titleIcon: Qt.resolvedUrl("../resources/images/kwal.png")
-        width: parent.width / 4
-        opacity: 0.8
-        //isMenu: true
+        //width: parent.width / 4
+        //opacity: 0.8
+        isMenu: true
 
         actions: [
             Kirigami.Action {
@@ -71,6 +71,7 @@ Kirigami.ApplicationWindow {
             Kirigami.Action {
                 text: qsTr("Settings")
                 icon.name: "settings-configure-symbolic"
+                visible: false
                 onTriggered: {
                     var settingsPageComponent = Qt.createComponent("components/Settings.qml");
                     if (settingsPageComponent.status === Component.Ready) {
@@ -82,7 +83,7 @@ Kirigami.ApplicationWindow {
                 }
             },
             Kirigami.Action {
-                text: qsTr("Alternative Settings")
+                text: qsTr("Settings")
                 icon.name: "settings-configure-symbolic"
                 onTriggered: {
                     var altSettingsPageComponent = Qt.createComponent("components/AltSettings.qml");
