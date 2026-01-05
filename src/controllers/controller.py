@@ -20,6 +20,7 @@ class Controller(QObject):
 
 	selectedFolderChanged = Signal()
 	selectedWallpaperChanged = Signal()
+	templatesInstalledChanged = Signal()
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -48,6 +49,9 @@ class Controller(QObject):
 			
 		self._model = WallpaperFolderModel(folders)
 		self._image_model = ImageModel()
+
+		# templates installed flag
+		self._templates_installed = self._check_templates_installed()
 
 		# Initialize Settings App Model
 		apps = [
@@ -101,6 +105,34 @@ class Controller(QObject):
 
 	def imageModel(self) -> ImageModel:
 		return self._image_model
+
+	@Slot(result=bool)
+	def templatesInstalled(self) -> bool:
+		"""Return True if user templates are present in XDG config."""
+		return self._templates_installed
+
+	@Slot(result=bool)
+	def _check_templates_installed(self) -> bool:
+		cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates"
+		try:
+			return cfg_dir.exists() and any(cfg_dir.iterdir())
+		except Exception:
+			return False
+
+	@Slot(result=bool)
+	def installTemplates(self) -> bool:
+		"""Attempt to install packaged templates to user's XDG config.
+		Returns True on success.
+		"""
+		try:
+			from ..utils.setup import install_templates_to_user
+			install_templates_to_user()
+			self._templates_installed = self._check_templates_installed()
+			self.templatesInstalledChanged.emit()
+			return self._templates_installed
+		except Exception:
+			self._logger.exception("Failed to install templates")
+			return False
 
 	@Slot(str)
 	def selectWallpaper(self, path: str) -> None:

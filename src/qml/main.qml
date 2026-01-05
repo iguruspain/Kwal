@@ -97,4 +97,25 @@ Kirigami.ApplicationWindow {
             }
         ]
     }
+
+    // First-run dialog: offer to install packaged templates to the user's config
+    Dialog {
+        id: templatesDialog
+        title: qsTr("Install templates")
+        visible: !pyController.templatesInstalled()
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            // call the controller slot to install templates
+            pyController.installTemplates()
+            templatesDialog.visible = false
+        }
+        onRejected: {
+            templatesDialog.visible = false
+        }
+        ColumnLayout {
+            anchors.fill: parent
+            Label { text: qsTr("Install default templates to your user configuration (~/.config/kwal/templates)?") }
+        }
+    }
 }

@@ -8,30 +8,62 @@ Kirigami.Page{
     title: qsTr("Fastfetch Settings")
 
     background: Rectangle {
-        // color: Kirigami.Theme.backgroundColor
-        // opacity: 0.8
         color: "transparent"
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
-
-        Text {
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            text: qsTr("Fastfetch settings will go here.")
-            font.pointSize: 14
-            color: Kirigami.Theme.textColor
+    // Model for Fastfetch configurations
+    ListModel {
+        id: fastfetchModel
+        ListElement {
+            config_path: "config_path"
+            config_image: "config_image"
+            template_image_folder: "~/templates/fastfetch"
         }
     }
-    actions: [
-        Kirigami.Action {
-            icon.name: "go-previous"
-            text: qsTr("Back")
-            onTriggered: {
-                    StackView.view.pop()
+
+    RowLayout {
+        anchors.fill: parent
+        spacing: Kirigami.Units.smallSpacing
+
+        Rectangle {
+            id: leftPaneFastfetch
+            color: Kirigami.Theme.backgroundColor
+            Layout.preferredWidth: 360
+            Layout.fillHeight: true
+            radius: 0
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.smallSpacing
+                Text {
+                    text: qsTr("Fastfetch settings will go here.")
+                    color: Kirigami.Theme.textColor
+                }
             }
         }
-    ]
+
+        Rectangle {
+            id: rightPaneFastfetch
+            color: Kirigami.Theme.backgroundColor
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.smallSpacing
+                RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    Text {
+                        text: qsTr("Fastfetch Preview")
+                        font.bold: true
+                        color: Kirigami.Theme.textColor
+                    }
+                    Image {
+                        source: "qrc:/images/kwal.png"
+                        width: 24
+                        height: 24
+                        fillMode: Image.PreserveAspectFit
+                    }
+                }
+            }
+        }
+    }
 }

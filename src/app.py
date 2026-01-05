@@ -22,6 +22,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Can also be set via LOG_LEVEL env var.",
         default=None,
     )
+    parser.add_argument(
+        "--install-templates",
+        dest="install_templates",
+        action="store_true",
+        help="Copy packaged templates to the user's XDG_CONFIG_HOME (interactive install).",
+    )
     return parser.parse_args(argv)
 
 def main():
@@ -31,6 +37,16 @@ def main():
     to QML via context properties.
     """
     args = _parse_args()
+
+    if getattr(args, "install_templates", False):
+        try:
+            from .utils.setup import install_templates_to_user
+
+            install_templates_to_user()
+            return 0
+        except Exception as exc:  # pragma: no cover - IO/system errors
+            print(f"Failed to install templates: {exc}")
+            return 1
 
     # Determine log level: CLI arg > env var > INFO
     level_name = args.log_level or os.environ.get("LOG_LEVEL") or "INFO"
