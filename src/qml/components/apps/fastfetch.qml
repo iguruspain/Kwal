@@ -11,20 +11,21 @@ Kirigami.Page{
         color: "transparent"
     }
 
-    // Model for Fastfetch configurations
+    // Model example for Fastfetch configurations
     ListModel {
         id: fastfetchModel
         ListElement {
-            config_path: "config_path"
-            config_image: "config_image"
-            template_image_folder: "~/templates/fastfetch"
+            config_path: "~/.config/fastfetch/config.jsonc" // Path to Fastfetch config file, will be obtained using config_readers.py functions
+            config_image: "~/.config/fastfetch/chica-tinted.png" // Path to Fastfetch config image, will be obtained using config_readers.py functions
+            template_image_folder: "~/.config/kwal/templates/fastfetch" // Path to Fastfetch template images folder, should be present by default (kwal installation)
+            }
         }
-    }
 
     RowLayout {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
+        // Left Pane for Fastfetch settings
         Rectangle {
             id: leftPaneFastfetch
             color: Kirigami.Theme.backgroundColor
@@ -55,12 +56,6 @@ Kirigami.Page{
                         text: qsTr("Fastfetch Preview")
                         font.bold: true
                         color: Kirigami.Theme.textColor
-                    }
-                    Image {
-                        source: "qrc:/images/kwal.png"
-                        width: 24
-                        height: 24
-                        fillMode: Image.PreserveAspectFit
                     }
                 }
             }

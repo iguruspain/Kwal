@@ -21,9 +21,16 @@ class Folder:
 
 @dataclass
 class SettingsApp:
-	title: str
+	app_name: str
 	section: str
 	qml_page: str
+	title: str = ""
+
+	def __post_init__(self) -> None:
+		# If title not provided, derive it from app_name (capitalize)
+		if not self.title:
+			# Keep title human-friendly by capitalizing the app_name
+			self.title = self.app_name.capitalize()
 
 
 class WallpaperFolderModel(QAbstractListModel):
@@ -281,6 +288,7 @@ class SettingsAppModel(QAbstractListModel):
 	TitleRole = Qt.UserRole + 1
 	SectionRole = Qt.UserRole + 2
 	PageRole = Qt.UserRole + 3
+	AppNameRole = Qt.UserRole + 4
 
 	def __init__(self, apps: List[SettingsApp] | None = None, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -293,9 +301,10 @@ class SettingsAppModel(QAbstractListModel):
 		if not index.isValid() or index.row() < 0 or index.row() >= self.rowCount():
 			return None
 		app = self._apps[index.row()]
+		if role == SettingsAppModel.AppNameRole:
+			return app.app_name
 		if role == SettingsAppModel.TitleRole:
-			#Capitalize first letter
-			return app.title.capitalize()
+			return app.title
 		if role == SettingsAppModel.SectionRole:
 			return app.section
 		if role == SettingsAppModel.PageRole:
@@ -304,6 +313,7 @@ class SettingsAppModel(QAbstractListModel):
 
 	def roleNames(self) -> dict[int, bytes]:
 		return {
+			SettingsAppModel.AppNameRole: b"app_name",
 			SettingsAppModel.TitleRole: b"title",
 			SettingsAppModel.SectionRole: b"section",
 			SettingsAppModel.PageRole: b"qmlpage",
@@ -320,7 +330,8 @@ class SettingsAppModel(QAbstractListModel):
 		if 0 <= row < self.rowCount():
 			app = self._apps[row]
 			return {
-				"title": app.title.capitalize(),
+				"app_name": app.app_name,
+				"title": app.title,
 				"section": app.section,
 				"qmlpage": app.qml_page
 			}

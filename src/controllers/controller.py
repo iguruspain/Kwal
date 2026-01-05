@@ -55,9 +55,9 @@ class Controller(QObject):
 
 		# Initialize Settings App Model
 		apps = [
-			SettingsApp(title="fastfetch", section="Apps", qml_page="apps/fastfetch.qml"),
-			SettingsApp(title="starship", section="Apps", qml_page="apps/starship.qml"),
-			SettingsApp(title="ulauncher", section="Apps", qml_page="apps/ulauncher.qml"),
+			SettingsApp(app_name="fastfetch", section="Apps", qml_page="apps/fastfetch.qml"),
+			SettingsApp(app_name="starship", section="Apps", qml_page="apps/starship.qml"),
+			SettingsApp(app_name="ulauncher", section="Apps", qml_page="apps/ulauncher.qml"),
 		]
 		self._settings_app_model = SettingsAppModel(apps)
 
