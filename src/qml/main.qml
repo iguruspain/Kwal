@@ -80,6 +80,19 @@ Kirigami.ApplicationWindow {
                         console.error("Failed to load Settings page:", settingsPageComponent.errorString());
                     }
                 }
+            },
+            Kirigami.Action {
+                text: qsTr("Alternative Settings")
+                icon.name: "settings-configure-symbolic"
+                onTriggered: {
+                    var altSettingsPageComponent = Qt.createComponent("components/AltSettings.qml");
+                    if (altSettingsPageComponent.status === Component.Ready) {
+                        var altSettingsPage = altSettingsPageComponent.createObject(root);
+                        pageStack.replace(altSettingsPage);
+                    } else {
+                        console.error("Failed to load Alternative Settings page:", altSettingsPageComponent.errorString());
+                    }
+                }
             }
         ]
     }

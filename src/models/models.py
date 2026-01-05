@@ -294,7 +294,8 @@ class SettingsAppModel(QAbstractListModel):
 			return None
 		app = self._apps[index.row()]
 		if role == SettingsAppModel.TitleRole:
-			return app.title
+			#Capitalize first letter
+			return app.title.capitalize()
 		if role == SettingsAppModel.SectionRole:
 			return app.section
 		if role == SettingsAppModel.PageRole:
@@ -319,7 +320,7 @@ class SettingsAppModel(QAbstractListModel):
 		if 0 <= row < self.rowCount():
 			app = self._apps[row]
 			return {
-				"title": app.title,
+				"title": app.title.capitalize(),
 				"section": app.section,
 				"qmlpage": app.qml_page
 			}
