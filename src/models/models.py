@@ -174,6 +174,28 @@ class ThumbnailWorker(QObject):
 			self.finished.emit([], [])
 
 
+class FastfetchTintWorker(QObject):
+	"""Worker to generate a tinted image off the main thread."""
+	finished = Signal(str)
+
+	def __init__(self, src: str, tint_hex: str, strength: float = 0.8, parent: Optional[QObject] = None):
+		super().__init__(parent)
+		self.src = src
+		self.tint_hex = tint_hex
+		self.strength = strength
+
+	@Slot()
+	def process(self) -> None:
+		logger = logging.getLogger(__name__)
+		try:
+			from ..utils import color_utils
+			dst = color_utils.tint_image(self.src, self.tint_hex, float(self.strength))
+			self.finished.emit(str(dst) if dst else "")
+		except Exception:
+			logger.exception("FastfetchTintWorker failed for %s", self.src)
+			self.finished.emit("")
+
+
 class ImageModel(QAbstractListModel):
 	FileNameRole = Qt.UserRole + 1
 	FilePathRole = Qt.UserRole + 2
@@ -352,3 +374,62 @@ class SettingsAppModel(QAbstractListModel):
 			item = self._apps.pop(source)
 			self._apps.insert(destination, item)
 			self.endMoveRows()
+
+
+class FastfetchTemplateModel(QAbstractListModel):
+	FileNameRole = Qt.UserRole + 1
+	FilePathRole = Qt.UserRole + 2
+	FileUrlRole = Qt.UserRole + 3
+
+	def __init__(self, parent: Optional[QObject] = None):
+		super().__init__(parent)
+		self._files: List[Path] = []
+
+	def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # type: ignore[override]
+		return len(self._files)
+
+	def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
+		if not index.isValid() or index.row() < 0 or index.row() >= self.rowCount():
+			return None
+		p = self._files[index.row()]
+		if role == FastfetchTemplateModel.FileNameRole:
+			return p.name
+		if role == FastfetchTemplateModel.FilePathRole:
+			return str(p)
+		if role == FastfetchTemplateModel.FileUrlRole:
+			return "file://" + str(p)
+		return None
+
+	def roleNames(self) -> dict[int, bytes]:
+		return {
+			FastfetchTemplateModel.FileNameRole: b"fileName",
+			FastfetchTemplateModel.FilePathRole: b"filePath",
+			FastfetchTemplateModel.FileUrlRole: b"fileUrl",
+		}
+
+	@Slot(str)
+	def refresh(self, folder_path: str | None = None) -> None:
+		"""Populate model from a folder path. If folder_path is None or empty, clears the model."""
+		logger = logging.getLogger(__name__)
+		try:
+			if not folder_path:
+				self.beginResetModel()
+				self._files = []
+				self.endResetModel()
+				return
+			from ..utils.file_utils import list_template_images
+
+			files = list_template_images(folder_path)
+			self.beginResetModel()
+			self._files = [Path(x) for x in files]
+			self.endResetModel()
+			logger.debug("FastfetchTemplateModel refreshed %d files from %s", len(self._files), folder_path)
+		except Exception:
+			logger.exception("Failed refreshing FastfetchTemplateModel for %s", folder_path)
+
+	@Slot(int, result="QVariantMap")
+	def get(self, row: int) -> dict:
+		if 0 <= row < self.rowCount():
+			p = self._files[row]
+			return {"fileName": p.name, "filePath": str(p), "fileUrl": "file://" + str(p)}
+		return {}

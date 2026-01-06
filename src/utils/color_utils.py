@@ -4,21 +4,69 @@ import logging
 import hashlib
 from pathlib import Path
 from PIL import Image, ImageOps, ImageColor
+import os
 
 logger = logging.getLogger(__name__)
 
 def tint_image(src: str, tint_hex: str="#FF0000", strength: float = 0.8) -> str:
-    """Apply grayscale+color tint to source image and return a cache file from hash of parameters to tinted image."""
-    src_path = Path(src).expanduser()
-    #temporal file in cache kwal with hash of parameters
-    cache = Path.home() / ".cache" / "kwal" / "fastfetch_tinted"
-    cache.mkdir(parents=True, exist_ok=True)
+    """Apply grayscale+color tint to source image and return a deterministic cached file path.
 
-    dst = cache / f"{src_path.stem}-tinted{src_path.suffix}"
+    Cache filename is derived from a sha1 of (absolute src path, tint_hex, strength) to avoid collisions.
+    Returns the absolute filesystem path to the generated tinted image, or an empty string on error.
+    """
+    try:
+        src_path = Path(src).expanduser().resolve()
+        if not src_path.exists():
+            logger.error("tint_image: source does not exist: %s", src_path)
+            return ""
 
-    im = Image.open(src_path).convert("RGBA")
-    gray = ImageOps.grayscale(im).convert("RGBA")
-    color = Image.new("RGBA", im.size, ImageColor.getrgb(tint_hex) + (255,))
-    tinted = Image.blend(gray, color, float(strength))
-    tinted.save(dst)
-    return str(dst)
+        # create cache directory under XDG_CACHE_HOME if set
+        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "fastfetch_tinted"
+        cache_root.mkdir(parents=True, exist_ok=True)
+
+        # sanitize tint value
+        try:
+            if not tint_hex or str(tint_hex).lower() == "transparent":
+                tint_hex = "#ffffff"
+            # ensure ImageColor can parse it
+            _ = ImageColor.getrgb(tint_hex)
+        except Exception:
+            logger.warning("tint_image: invalid tint '%s', falling back to #ffffff", tint_hex)
+            tint_hex = "#ffffff"
+
+        # deterministic name based on parameters
+        key = f"{str(src_path)}|{tint_hex}|{float(strength)}"
+        digest = hashlib.sha1(key.encode("utf-8")).hexdigest()
+        # always write tinted output as PNG to preserve alpha and avoid format issues
+        dst = cache_root / f"{src_path.stem}-{digest}.png"
+
+        # if already exists, return quickly
+        if dst.exists():
+            logger.debug("tint_image: using cached tinted image %s", dst)
+            return str(dst)
+
+        im = Image.open(src_path).convert("RGBA")
+        gray = ImageOps.grayscale(im).convert("RGBA")
+        color = Image.new("RGBA", im.size, ImageColor.getrgb(tint_hex) + (255,))
+        tinted = Image.blend(gray, color, float(strength))
+        tinted.save(dst)
+        logger.info("tint_image: created tinted image %s", dst)
+        return str(dst)
+    except Exception:
+        logger.exception("tint_image failed for %s with tint %s", src, tint_hex)
+        return ""
+
+
+def clear_fastfetch_tinted_cache() -> None:
+    """Remove the fastfetch_tinted cache directory entirely.
+
+    Safe to call on exit; logs exceptions.
+    """
+    try:
+        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "fastfetch_tinted"
+        if cache_root.exists():
+            import shutil
+            shutil.rmtree(cache_root)
+            logger.info("Cleared fastfetch tinted cache %s", cache_root)
+    except Exception:
+        logger.exception("Failed clearing fastfetch tinted cache")

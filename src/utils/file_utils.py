@@ -85,3 +85,26 @@ if __name__ == "__main__":
     value, path = read_config_fastfetch("source", None)
     logger.info("Config file: %s", path)
     logger.info("Config value for 'source': %s", value)
+
+
+def list_template_images(folder: str | Path) -> list[str]:
+    """Return list of absolute file paths for template images in `folder`.
+
+    Accepts a string or Path. Applies extension filters and returns sorted list.
+    """
+    try:
+        p = Path(folder) if not isinstance(folder, Path) else folder
+        if not p.exists() or not p.is_dir():
+            logger.debug("list_template_images: folder does not exist or is not a dir: %s", p)
+            return []
+        exts = {".png", ".jpg", ".jpeg", ".bmp", ".svg"}
+        files: list[Path] = []
+        for f in sorted(p.iterdir()):
+            if not f.is_file():
+                continue
+            if f.suffix.lower() in exts:
+                files.append(f.resolve())
+        return [str(x) for x in files]
+    except Exception:
+        logger.exception("Error listing template images in %s", folder)
+        return []

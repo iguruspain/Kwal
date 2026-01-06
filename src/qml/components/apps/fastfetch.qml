@@ -15,31 +15,8 @@ Kirigami.Page {
         color: "transparent"
     }
 
-    // 1. Model (Static data only) - will be placed/adapted in models.py later
-    ListModel {
-        id: fastfetchModel
-        ListElement {
-            config_path: "/home/iguruspain/.config/fastfetch/config.jsonc" //will be populated with file_utils.py logic, currently static for testing
-            config_image: "/home/iguruspain/.config/fastfetch/chica-tinted.png" //will be populated with file_utils.py logic, currently static for testing
-            template_image_folder: "/home/iguruspain/.config/kwal/templates/fastfetch" //will be populated with target folder from templates installer
-        }
-    }
-
-    // Dynamic logic for searching template files
-    FolderListModel {
-        id: templateFilesModel
-
-        folder: "file://" + fastfetchModel.get(0).template_image_folder
-        nameFilters: [ "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.svg" ]
-        showDirs: false
-        showFiles: true
-        sortField: FolderListModel.Name
-        onCountChanged: {
-            if (count > 0 && !fastfetchPage.isFileSelected) {
-                templateSelector.currentIndex = -1;
-            }
-        }
-    }
+    // Data provided by Python model/controller (FastfetchTemplateModel)
+    // The `pyController.fastfetchTemplateModel` is a QAbstractListModel exposed from Python.
 
     RowLayout {
         anchors.fill: parent
@@ -79,6 +56,8 @@ Kirigami.Page {
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 2
                         //opacity: fastfetchPage.isFileSelected ? 1 : 0
                         //enabled: fastfetchPage.isFileSelected
+                        ToolTip.text: qsTr("Clear selection")
+                        ToolTip.visible: hovered
                         onClicked: {
                             pyController.clearSelectedFile(); 
                             fastfetchPage.isFileSelected = false;
@@ -94,13 +73,23 @@ Kirigami.Page {
                     ComboBox {
                         id: templateSelector
                         Layout.fillWidth: true
-                        model: templateFilesModel
+                        model: fastfetchTemplateModel
                         textRole: "fileName"
-                        enabled: !fastfetchPage.isFileSelected
+                        enabled: !fastfetchPage.isFileSelected && (typeof fastfetchTemplateModel.rowCount === 'function' ? fastfetchTemplateModel.rowCount() > 0 : true)
+                        opacity: enabled ? 1.0 : 0.5
 
                         currentIndex: -1
                         displayText: currentIndex === -1 ? qsTr("Select predefined") : currentText
-                        onActivated: {}                        
+                        ToolTip.text: qsTr("Select a predefined template")
+                        ToolTip.visible: hovered
+                        onActivated: {
+                            // generate tinted preview for chosen template
+                            if (currentIndex !== -1) {
+                                var info = fastfetchTemplateModel.get(currentIndex);
+                                var url = info ? info.fileUrl : "";
+                                if (url && fastfetchPage.selectedTintColor !== "transparent" && fastfetchPage.selectedTintColor !== "") pyController.generateTintedPreview(url, fastfetchPage.selectedTintColor);
+                            }
+                        }
                     }
 
                     RowLayout {
@@ -126,6 +115,7 @@ Kirigami.Page {
                                 pyController.openFileDialog();
                                 if (pyController.selectedFile) {
                                     fastfetchPage.isFileSelected = true;
+                                    pyController.generateTintedPreview(pyController.selectedFile, fastfetchPage.selectedTintColor);
                                 } else {
                                     fastfetchPage.isFileSelected = false;
                                 }
@@ -151,10 +141,12 @@ Kirigami.Page {
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         width: Kirigami.Units.gridUnit * 1.5
                         height: Kirigami.Units.gridUnit * 1.5
-                        color: fastfetchPage.selectedTintColor
+                            color: fastfetchPage.selectedTintColor
                         border.color: Kirigami.Theme.disabledTextColor
                         border.width: 1
                         radius: Kirigami.Units.smallSpacing
+                            ToolTip.text: qsTr("Pick tint color")
+                            ToolTip.visible: hovered
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
@@ -162,6 +154,13 @@ Kirigami.Page {
                                 var color = pyController.openColorDialog(colorPreview.color);
                                 if (color) {
                                     fastfetchPage.selectedTintColor = color;
+                                    // regenerate tinted preview for current selection
+                                    if (pyController.selectedFile) {
+                                        pyController.generateTintedPreview(pyController.selectedFile, fastfetchPage.selectedTintColor);
+                                    } else if (templateSelector.currentIndex !== -1) {
+                                        var info = fastfetchTemplateModel.get(templateSelector.currentIndex);
+                                        if (info && info.fileUrl) pyController.generateTintedPreview(info.fileUrl, fastfetchPage.selectedTintColor);
+                                    }
                                 }
                             }
                         }
@@ -196,9 +195,18 @@ Kirigami.Page {
                         id: fastfetchCurrentImage
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        source: "file://" + fastfetchModel.get(0).config_image
+                        source: {
+                            var info = pyController.getFastfetchInfo();
+                            return (info && info.config_image) ? ("file://" + info.config_image) : "";
+                        }
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
+                    }
+                    Label {
+                        id: noCurrentImageLabel
+                        text: qsTr("No configured image")
+                        visible: fastfetchCurrentImage.source === ""
+                        color: Kirigami.Theme.disabledTextColor
                     }
                 }
                 
@@ -242,27 +250,46 @@ Kirigami.Page {
                             font.bold: true
                             visible: text !== qsTr("Tinted:")
                         }
-                        Image {
-                            id: fastfetchPreviewTemplate
+                        // Left cell: template preview
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            Image {
+                                id: fastfetchPreviewTemplate
+                                anchors.fill: parent
+                                source: {
+                                    if (pyController.selectedFile) {
+                                        return pyController.selectedFile;
+                                    }
+                                    if (templateSelector.currentIndex !== -1) {
+                                        var info = fastfetchTemplateModel.get(templateSelector.currentIndex);
+                                        return info ? info.fileUrl : "";
+                                    }
+                                    return "";
+                                }
+                                fillMode: Image.PreserveAspectFit
+                            }
+                        }
+
+                        // Right cell: tinted preview (falls back to template preview when no tinted image)
+                        Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
 
-                            source: {
-                                if (pyController.selectedFile) {
-                                    return pyController.selectedFile;
-                                }
-                                return templateSelector.currentValue ? (templateFilesModel.folder + "/" + templateSelector.currentText) : ""
+                            Image {
+                                id: fastfetchPreviewTinted
+                                anchors.fill: parent
+                                source: (pyController.fastfetchTintedPreview && pyController.fastfetchTintedPreview !== "") ? pyController.fastfetchTintedPreview : (pyController.selectedFile ? pyController.selectedFile : (templateSelector.currentIndex !== -1 ? (fastfetchTemplateModel.get(templateSelector.currentIndex).fileUrl) : ""))
+                                fillMode: Image.PreserveAspectFit
+                                cache: false
                             }
-                            fillMode: Image.PreserveAspectFit
-                        }                                     
-                        Image {
-                            id: fastfetchPreviewTinted
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            source: fastfetchPreviewTemplate.source // Placeholder, will be replaced with tinted version logic (controller and color_utils.py)
-                            fillMode: Image.PreserveAspectFit
-                            cache: false
-                        } 
+
+                            BusyIndicator {
+                                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+                                running: pyController.fastfetchTinting
+                                visible: pyController.fastfetchTinting
+                            }
+                        }
                     }
                 }
             }

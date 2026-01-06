@@ -73,7 +73,9 @@ def main():
     # Set application metadata
     app.setApplicationName("kwal")
     app.setApplicationDisplayName("Kwal")
-    app.setOrganizationName("kwal")
+    # Use reverse-DNS style organization name to avoid duplicated cache paths
+    app.setOrganizationName("org.kde")
+    app.setOrganizationDomain("org.kde")
     app.setDesktopFileName("org.kde.kwal") #disabled until packaging is sorted
     # app.setDesktopFileName("kwal")
     engine = QQmlApplicationEngine()
@@ -87,6 +89,8 @@ def main():
     engine.rootContext().setContextProperty("pyController", controller)
     engine.rootContext().setContextProperty("wallpaperFolderModel", controller.wallpaperModel())
     engine.rootContext().setContextProperty("imageModel", controller.imageModel())
+    # Expose Fastfetch template model directly to QML as a context property
+    engine.rootContext().setContextProperty("fastfetchTemplateModel", controller.fastfetchTemplateModel())
 
     # Route Qt/QML messages into Python logging and respect application log level.
     def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
@@ -119,6 +123,24 @@ def main():
     if len(engine.rootObjects()) == 0:
         logger.error("No root objects loaded, exiting")
         sys.exit(1)
+
+    # Ensure tint worker is stopped and fastfetch tinted cache is cleaned up on exit
+    try:
+        from .utils.color_utils import clear_fastfetch_tinted_cache
+        # stop worker and clear cache when application is about to quit
+        def _on_quit() -> None:
+            try:
+                controller.stopTintWorker()
+            except Exception:
+                logger.exception("Error stopping tint worker during shutdown")
+            try:
+                clear_fastfetch_tinted_cache()
+            except Exception:
+                logger.exception("Error clearing fastfetch tinted cache during shutdown")
+
+        app.aboutToQuit.connect(_on_quit)
+    except Exception:
+        logger.exception("Failed to register fastfetch shutdown handler")
 
     root_window = engine.rootObjects()[0]
     root_window.setProperty("kwin_blur", True)

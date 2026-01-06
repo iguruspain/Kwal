@@ -9,10 +9,12 @@ import shutil
 from pathlib import Path
 from PySide6.QtWidgets import QFileDialog,QColorDialog
 from PySide6.QtGui import QImage, QColor
-from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths
+from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths, QThread
+import threading
 
 
-from ..models.models import WallpaperFolderModel, Folder, ImageModel, SettingsAppModel, SettingsApp
+from ..models.models import WallpaperFolderModel, Folder, ImageModel, SettingsAppModel, SettingsApp, FastfetchTemplateModel
+from ..utils import color_utils, file_utils
 
 
 class Controller(QObject):
@@ -22,6 +24,9 @@ class Controller(QObject):
 	selectedWallpaperChanged = Signal()
 	templatesInstalledChanged = Signal()
 	selectedFileChanged = Signal()
+	fastfetchTintedPreviewChanged = Signal()
+	fastfetchTintingChanged = Signal()
+	tintResult = Signal(str)
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -52,6 +57,23 @@ class Controller(QObject):
 		self._model = WallpaperFolderModel(folders)
 		self._image_model = ImageModel()
 
+		# Fastfetch template model (populated from user templates folder)
+		self._fastfetch_model = FastfetchTemplateModel()
+		# default templates folder (user XDG location)
+		self._fastfetch_templates_folder = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "fastfetch")
+		# attempt initial refresh (non-fatal)
+		try:
+			self._fastfetch_model.refresh(self._fastfetch_templates_folder)
+		except Exception:
+			self._logger.debug("Initial fastfetch template refresh failed or empty")
+
+		self._fastfetch_tinted_preview: str = ""
+		self._fastfetch_tinting: bool = False
+		self._tint_worker: Optional[object] = None
+		self._tint_thread: Optional[QThread] = None
+		# connect tint result signal (used by background Python thread)
+		self.tintResult.connect(self._on_tint_done)
+
 		# templates installed flag
 		self._templates_installed = self._check_templates_installed()
 
@@ -76,6 +98,9 @@ class Controller(QObject):
 
 	def wallpaperModel(self) -> WallpaperFolderModel:
 		return self._model
+
+	def fastfetchTemplateModel(self) -> FastfetchTemplateModel:
+		return self._fastfetch_model
 
 	@Property(QObject, constant=True)
 	def settingsAppModel(self) -> SettingsAppModel:
@@ -132,9 +157,93 @@ class Controller(QObject):
 			self._templates_installed = self._check_templates_installed()
 			self.templatesInstalledChanged.emit()
 			return self._templates_installed
+
 		except Exception:
 			self._logger.exception("Failed to install templates")
 			return False
+
+	@Slot(str, str, result=str)
+	def generateTintedPreview(self, src: str, tint_hex: str, strength: float = 0.8) -> str:
+		"""Generate a tinted preview from `src` using color_utils and return a file:// URL."""
+		# accept file:// URIs and plain paths
+		if src.startswith("file://"):
+			src_path = src.replace("file://", "")
+		else:
+			src_path = src
+
+		# Do not tint if tint_hex is empty, 'transparent' or invalid
+		try:
+			if not tint_hex or str(tint_hex).lower() == "transparent" or not QColor.isValidColor(tint_hex):
+				# clear any existing tinted preview and return empty so QML shows original
+				self._fastfetch_tinted_preview = ""
+				self.fastfetchTintedPreviewChanged.emit()
+				return ""
+		except Exception:
+			# If QColor check fails for any reason, fallback to no-tint
+			self._logger.debug("generateTintedPreview: QColor validation failed for %r", tint_hex)
+			self._fastfetch_tinted_preview = ""
+			self.fastfetchTintedPreviewChanged.emit()
+			return ""
+
+		# start background Python thread to run tint_image (avoids QThread lifetime issues)
+		try:
+			def _run_tint(s: str, t: str, st: float) -> None:
+				try:
+					from ..utils import color_utils as _cu
+					res = _cu.tint_image(s, t, float(st))
+					# emit result back to main thread via signal; emit from this thread is safe (queued)
+					self.tintResult.emit(res if res else "")
+				except Exception:
+					self._logger.exception("Background tint failed for %s", s)
+					self.tintResult.emit("")
+
+			# set tinting flag and start thread
+			self._fastfetch_tinting = True
+			self.fastfetchTintingChanged.emit()
+			thr = threading.Thread(target=_run_tint, args=(src_path, tint_hex, float(strength)), daemon=True)
+			thr.start()
+			# store reference so it isn't GC'd (optional)
+			self._tint_thread = thr
+			return ""
+		except Exception:
+			self._logger.exception("Failed starting background tint thread for %s", src)
+			return ""
+
+	@Slot(str)
+	def refreshFastfetchTemplates(self, folder: str) -> None:
+		try:
+			self._fastfetch_templates_folder = folder or self._fastfetch_templates_folder
+			self._fastfetch_model.refresh(self._fastfetch_templates_folder)
+		except Exception:
+			self._logger.exception("Failed refreshing fastfetch templates for %s", folder)
+
+	@Slot(result="QVariantMap")
+	def getFastfetchInfo(self) -> dict:
+		"""Return small dict with keys `config_image` and `template_folder` for QML consumption."""
+		try:
+			# Try to discover a reasonable template folder and any config image
+			template_folder = self._fastfetch_templates_folder
+			# Try several common keys in fastfetch config for a configured image
+			config_image = ""
+			cfg_path = ""
+			for key in ("config_image", "image", "source", "logo", "icon"):
+				val, cfg_path = file_utils.read_config_fastfetch(key, None)
+				if val:
+					# expand and verify
+					p = Path(str(val)).expanduser()
+					if p.exists():
+						config_image = str(p)
+						break
+			# as a last resort, check a reasonable default location
+			if not config_image:
+				fallback = Path.home() / ".config" / "fastfetch" / "chica-tinted.png"
+				if fallback.exists():
+					config_image = str(fallback)
+
+			return {"config_image": config_image, "template_folder": template_folder, "config_path": cfg_path}
+		except Exception:
+			self._logger.exception("Failed reading fastfetch info")
+			return {"config_image": "", "template_folder": self._fastfetch_templates_folder, "config_path": ""}
 
 	@Slot(str)
 	def selectWallpaper(self, path: str) -> None:
@@ -365,6 +474,16 @@ class Controller(QObject):
 		try:
 			if self._selected_file:
 				self._selected_file = ""
+				# attempt to stop any running tint worker
+				try:
+					if self._tint_thread and hasattr(self._tint_thread, "isRunning") and self._tint_thread.isRunning():
+						self._tint_thread.quit()
+						self._tint_thread.wait(200)
+				except Exception:
+					pass
+				# also clear any tinted preview since selection was cleared
+				self._fastfetch_tinted_preview = ""
+				self.fastfetchTintedPreviewChanged.emit()
 				self.selectedFileChanged.emit()
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Error clearing selected file"))
@@ -386,6 +505,50 @@ class Controller(QObject):
 
 	def _get_selected_folder(self) -> str:
 		return self._selected_folder
+
+	def _get_fastfetch_tinted_preview(self) -> str:
+		return self._fastfetch_tinted_preview
+
+	def _get_fastfetch_tinting(self) -> bool:
+		return getattr(self, "_fastfetch_tinting", False)
+
+	@Slot(str)
+	def _on_tint_done(self, dst: str) -> None:
+		"""Handler for FastfetchTintWorker.finished signal."""
+		try:
+			if dst:
+				self._fastfetch_tinted_preview = "file://" + str(Path(dst))
+			else:
+				self._fastfetch_tinted_preview = ""
+			self.fastfetchTintedPreviewChanged.emit()
+		finally:
+			# clear tinting flag and cleanup thread references
+			self._fastfetch_tinting = False
+			self.fastfetchTintingChanged.emit()
+			self._tint_worker = None
+			self._tint_thread = None
+
+	@Slot()
+	def stopTintWorker(self) -> None:
+		"""Stop any running tint worker/thread safely. Intended to be called on app shutdown."""
+		try:
+			# If using Python thread, attempt to join briefly
+			if self._tint_thread and isinstance(self._tint_thread, threading.Thread):
+				try:
+					self._tint_thread.join(timeout=1.0)
+				except Exception:
+					pass
+			# If using QThread fallback, handle quit/wait
+			if self._tint_thread and hasattr(self._tint_thread, "isRunning") and self._tint_thread.isRunning():
+				self._tint_thread.quit()
+				self._tint_thread.wait(1000)
+		except Exception:
+			self._logger.exception("Error stopping tint thread")
+		finally:
+			self._tint_worker = None
+			self._tint_thread = None
+			self._fastfetch_tinting = False
+			self.fastfetchTintingChanged.emit()
 
 	def _config_path(self) -> Path:
 		cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal"
@@ -426,3 +589,5 @@ class Controller(QObject):
 	
 	selectedFile = Property(str, _get_selected_file, notify=selectedFileChanged)
 	selectedFolder = Property(str, _get_selected_folder, notify=selectedFolderChanged)
+	fastfetchTintedPreview = Property(str, _get_fastfetch_tinted_preview, notify=fastfetchTintedPreviewChanged)
+	fastfetchTinting = Property(bool, _get_fastfetch_tinting, notify=fastfetchTintingChanged)
