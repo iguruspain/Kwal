@@ -21,6 +21,7 @@ class Controller(QObject):
 	selectedFolderChanged = Signal()
 	selectedWallpaperChanged = Signal()
 	templatesInstalledChanged = Signal()
+	selectedFileChanged = Signal()
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -29,6 +30,7 @@ class Controller(QObject):
 		self._selected_wallpaper: str = ""
 		self._last_set_wallpaper: str = ""
 		self._selected_wallpaper_resolution: str = ""
+		self._selected_file: str = ""
 
 		# expose home path for QML convenience (ensure trailing slash)
 		self._home_path: str = str(Path.home()).rstrip("/") + "/"
@@ -306,6 +308,52 @@ class Controller(QObject):
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Error selecting folder"))
 
+	@Slot()
+	def openFileDialog(self) -> None:
+		"""Open a native file selection dialog to choose a file.
+		"""
+		try:
+			self._logger.debug(QCoreApplication.translate("Controller", "Opening file selection dialog"))
+			# determine sensible initial directory: user's Pictures location (localized by the system)
+			initial_dir = QStandardPaths.writableLocation(QStandardPaths.PicturesLocation)
+			if not initial_dir:
+				initial_dir = os.path.expanduser("~")
+			# This shows a native dialog and returns an empty string if cancelled
+			selected, _ = QFileDialog.getOpenFileName(
+				parent=None,
+				caption=QCoreApplication.translate("Controller", "Select file"),
+				dir=initial_dir
+			)
+			if selected:
+				self.selectFile(selected)
+				self._logger.info(QCoreApplication.translate("Controller", "Selected file %s"), selected)
+			else:
+				self._logger.debug(QCoreApplication.translate("Controller", "File selection cancelled or no file chosen"))
+		except Exception:
+			self._logger.exception(QCoreApplication.translate("Controller", "Failed to open file dialog or select file"))
+	@Slot(str)
+	def selectFile(self, path: str) -> None:
+		"""Select a file and notify QML. Accepts a filesystem path (absolute or relative).
+		If the path exists, sets `self._selected_file` to a file:// URL and emits `selectedFileChanged`.
+		"""
+		try:
+			if not path:
+				self._logger.debug(QCoreApplication.translate("Controller", "selectFile called with empty path"))
+				return
+			# normalize and validate path
+			abs_path = os.path.abspath(path)
+			if not os.path.exists(abs_path):
+				self._logger.warning(QCoreApplication.translate("Controller", "Selected file does not exist: %s"), abs_path)
+				return
+			self._selected_file = "file://" + abs_path
+			self.selectedFileChanged.emit()
+		except Exception:
+			self._logger.exception(QCoreApplication.translate("Controller", "Error selecting file"))
+	
+	def _get_selected_file(self) -> str:
+		return self._selected_file
+	
+
 	def _get_selected_folder(self) -> str:
 		return self._selected_folder
 
@@ -345,5 +393,6 @@ class Controller(QObject):
 			data["last_set_wallpaper"] = self._last_set_wallpaper
 		with open(cfg, "w", encoding="utf-8") as fh:
 			json.dump(data, fh, ensure_ascii=False, indent=2)
-
+	
+	selectedFile = Property(str, _get_selected_file, notify=selectedFileChanged)
 	selectedFolder = Property(str, _get_selected_folder, notify=selectedFolderChanged)

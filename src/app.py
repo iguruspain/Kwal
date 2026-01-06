@@ -58,20 +58,29 @@ def main():
     logger = logging.getLogger(__name__)
     logger.debug("Log level set to %s", logging.getLevelName(level))
 
+    # Needed to get proper KDE style outside of Plasma
+    if not os.environ.get("QT_QPA_PLATFORM"):
+        os.environ["QT_QPA_PLATFORM"] = "wayland"    
+    if not os.environ.get("QT_QUICK_CONTROLS_STYLE"):
+        os.environ["QT_QUICK_CONTROLS_STYLE"] = "org.kde.desktop"
+
+    logger.info("QT_QPA_PLATFORM: %s", os.environ.get("QT_QPA_PLATFORM"))    
+    logger.info("QT_QUICK_CONTROLS_STYLE: %s", os.environ.get("QT_QUICK_CONTROLS_STYLE"))
+
     # Use QApplication because we use Qt Widgets (QFileDialog) in controller
     app = QApplication(sys.argv)
+
+    # Set application metadata
     app.setApplicationName("kwal")
     app.setApplicationDisplayName("Kwal")
     app.setOrganizationName("kwal")
-    app.setDesktopFileName("org.kde.kwal")
+    app.setDesktopFileName("org.kde.kwal") #disabled until packaging is sorted
+    # app.setDesktopFileName("kwal")
     engine = QQmlApplicationEngine()
 
     # Needed to close the app with Ctrl+C
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-    # Needed to get proper KDE style outside of Plasma
-    if not os.environ.get("QT_QUICK_CONTROLS_STYLE"):
-        os.environ["QT_QUICK_CONTROLS_STYLE"] = "org.kde.desktop"
 
     # Create controller and expose to QML
     controller = Controller()
@@ -111,8 +120,11 @@ def main():
         logger.error("No root objects loaded, exiting")
         sys.exit(1)
 
-    return app.exec()
+    root_window = engine.rootObjects()[0]
+    root_window.setProperty("kwin_blur", True)
+    root_window.setProperty("_KDE_NET_WM_BLUR_BEHIND_REGION", 0)
 
+    return app.exec()
 
 if __name__ == "__main__":
     main()
