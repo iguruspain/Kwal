@@ -8,24 +8,22 @@ Kirigami.Page {
     id: fastfetchPage
     title: qsTr("Fastfetch Settings")
     property bool isFileSelected: false
-    property string sFileSelected: ""
 
     background: Rectangle {
         color: "transparent"
     }
 
-    // 1. EL MODELO (Solo datos estáticos)
+    // 1. Model (Static data only) - will be placed/adapted in models.py later
     ListModel {
         id: fastfetchModel
         ListElement {
-            config_path: "/home/iguruspain/.config/fastfetch/config.jsonc"
-            config_image: "/home/iguruspain/.config/fastfetch/chica-tinted.png"
-            template_image_folder: "/home/iguruspain/.config/kwal/templates/fastfetch"
+            config_path: "/home/iguruspain/.config/fastfetch/config.jsonc" //will be populated with config_reader.py logic, currently static for testing
+            config_image: "/home/iguruspain/.config/fastfetch/chica-tinted.png" //will be populated with config_reader.py logic, currently static for testing
+            template_image_folder: "/home/iguruspain/.config/kwal/templates/fastfetch" //will be populated with target folder from templates installer
         }
     }
 
-    // 2. EL BUSCADOR DE ARCHIVOS (Lógica dinámica)
-    // Este objeto leerá la carpeta definida en el modelo
+    // Dynamic logic for searching template files
     FolderListModel {
         id: templateFilesModel
 
@@ -36,16 +34,15 @@ Kirigami.Page {
         sortField: FolderListModel.Name
     }
 
-
     RowLayout {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
-        // --- Panel Izquierdo ---
+        // Left Pane
         Rectangle {
             id: leftPaneFastfetch
             color: Kirigami.Theme.backgroundColor
-            Layout.preferredWidth: 250 // Un poco más ancho para los paths
+            Layout.preferredWidth: 250
             Layout.fillHeight: true
        
             ColumnLayout {
@@ -64,15 +61,19 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
                     Label {
-                        text: qsTr("Select Fastfetch Template")
-                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                        id: selectTemplateLabel
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter                        
+                        text: qsTr("Select a template")
                     }
                     ToolButton {
                         id: clearSelectionButton
                         icon.name: "edit-clear"
-                        visible: fastfetchPage.isFileSelected
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                        opacity: fastfetchPage.isFileSelected ? 1 : 0
+                        enabled: fastfetchPage.isFileSelected
                         onClicked: {
-                            pyController.selectedFile = ""; // Asumiendo que puedes resetearlo en Python
+                            pyController.clearSelectedFile(); 
                             fastfetchPage.isFileSelected = false;
                         }
                     }              
@@ -82,8 +83,6 @@ Kirigami.Page {
                     columns: 1
                     Layout.fillWidth: true
 
-                    //Label { text: qsTr("Default:") }
-                    // Selector para elegir entre los archivos encontrados en la carpeta
                     ComboBox {
                         id: templateSelector
                         Layout.fillWidth: true
@@ -91,7 +90,7 @@ Kirigami.Page {
                         textRole: "fileName"
                         enabled: !fastfetchPage.isFileSelected
                     }
-                    //Label { text: qsTr("Custom:") }
+
                     RowLayout {
                         Layout.fillWidth: true
 
@@ -109,10 +108,8 @@ Kirigami.Page {
                         }
                         ToolButton {
                             id: openFileButton
-                            //text: qsTr("Add Folder")
                             icon.name: "document-open"
                             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                            //text: qsTr("Add Folder")
                             onClicked: {
                                 pyController.openFileDialog();
                                 if (pyController.selectedFile) {
@@ -133,7 +130,7 @@ Kirigami.Page {
             }
         }
 
-        // --- Panel Derecho (Previews) ---
+        // Right Pane
         Rectangle {
             id: rightPaneFastfetch
             color: Kirigami.Theme.backgroundColor
@@ -162,7 +159,6 @@ Kirigami.Page {
                         id: fastfetchCurrentImage
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        // Usamos file:// para asegurar que cargue de disco local
                         source: "file://" + fastfetchModel.get(0).config_image
                         fillMode: Image.PreserveAspectFit
                     }
@@ -178,7 +174,7 @@ Kirigami.Page {
                         Layout.fillHeight: true
                         source: {
                             if (pyController.selectedFile) {
-                                return pyController.selectedFile; // Ya debería ser una URL válida
+                                return pyController.selectedFile;
                             }
                             return templateSelector.currentValue ? (templateFilesModel.folder + "/" + templateSelector.currentText) : ""
                         }

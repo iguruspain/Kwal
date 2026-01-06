@@ -349,6 +349,16 @@ class Controller(QObject):
 			self.selectedFileChanged.emit()
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Error selecting file"))
+
+	@Slot()
+	def clearSelectedFile(self) -> None:
+		"""Clear the currently selected file and notify QML."""
+		try:
+			if self._selected_file:
+				self._selected_file = ""
+				self.selectedFileChanged.emit()
+		except Exception:
+			self._logger.exception(QCoreApplication.translate("Controller", "Error clearing selected file"))
 	
 	def _get_selected_file(self) -> str:
 		return self._selected_file
