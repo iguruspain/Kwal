@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 import hashlib
 from pathlib import Path
-from PIL import Image, ImageOps, ImageColor
+from PIL import ImageColor
+import subprocess
+import tempfile
+import shutil
 from typing import Optional
 import os
 
@@ -60,13 +63,34 @@ def tint_image(src: str, tint_hex: str, strength: float = 0.8) -> str:
             logger.debug("tint_image: using cached tinted image %s", dst)
             return str(dst)
 
-        im = Image.open(src_path).convert("RGBA")
-        gray = ImageOps.grayscale(im).convert("RGBA")
-        color = Image.new("RGBA", im.size, ImageColor.getrgb(tint_hex) + (255,))
-        tinted = Image.blend(gray, color, float(strength))
-        tinted.save(dst)
-        logger.info("tint_image: created tinted image %s", dst)
-        return str(dst)
+        # Use ImageMagick (`magick` or `convert`) as the primary tinting backend
+        im_exe = shutil.which("magick") or shutil.which("convert")
+        if im_exe:
+            # ImageMagick `-tint` expects a percentage value in the range 0-100
+            tint_pct = max(0, min(100, int(float(strength) * 100)))
+            # Create a temporary grayscale intermediate and apply the tint into `dst`
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png", dir=str(cache_root)) as tmpf:
+                tmp_gray = Path(tmpf.name)
+            try:
+                # Convert source image to grayscale (intermediate)
+                cmd1 = [im_exe, str(src_path), "-colorspace", "gray", str(tmp_gray)]
+                subprocess.run(cmd1, check=True)
+                # Apply tint color to the grayscale intermediate
+                cmd2 = [im_exe, str(tmp_gray), "-fill", tint_hex, "-tint", str(tint_pct), str(dst)]
+                subprocess.run(cmd2, check=True)
+                logger.info("tint_image: created tinted image via ImageMagick %s", dst)
+                return str(dst)
+            except subprocess.CalledProcessError:
+                logger.exception("tint_image: ImageMagick failed for %s", src_path)
+                return ""
+            finally:
+                try:
+                    tmp_gray.unlink(missing_ok=True)
+                except Exception:
+                    pass
+        # If ImageMagick is unavailable or failed, log an error and return an empty result
+        logger.error("tint_image: ImageMagick not available or failed; cannot generate tinted image for %s", src_path)
+        return ""
     except Exception:
         logger.exception("tint_image failed for %s with tint %s", src, tint_hex)
         return ""
