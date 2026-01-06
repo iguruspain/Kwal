@@ -2,13 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import Qt.labs.folderlistmodel 2.1
+import Qt.labs.folderlistmodel
 
 Kirigami.Page {
     id: fastfetchPage
     title: qsTr("Fastfetch Settings")
     property bool isFileSelected: false
     property string sTintedName: ""
+    property string selectedTintColor: "transparent"
 
     background: Rectangle {
         color: "transparent"
@@ -136,7 +137,36 @@ Kirigami.Page {
                         }     
                     }
                 }
-                
+                MenuSeparator { Layout.fillWidth: true }
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Label {
+                        text: qsTr("Tint Color:")
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                    }
+                    Item { Layout.fillWidth: true }
+                    Rectangle {
+                        id: colorPreview
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                        width: Kirigami.Units.gridUnit * 1.5
+                        height: Kirigami.Units.gridUnit * 1.5
+                        color: fastfetchPage.selectedTintColor
+                        border.color: Kirigami.Theme.disabledTextColor
+                        border.width: 1
+                        radius: Kirigami.Units.smallSpacing
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                var color = pyController.openColorDialog(colorPreview.color);
+                                if (color) {
+                                    fastfetchPage.selectedTintColor = color;
+                                }
+                            }
+                        }
+                    }
+                }
                 Item { Layout.fillHeight: true }
             }
         }
@@ -179,10 +209,10 @@ Kirigami.Page {
                     spacing: Kirigami.Units.smallSpacing
                     Layout.preferredHeight: 3
 
-                    // Labels row
-                    RowLayout {
+                    GridLayout {
+                        columns: 2
                         Layout.fillWidth: true
-                    
+                        Layout.fillHeight: true
                         Label {
                             id: selectedTemplateLabel
                             text: {
@@ -192,8 +222,6 @@ Kirigami.Page {
                                     } else {
                                         name = templateSelector.currentIndex !== -1 ? templateSelector.currentText : "";
                                     }
-                                    //sTintedName = name !== "" ? replace(name, ".", "-tinted.") : "";
-                                    // update tinted name property
                                     if (name !== "") {
                                         fastfetchPage.sTintedName = name.replace(".", "-tinted.");
                                     } else {
@@ -205,7 +233,6 @@ Kirigami.Page {
                             visible: text !== qsTr("Template:")
                             font.bold: true
                         }
-                        Item { Layout.fillWidth: true }
                         Label {
                             id: tintedLabel
                             text: {
@@ -215,13 +242,6 @@ Kirigami.Page {
                             font.bold: true
                             visible: text !== qsTr("Tinted:")
                         }
-                    }
-                    // Images row
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        spacing: Kirigami.Units.mediumSpacing
-                    
                         Image {
                             id: fastfetchPreviewTemplate
                             Layout.fillWidth: true
@@ -234,7 +254,7 @@ Kirigami.Page {
                                 return templateSelector.currentValue ? (templateFilesModel.folder + "/" + templateSelector.currentText) : ""
                             }
                             fillMode: Image.PreserveAspectFit
-                        }
+                        }                                     
                         Image {
                             id: fastfetchPreviewTinted
                             Layout.fillWidth: true
@@ -242,7 +262,7 @@ Kirigami.Page {
                             source: fastfetchPreviewTemplate.source // Placeholder, will be replaced with tinted version logic (controller and color_utils.py)
                             fillMode: Image.PreserveAspectFit
                             cache: false
-                        }
+                        } 
                     }
                 }
             }

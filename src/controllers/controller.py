@@ -4,13 +4,13 @@ from typing import Optional
 import logging
 import os
 import json
-from pathlib import Path
-
-from PySide6.QtWidgets import QFileDialog
-from PySide6.QtGui import QImage
-from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths
 import subprocess
 import shutil
+from pathlib import Path
+from PySide6.QtWidgets import QFileDialog,QColorDialog
+from PySide6.QtGui import QImage, QColor
+from PySide6.QtCore import QObject, Slot, Signal, Property, QCoreApplication, QStandardPaths
+
 
 from ..models.models import WallpaperFolderModel, Folder, ImageModel, SettingsAppModel, SettingsApp
 
@@ -331,6 +331,15 @@ class Controller(QObject):
 				self._logger.debug(QCoreApplication.translate("Controller", "File selection cancelled or no file chosen"))
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Failed to open file dialog or select file"))
+
+	@Slot(str,result=str)
+	def openColorDialog(self,initial: str) -> str:
+		"""Compatibility wrapper for QML: open color dialog and return selected color hex."""
+		try:
+			return self.pickColor(initial)
+		except Exception:
+			self._logger.exception("Error opening color dialog")
+			return ""
 	@Slot(str)
 	def selectFile(self, path: str) -> None:
 		"""Select a file and notify QML. Accepts a filesystem path (absolute or relative).
@@ -359,7 +368,18 @@ class Controller(QObject):
 				self.selectedFileChanged.emit()
 		except Exception:
 			self._logger.exception(QCoreApplication.translate("Controller", "Error clearing selected file"))
-	
+
+	@Slot(str, result=str)
+	def pickColor(self, initial: str = "") -> str:
+		try:
+			if not initial or not QColor.isValidColor(initial):
+				initial = "#ffffff"
+			color = QColorDialog.getColor(QColor(initial), None, "Select color")
+		except Exception:
+			self._logger.exception("Error opening color dialog")
+			return ""
+		return color.name()
+
 	def _get_selected_file(self) -> str:
 		return self._selected_file
 	
