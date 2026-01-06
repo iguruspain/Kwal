@@ -4,11 +4,30 @@ import logging
 import hashlib
 from pathlib import Path
 from PIL import Image, ImageOps, ImageColor
+from typing import Optional
 import os
 
 logger = logging.getLogger(__name__)
 
-def tint_image(src: str, tint_hex: str="#FF0000", strength: float = 0.8) -> str:
+def _normalize_tint(tint_hex: Optional[str]) -> Optional[str]:
+    """Validate `tint_hex`.
+
+    Return the original string if valid. If `tint_hex` is None, the string "transparent",
+    or cannot be parsed, return `None` to indicate that no tinted image should be produced.
+    """
+    if not tint_hex:
+        return None
+    if str(tint_hex).lower() == "transparent":
+        return None
+    try:
+        ImageColor.getrgb(tint_hex)
+        return tint_hex
+    except Exception:
+        logger.debug("tint_image: invalid tint '%s', skipping tinted generation", tint_hex)
+        return None
+
+
+def tint_image(src: str, tint_hex: str, strength: float = 0.8) -> str:
     """Apply grayscale+color tint to source image and return a deterministic cached file path.
 
     Cache filename is derived from a sha1 of (absolute src path, tint_hex, strength) to avoid collisions.
@@ -24,15 +43,11 @@ def tint_image(src: str, tint_hex: str="#FF0000", strength: float = 0.8) -> str:
         cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "fastfetch_tinted"
         cache_root.mkdir(parents=True, exist_ok=True)
 
-        # sanitize tint value
-        try:
-            if not tint_hex or str(tint_hex).lower() == "transparent":
-                tint_hex = "#ffffff"
-            # ensure ImageColor can parse it
-            _ = ImageColor.getrgb(tint_hex)
-        except Exception:
-            logger.warning("tint_image: invalid tint '%s', falling back to #ffffff", tint_hex)
-            tint_hex = "#ffffff"
+        # validate tint value; None means no tinted output requested/possible
+        tint_hex = _normalize_tint(tint_hex)
+        if tint_hex is None:
+            logger.debug("tint_image: tint is None or invalid, skipping generation for %s", src_path)
+            return ""
 
         # deterministic name based on parameters
         key = f"{str(src_path)}|{tint_hex}|{float(strength)}"

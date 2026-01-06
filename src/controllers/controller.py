@@ -177,9 +177,11 @@ class Controller(QObject):
 				# clear any existing tinted preview and return empty so QML shows original
 				self._fastfetch_tinted_preview = ""
 				self.fastfetchTintedPreviewChanged.emit()
+				self._logger.info("generateTintedPreview: skipping tint generation for invalid/transparent color %r", tint_hex)
 				return ""
 		except Exception:
-			# If QColor check fails for any reason, fallback to no-tint
+			# If QColor check fails for any reason, fallback to no-tint and log
+			self._logger.info("generateTintedPreview: QColor validation error for %r, skipping tint", tint_hex)
 			self._logger.debug("generateTintedPreview: QColor validation failed for %r", tint_hex)
 			self._fastfetch_tinted_preview = ""
 			self.fastfetchTintedPreviewChanged.emit()
