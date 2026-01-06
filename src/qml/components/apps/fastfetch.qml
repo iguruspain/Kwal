@@ -8,6 +8,7 @@ Kirigami.Page {
     id: fastfetchPage
     title: qsTr("Fastfetch Settings")
     property bool isFileSelected: false
+    property string sTintedName: ""
 
     background: Rectangle {
         color: "transparent"
@@ -17,8 +18,8 @@ Kirigami.Page {
     ListModel {
         id: fastfetchModel
         ListElement {
-            config_path: "/home/iguruspain/.config/fastfetch/config.jsonc" //will be populated with config_reader.py logic, currently static for testing
-            config_image: "/home/iguruspain/.config/fastfetch/chica-tinted.png" //will be populated with config_reader.py logic, currently static for testing
+            config_path: "/home/iguruspain/.config/fastfetch/config.jsonc" //will be populated with file_utils.py logic, currently static for testing
+            config_image: "/home/iguruspain/.config/fastfetch/chica-tinted.png" //will be populated with file_utils.py logic, currently static for testing
             template_image_folder: "/home/iguruspain/.config/kwal/templates/fastfetch" //will be populated with target folder from templates installer
         }
     }
@@ -32,6 +33,11 @@ Kirigami.Page {
         showDirs: false
         showFiles: true
         sortField: FolderListModel.Name
+        onCountChanged: {
+            if (count > 0 && !fastfetchPage.isFileSelected) {
+                templateSelector.currentIndex = -1;
+            }
+        }
     }
 
     RowLayout {
@@ -70,11 +76,12 @@ Kirigami.Page {
                         id: clearSelectionButton
                         icon.name: "edit-clear"
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-                        opacity: fastfetchPage.isFileSelected ? 1 : 0
-                        enabled: fastfetchPage.isFileSelected
+                        //opacity: fastfetchPage.isFileSelected ? 1 : 0
+                        //enabled: fastfetchPage.isFileSelected
                         onClicked: {
                             pyController.clearSelectedFile(); 
                             fastfetchPage.isFileSelected = false;
+                            templateSelector.currentIndex = -1;
                         }
                     }              
                 }
@@ -89,6 +96,10 @@ Kirigami.Page {
                         model: templateFilesModel
                         textRole: "fileName"
                         enabled: !fastfetchPage.isFileSelected
+
+                        currentIndex: -1
+                        displayText: currentIndex === -1 ? qsTr("Select predefined") : currentText
+                        onActivated: {}                        
                     }
 
                     RowLayout {
@@ -97,13 +108,13 @@ Kirigami.Page {
                         TextField {
                             id: customTemplateField
                             Layout.fillWidth: true
-                            placeholderText: qsTr("Select a custom image")
+                            placeholderText: qsTr("Select your own image")
                             readOnly: true
                             text: {
                                 if (!pyController.selectedFile) return ""
                                 var f = pyController.selectedFile.replace("file://", "")
                                 var parts = f.split("/")
-                                return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 1).join("/") : f
+                                return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 2).join("/") : f
                             }
                         }
                         ToolButton {
@@ -133,27 +144,23 @@ Kirigami.Page {
         // Right Pane
         Rectangle {
             id: rightPaneFastfetch
-            color: Kirigami.Theme.backgroundColor
+            color: "transparent" //Kirigami.Theme.backgroundColor
             Layout.fillWidth: true
             Layout.fillHeight: true
 
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.largeSpacing
 
-                Text {
-                    text: qsTr("Fastfetch Previews")
-                    font.bold: true
-                    color: Kirigami.Theme.textColor
-                }
-
-                GridLayout {
-                    columns: 2
+                // Preview Section top
+                ColumnLayout {
+                    id: previewSectionTop
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.preferredHeight: 7
 
-                    Label { text: qsTr("Current"); font.bold: true }
-                    Item { Layout.fillHeight: true; Layout.fillWidth: true }
+                    Label { text: qsTr("Current (config):"); font.bold: true }
 
                     Image {
                         id: fastfetchCurrentImage
@@ -161,32 +168,81 @@ Kirigami.Page {
                         Layout.fillHeight: true
                         source: "file://" + fastfetchModel.get(0).config_image
                         fillMode: Image.PreserveAspectFit
+                        asynchronous: true
                     }
+                }
+                
+                // Preview Section bottom
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: Kirigami.Units.smallSpacing
+                    Layout.preferredHeight: 3
 
-                    Item { Layout.fillHeight: true; Layout.fillWidth: true }
-
-                    Label { text: qsTr("Template:"); font.bold: true }
-                    Label { text: qsTr("Tinted:"); font.bold: true }
-
-                    Image {
-                        id: fastfetchPreviewTemplate
+                    // Labels row
+                    RowLayout {
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        source: {
-                            if (pyController.selectedFile) {
-                                return pyController.selectedFile;
-                            }
-                            return templateSelector.currentValue ? (templateFilesModel.folder + "/" + templateSelector.currentText) : ""
+                    
+                        Label {
+                            id: selectedTemplateLabel
+                            text: {
+                                    let name = "";
+                                    if (fastfetchPage.isFileSelected) {
+                                        name = pyController.selectedFile ? pyController.selectedFile.split("/").pop() : "";
+                                    } else {
+                                        name = templateSelector.currentIndex !== -1 ? templateSelector.currentText : "";
+                                    }
+                                    //sTintedName = name !== "" ? replace(name, ".", "-tinted.") : "";
+                                    // update tinted name property
+                                    if (name !== "") {
+                                        fastfetchPage.sTintedName = name.replace(".", "-tinted.");
+                                    } else {
+                                        fastfetchPage.sTintedName = "";
+                                    }
+                                    
+                                    return name !== "" ? qsTr("Template: %1").arg(name) : qsTr("Template:");
+                                }
+                            visible: text !== qsTr("Template:")
+                            font.bold: true
                         }
-                        fillMode: Image.PreserveAspectFit
+                        Item { Layout.fillWidth: true }
+                        Label {
+                            id: tintedLabel
+                            text: {
+                                let name = fastfetchPage.sTintedName;
+                                return name !== "" ? qsTr("Tinted: %1").arg(name) : qsTr("Tinted:");
+                            } // Placeholder
+                            font.bold: true
+                            visible: text !== qsTr("Tinted:")
+                        }
                     }
-
-                    Image {
-                        id: fastfetchPreviewTinted
+                    // Images row
+                    RowLayout {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        source: fastfetchPreviewTemplate.source // Placeholder
-                        fillMode: Image.PreserveAspectFit
+                        spacing: Kirigami.Units.mediumSpacing
+                    
+                        Image {
+                            id: fastfetchPreviewTemplate
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+
+                            source: {
+                                if (pyController.selectedFile) {
+                                    return pyController.selectedFile;
+                                }
+                                return templateSelector.currentValue ? (templateFilesModel.folder + "/" + templateSelector.currentText) : ""
+                            }
+                            fillMode: Image.PreserveAspectFit
+                        }
+                        Image {
+                            id: fastfetchPreviewTinted
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            source: fastfetchPreviewTemplate.source // Placeholder, will be replaced with tinted version logic (controller and color_utils.py)
+                            fillMode: Image.PreserveAspectFit
+                            cache: false
+                        }
                     }
                 }
             }
