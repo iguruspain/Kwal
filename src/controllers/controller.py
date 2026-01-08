@@ -47,6 +47,11 @@ class Controller(QObject):
     fastfetchDestNameChanged = Signal()
     fastfetchBackupExistsChanged = Signal()
     fastfetchConfigImageChanged = Signal()
+    # Draft signals
+    fastfetchDraftColorChanged = Signal()
+    fastfetchIsFileModeChanged = Signal()
+    fastfetchTemplateIndexChanged = Signal()
+
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
 
@@ -67,6 +72,11 @@ class Controller(QObject):
         self._result_dialog_visible: bool = False
         self._result_dialog_text: str = ""
         self._templates_installed: bool = False
+        
+        # Draft State (Persist across tabs)
+        self._fastfetch_draft_color: str = "transparent"
+        self._fastfetch_is_file_mode: bool = False
+        self._fastfetch_template_index: int = -1
 
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
@@ -276,6 +286,38 @@ class Controller(QObject):
         return bak.exists() and bak.is_file()
 
     hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
+
+    # --- Draft Properties ---
+
+    def _get_fastfetch_draft_color(self) -> str:
+        return self._fastfetch_draft_color
+
+    def _set_fastfetch_draft_color(self, color: str) -> None:
+        if self._fastfetch_draft_color != color:
+            self._fastfetch_draft_color = color
+            self.fastfetchDraftColorChanged.emit()
+
+    fastfetchDraftColor = Property(str, _get_fastfetch_draft_color, _set_fastfetch_draft_color, notify=fastfetchDraftColorChanged)
+
+    def _get_fastfetch_is_file_mode(self) -> bool:
+        return self._fastfetch_is_file_mode
+
+    def _set_fastfetch_is_file_mode(self, v: bool) -> None:
+        if self._fastfetch_is_file_mode != v:
+            self._fastfetch_is_file_mode = v
+            self.fastfetchIsFileModeChanged.emit()
+
+    fastfetchIsFileMode = Property(bool, _get_fastfetch_is_file_mode, _set_fastfetch_is_file_mode, notify=fastfetchIsFileModeChanged)
+
+    def _get_fastfetch_template_index(self) -> int:
+        return self._fastfetch_template_index
+
+    def _set_fastfetch_template_index(self, idx: int) -> None:
+        if self._fastfetch_template_index != idx:
+            self._fastfetch_template_index = idx
+            self.fastfetchTemplateIndexChanged.emit()
+
+    fastfetchTemplateIndex = Property(int, _get_fastfetch_template_index, _set_fastfetch_template_index, notify=fastfetchTemplateIndexChanged)
 
     # --- Slots & Logic ---
 

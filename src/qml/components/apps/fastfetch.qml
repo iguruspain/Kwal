@@ -9,9 +9,8 @@ Kirigami.Page {
     title: qsTr("Fastfetch Settings")
     
     // Properties
-    property bool isFileSelected: false
+    // Local ephemeral properties derived from controller
     property string sTintedName: ""
-    property string selectedTintColor: "transparent"
 
     // Controller Helper
     // Safe access to pyController in case it's not injected yet (though it should be)
@@ -131,9 +130,11 @@ Kirigami.Page {
                         ToolTip.text: qsTr("Clear selection")
                         ToolTip.visible: hovered
                         onClicked: {
-                            if (controller) controller.clearSelectedFile(); 
-                            fastfetchPage.isFileSelected = false;
-                            templateSelector.currentIndex = -1;
+                            if (controller) {
+                                controller.clearSelectedFile(); 
+                                controller.fastfetchIsFileMode = false;
+                                controller.fastfetchTemplateIndex = -1;
+                            }
                         }
                     }              
                 }
@@ -150,21 +151,32 @@ Kirigami.Page {
                         model: (typeof fastfetchTemplateModel !== "undefined") ? fastfetchTemplateModel : null
                         textRole: "fileName"
                         
+                        // Binding to controller
+                        currentIndex: controller ? controller.fastfetchTemplateIndex : -1
+                        onCurrentIndexChanged: {
+                            if (controller && moving && currentIndex !== controller.fastfetchTemplateIndex) {
+                                controller.fastfetchTemplateIndex = currentIndex;
+                            }
+                        }
+                        
                         // Simplify enabled check
-                        enabled: !fastfetchPage.isFileSelected && (model ? model.rowCount() > 0 : false)
+                        enabled: (controller && !controller.fastfetchIsFileMode) && (model ? model.rowCount() > 0 : false)
                         opacity: enabled ? 1.0 : 0.5
 
-                        currentIndex: -1
                         displayText: currentIndex === -1 ? qsTr("Select predefined") : currentText
                         ToolTip.text: qsTr("Select a predefined template")
                         ToolTip.visible: hovered
                         
                         onActivated: {
                             if (currentIndex !== -1 && model && controller) {
+                                // Sync Index first
+                                controller.fastfetchTemplateIndex = currentIndex;
+                                
                                 var info = model.get(currentIndex);
                                 var url = info ? info.fileUrl : "";
-                                if (url && fastfetchPage.selectedTintColor !== "transparent" && fastfetchPage.selectedTintColor !== "") {
-                                    controller.generateTintedPreview(url, fastfetchPage.selectedTintColor);
+                                var tint = controller.fastfetchDraftColor;
+                                if (url && tint !== "transparent" && tint !== "") {
+                                    controller.generateTintedPreview(url, tint);
                                 }
                             }
                         }
@@ -198,10 +210,13 @@ Kirigami.Page {
                                 if (!controller) return;
                                 controller.openFileDialog();
                                 if (controller.selectedFile) {
-                                    fastfetchPage.isFileSelected = true;
-                                    controller.generateTintedPreview(controller.selectedFile, fastfetchPage.selectedTintColor);
+                                    controller.fastfetchIsFileMode = true;
+                                    var tint = controller.fastfetchDraftColor;
+                                    controller.generateTintedPreview(controller.selectedFile, tint);
                                 } else {
-                                    fastfetchPage.isFileSelected = false;
+                                    // kept previous state if cancelled? Or force false?
+                                    // Usually dialog cancel returns empty string but doesn't signify "unselect"
+                                    // But if clearSelectedFile wasn't called, selectedFile remains.
                                 }
                             }
                         }     
@@ -224,7 +239,10 @@ Kirigami.Page {
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         width: Kirigami.Units.gridUnit * 1.5
                         height: Kirigami.Units.gridUnit * 1.5
-                        color: fastfetchPage.selectedTintColor
+                        
+                        // Bind to controller property
+                        color: controller ? (controller.fastfetchDraftColor === "" ? "transparent" : controller.fastfetchDraftColor) : "transparent"
+                        
                         border.color: Kirigami.Theme.disabledTextColor
                         border.width: 1
                         radius: Kirigami.Units.smallSpacing
@@ -237,16 +255,18 @@ Kirigami.Page {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (!controller) return;
-                                var color = controller.openColorDialog(colorPreview.color);
+                                var currentColor = controller.fastfetchDraftColor;
+                                var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
                                 if (color) {
-                                    fastfetchPage.selectedTintColor = color;
+                                    controller.fastfetchDraftColor = color;
+                                    
                                     // Regenerate preview
                                     if (controller.selectedFile) {
-                                        controller.generateTintedPreview(controller.selectedFile, fastfetchPage.selectedTintColor);
-                                    } else if (templateSelector.currentIndex !== -1 && templateSelector.model) {
-                                        var info = templateSelector.model.get(templateSelector.currentIndex);
+                                        controller.generateTintedPreview(controller.selectedFile, color);
+                                    } else if (controller.fastfetchTemplateIndex !== -1 && templateSelector.model) {
+                                        var info = templateSelector.model.get(controller.fastfetchTemplateIndex);
                                         if (info && info.fileUrl) {
-                                            controller.generateTintedPreview(info.fileUrl, fastfetchPage.selectedTintColor);
+                                            controller.generateTintedPreview(info.fileUrl, color);
                                         }
                                     }
                                 }
@@ -377,9 +397,11 @@ Kirigami.Page {
                                 if (!controller) return qsTr("Template:");
                                 
                                 let name = "";
-                                if (fastfetchPage.isFileSelected) {
+                                if (controller.fastfetchIsFileMode) {
                                     name = controller.selectedFile ? controller.selectedFile.split("/").pop() : "";
                                 } else {
+                                    // Using templateSelector.currentText directly works, but cleaner to use model+index
+                                    // However, currentText is convenient.
                                     name = templateSelector.currentIndex !== -1 ? templateSelector.currentText : "";
                                 }
                                 
@@ -415,9 +437,9 @@ Kirigami.Page {
                                 fillMode: Image.PreserveAspectFit
                                 source: {
                                     if (!controller) return "";
-                                    if (controller.selectedFile) return controller.selectedFile;
+                                    if (controller.fastfetchIsFileMode && controller.selectedFile) return controller.selectedFile;
                                     
-                                    if (templateSelector.currentIndex !== -1 && templateSelector.model) {
+                                    if (!controller.fastfetchIsFileMode && templateSelector.currentIndex !== -1 && templateSelector.model) {
                                         var info = templateSelector.model.get(templateSelector.currentIndex);
                                         return info ? info.fileUrl : "";
                                     }
