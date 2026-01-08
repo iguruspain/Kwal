@@ -81,3 +81,8 @@ qmlcache/
 # Run
 run.py
 ordenes.txt
+
+# backups
+*~.bak
+*.backup
+*.bak
