@@ -54,6 +54,9 @@ class Controller(QObject):
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
+    
+    # Global notification signal (message, type["error"|"success"|"info"])
+    notification = Signal(str, str)
 
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
@@ -172,8 +175,9 @@ class Controller(QObject):
         try:
             with open(self._config_path_file, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, ensure_ascii=False, indent=2)
-        except Exception:
+        except Exception as e:
             self._logger.exception("Failed saving config")
+            self.notification.emit(f"Failed to save config: {e}", "error")
 
     def _restore_folder_selection(self, last_selected: str) -> None:
         initial_index = 0
@@ -512,13 +516,15 @@ class Controller(QObject):
         # KDE Plasma via qdbus
         qdbus_path = shutil.which("qdbus")
         if qdbus_path:
+            # Escape single quotes for JS string context
+            safe_path = abs_path.replace("'", r"\'")
             script = (
                 "var allDesktops = desktops();\n"
                 "for (var i = 0; i < allDesktops.length; i++) {\n"
                 "  var d = allDesktops[i];\n"
                 "  d.wallpaperPlugin = 'org.kde.image';\n"
                 "  d.currentConfigGroup = Array('Wallpaper','org.kde.image','General');\n"
-                f"  d.writeConfig('Image', 'file://{abs_path}');\n"
+                f"  d.writeConfig('Image', 'file://{safe_path}');\n"
                 "}\n"
             )
             try:
@@ -526,10 +532,12 @@ class Controller(QObject):
                     [qdbus_path, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", script],
                     capture_output=True, text=True, check=False
                 )
-            except Exception:
+            except Exception as e:
                 self._logger.exception("Failed to call qdbus")
+                self.notification.emit(f"Failed to apply wallpaper: {e}", "error")
         else:
             self._logger.warning("qdbus not found")
+            self.notification.emit("qdbus executable not found (required for KDE Plasma)", "error")
             
         self._save_config()
 

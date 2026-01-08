@@ -118,4 +118,14 @@ Kirigami.ApplicationWindow {
             Label { text: qsTr("Install default templates to your user configuration (~/.config/kwal/templates)?") }
         }
     }
+
+    // Connect passive notifications from Python Controller
+    Connections {
+        target: pyController
+        function onNotification(message, type) {
+            if (type === "error" && message !== "") {
+                root.showPassiveNotification(message, "short")
+            }
+        }
+    }
 }
