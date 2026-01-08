@@ -27,6 +27,7 @@ class Controller(QObject):
 	fastfetchTintedPreviewChanged = Signal()
 	fastfetchTintingChanged = Signal()
 	tintResult = Signal(str)
+	fastfetchApplyResult = Signal(bool, str)
 
 	def __init__(self, parent: Optional[QObject] = None):
 		super().__init__(parent)
@@ -529,6 +530,90 @@ class Controller(QObject):
 			self.fastfetchTintingChanged.emit()
 			self._tint_worker = None
 			self._tint_thread = None
+
+
+	@Slot(str, result=bool)
+	def applyTintedImage(self, dest_name: str) -> bool:
+		"""Start background task to copy tinted preview into fastfetch config and update `source`.
+
+		Emits `fastfetchApplyResult(success: bool, message: str)` when done.
+		Returns True if the background task started, False on immediate validation error.
+		"""
+		if not dest_name:
+			# immediate validation failure
+			return False
+		# ensure we have a tinted preview
+		src = self._fastfetch_tinted_preview
+		if not src:
+			return False
+
+		# prepare source path (strip file:// if present)
+		src_path = src.replace("file://", "") if src.startswith("file://") else src
+
+		def _worker(s: str, dname: str) -> None:
+			try:
+				dst_path = file_utils.copy_image_to_fastfetch(s, dname)
+				ok = file_utils.set_fastfetch_source_inplace(None, dst_path)
+				if not ok:
+					self.fastfetchApplyResult.emit(False, f"Copied to {dst_path} but failed to update config (no 'source' key found).")
+				else:
+					# notify QML to refresh shown config image
+					self.fastfetchTintedPreviewChanged.emit()
+					# clear cache locations related to fastfetch
+					try:
+						from ..utils.file_utils import clear_fastfetch_cache
+						clear_fastfetch_cache()
+					except Exception:
+						self._logger.exception("Failed clearing fastfetch cache after apply")
+					self.fastfetchApplyResult.emit(True, f"Applied tinted image to {dst_path}")
+			except FileNotFoundError as exc:
+				self._logger.error("applyTintedImage worker: source file not found: %s", exc)
+				self.fastfetchApplyResult.emit(False, str(exc))
+			except Exception:
+				self._logger.exception("applyTintedImage worker failed")
+				self.fastfetchApplyResult.emit(False, "Unexpected error while applying tinted image.")
+
+		thr = threading.Thread(target=_worker, args=(src_path, dest_name), daemon=True)
+		thr.start()
+		# store reference optionally
+		self._apply_thread = thr
+		return True
+
+	@Slot(str, result=bool)
+	def fastfetchDestinationExists(self, dest_name: str) -> bool:
+		"""Return True if a file named `dest_name` already exists in ~/.config/fastfetch."""
+		try:
+			if not dest_name:
+				return False
+			cfg_dir = file_utils.ensure_fastfetch_config_dir()
+			dst = cfg_dir / (dest_name and dest_name or "")
+			return dst.exists()
+		except Exception:
+			self._logger.exception("fastfetchDestinationExists failed for %r", dest_name)
+			return False
+
+	@Slot(result="QVariantMap")
+	def restoreFastfetchBackup(self) -> dict:
+		"""Restore the fixed fastfetch config backup (config.jsonc.bak).
+
+		Returns a dict: {"success": bool, "message": str}
+		"""
+		try:
+			ok = file_utils.restore_fastfetch_config_backup(None)
+			if ok:
+				# notify UI and return result
+				# clear cache locations after restore
+				try:
+					file_utils.clear_fastfetch_cache()
+				except Exception:
+					self._logger.exception("Failed clearing fastfetch cache after restore")
+				self.fastfetchApplyResult.emit(True, "Restored fastfetch config from backup")
+				return {"success": True, "message": "Restored fastfetch config from backup"}
+			else:
+				return {"success": False, "message": "No backup found to restore"}
+		except Exception:
+			self._logger.exception("Failed restoring fastfetch backup")
+			return {"success": False, "message": "Unexpected error while restoring backup"}
 
 	@Slot()
 	def stopTintWorker(self) -> None:
