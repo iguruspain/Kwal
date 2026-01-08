@@ -10,8 +10,6 @@ Kirigami.Page {
     property bool isFileSelected: false
     property string sTintedName: ""
     property string selectedTintColor: "transparent"
-    property bool resultDialogVisible: false
-    property string resultDialogText: ""
 
     background: Rectangle {
         color: "transparent"
@@ -19,14 +17,14 @@ Kirigami.Page {
 
     Dialog {
         id: resultDialog
-        visible: fastfetchPage.resultDialogVisible
+        visible: (typeof pyController !== "undefined") ? pyController.resultDialogVisible : false
         modal: true
         title: qsTr("Fastfetch")
         onVisibleChanged: {
-            if (!visible) fastfetchPage.resultDialogVisible = false;
+            if (!visible && typeof pyController !== "undefined") pyController.resultDialogVisible = false;
         }
         contentItem: Label {
-            text: fastfetchPage.resultDialogText
+            text: (typeof pyController !== "undefined") ? pyController.resultDialogText : ""
             wrapMode: Text.WordWrap
             leftPadding: Kirigami.Units.smallSpacing
             rightPadding: Kirigami.Units.smallSpacing
@@ -51,8 +49,8 @@ Kirigami.Page {
                         confirmDialog.visible = false
                         var started = pyController.applyTintedImage(pyController.fastfetchDestName);
                         if (!started) {
-                            fastfetchPage.resultDialogText = qsTr("Failed to start apply operation.");
-                            fastfetchPage.resultDialogVisible = true;
+                            pyController.resultDialogText = qsTr("Failed to start apply operation.");
+                            pyController.resultDialogVisible = true;
                         }
                     }
                 }
@@ -60,11 +58,14 @@ Kirigami.Page {
         }
     }
     Component.onCompleted: {
-        // Listen for background result signal from controller
-        pyController.fastfetchApplyResult.connect(function(success, message) {
-            fastfetchPage.resultDialogText = message || (success ? qsTr("Operation completed") : qsTr("Operation failed"));
-            fastfetchPage.resultDialogVisible = true;
-        })
+        // Listen for background result signal from controller (guarded)
+        var ctrl = (typeof pyController !== "undefined") ? pyController : null;
+        if (ctrl && ctrl.fastfetchApplyResult) {
+            ctrl.fastfetchApplyResult.connect(function(success, message) {
+                ctrl.resultDialogText = message || (success ? qsTr("Operation completed") : qsTr("Operation failed"));
+                ctrl.resultDialogVisible = true;
+            })
+        }
     }
 
     // Data provided by Python model/controller (FastfetchTemplateModel)
@@ -222,14 +223,17 @@ Kirigami.Page {
                 RowLayout {
                     Layout.fillWidth: true
                     Button {
-                        id: applyButton
+                        id: applyTintedButton
                         text: qsTr("Apply tinted")
                         Layout.fillWidth: true
+                        ToolTip.text: qsTr("Apply the tinted image to fastfetch config")
+                        ToolTip.visible: hovered
+                        enabled: pyController.fastfetchDestName && pyController.fastfetchDestName !== ""
                         onClicked: {
                             console.log("Apply Tinted Image clicked");
                             if (!pyController.fastfetchDestName || pyController.fastfetchDestName === "") {
-                                fastfetchPage.resultDialogText = qsTr("No destination filename available.");
-                                fastfetchPage.resultDialogVisible = true;
+                                pyController.resultDialogText = qsTr("No destination filename available.");
+                                pyController.resultDialogVisible = true;
                                 return;
                             }
                             var exists = pyController.fastfetchDestinationExists(pyController.fastfetchDestName);
@@ -239,8 +243,8 @@ Kirigami.Page {
                             } else {
                                 var started = pyController.applyTintedImage(pyController.fastfetchDestName);
                                 if (!started) {
-                                    fastfetchPage.resultDialogText = qsTr("Failed to start apply operation. Make sure a tinted preview exists and filename is valid.");
-                                    fastfetchPage.resultDialogVisible = true;
+                                    pyController.resultDialogText = qsTr("Failed to start apply operation. Make sure a tinted preview exists and filename is valid.");
+                                    pyController.resultDialogVisible = true;
                                 }
                             }
                         }
@@ -249,15 +253,18 @@ Kirigami.Page {
                         id: restoreBackupButton
                         text: qsTr("Restore backup")
                         Layout.fillWidth: true
+                        enabled: pyController.hasFastfetchBackup
+                        ToolTip.text: pyController.hasFastfetchBackup ? qsTr("Restore the fastfetch config from the last backup") : qsTr("No backup available to restore")
+                        ToolTip.visible: hovered
                         onClicked: {
                             console.log("Restore Backup clicked");
                             var res = pyController.restoreFastfetchBackup();
                             if (res) {
-                                fastfetchPage.resultDialogText = res.message || (res.success ? qsTr("Restore succeeded") : qsTr("Restore failed"));
+                                pyController.resultDialogText = res.message || (res.success ? qsTr("Restore succeeded") : qsTr("Restore failed"));
                             } else {
-                                fastfetchPage.resultDialogText = qsTr("Restore failed: no response from controller");
+                                pyController.resultDialogText = qsTr("Restore failed: no response from controller");
                             }
-                            fastfetchPage.resultDialogVisible = true;
+                            pyController.resultDialogVisible = true;
                         }
                     }
                 }
@@ -289,10 +296,10 @@ Kirigami.Page {
                         id: fastfetchCurrentImage
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        source: {
+                        source: pyController.fastfetchConfigImage !== "" ? pyController.fastfetchConfigImage : (function() {
                             var info = pyController.getFastfetchInfo();
                             return (info && info.config_image) ? ("file://" + info.config_image) : "";
-                        }
+                        })()
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                     }

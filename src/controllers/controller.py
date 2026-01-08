@@ -26,6 +26,12 @@ class Controller(QObject):
 	selectedFileChanged = Signal()
 	fastfetchTintedPreviewChanged = Signal()
 	fastfetchTintingChanged = Signal()
+	resultDialogVisibleChanged = Signal()
+	resultDialogTextChanged = Signal()
+	fastfetchDestNameChanged = Signal()
+	fastfetchBackupExistsChanged = Signal()
+	fastfetchConfigImageChanged = Signal()
+	fastfetchDestNameChanged = Signal()
 	tintResult = Signal(str)
 	fastfetchApplyResult = Signal(bool, str)
 
@@ -70,6 +76,14 @@ class Controller(QObject):
 
 		self._fastfetch_tinted_preview: str = ""
 		self._fastfetch_tinting: bool = False
+		# destination filename for tinted image (exposed to QML)
+		self._fastfetch_dest_name: str = ""
+		# currently configured fastfetch image (as file:// URL) exposed to QML
+		self._fastfetch_config_image: str = ""
+		# dialog properties exposed to QML
+		self._result_dialog_visible: bool = False
+		self._result_dialog_text: str = ""
+		# no explicit cached backup flag; expose via property getter
 		self._tint_worker: Optional[object] = None
 		self._tint_thread: Optional[QThread] = None
 		# connect tint result signal (used by background Python thread)
@@ -504,6 +518,47 @@ class Controller(QObject):
 
 	def _get_selected_file(self) -> str:
 		return self._selected_file
+
+	def _get_fastfetch_dest_name(self) -> str:
+		return getattr(self, "_fastfetch_dest_name", "")
+
+	def _set_fastfetch_dest_name(self, name: str) -> None:
+		val = name or ""
+		if getattr(self, "_fastfetch_dest_name", "") != val:
+			self._fastfetch_dest_name = val
+			self.fastfetchDestNameChanged.emit()
+
+	def _get_fastfetch_config_image(self) -> str:
+		return getattr(self, "_fastfetch_config_image", "")
+
+	def _set_fastfetch_config_image(self, path: str) -> None:
+		p = path or ""
+		if getattr(self, "_fastfetch_config_image", "") != p:
+			self._fastfetch_config_image = p
+			self.fastfetchConfigImageChanged.emit()
+
+	def _get_result_dialog_visible(self) -> bool:
+		return getattr(self, "_result_dialog_visible", False)
+
+	def _set_result_dialog_visible(self, v: bool) -> None:
+		v_bool = bool(v)
+		if getattr(self, "_result_dialog_visible", False) != v_bool:
+			self._result_dialog_visible = v_bool
+			self.resultDialogVisibleChanged.emit()
+
+	def _get_result_dialog_text(self) -> str:
+		return getattr(self, "_result_dialog_text", "")
+
+	def _set_result_dialog_text(self, txt: str) -> None:
+		t = txt or ""
+		if getattr(self, "_result_dialog_text", "") != t:
+			self._result_dialog_text = t
+			self.resultDialogTextChanged.emit()
+
+	def _get_fastfetch_backup_exists(self) -> bool:
+		cfg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc"
+		bak = cfg.with_name(cfg.name + ".bak")
+		return bak.exists() and bak.is_file()
 	
 
 	def _get_selected_folder(self) -> str:
@@ -540,11 +595,18 @@ class Controller(QObject):
 		Returns True if the background task started, False on immediate validation error.
 		"""
 		if not dest_name:
-			# immediate validation failure
+			# immediate validation failure -> show dialog
+			self._result_dialog_text = "No destination filename available."
+			self.resultDialogTextChanged.emit()
+			self._result_dialog_visible = True
+			self.resultDialogVisibleChanged.emit()
 			return False
 		# ensure we have a tinted preview
 		src = self._fastfetch_tinted_preview
 		if not src:
+			self._result_dialog_text = "No tinted preview available to apply."
+			self.resultDialogTextChanged.emit()
+			self._result_dialog_visible = True
 			return False
 
 		# prepare source path (strip file:// if present)
@@ -555,7 +617,13 @@ class Controller(QObject):
 				dst_path = file_utils.copy_image_to_fastfetch(s, dname)
 				ok = file_utils.set_fastfetch_source_inplace(None, dst_path)
 				if not ok:
-					self.fastfetchApplyResult.emit(False, f"Copied to {dst_path} but failed to update config (no 'source' key found).")
+					msg = f"Copied to {dst_path} but failed to update config (no 'source' key found)."
+					# set dialog via controller properties
+					self._result_dialog_text = msg
+					self.resultDialogTextChanged.emit()
+					self._result_dialog_visible = True
+					self.resultDialogVisibleChanged.emit()
+					self.fastfetchApplyResult.emit(False, msg)
 				else:
 					# notify QML to refresh shown config image
 					self.fastfetchTintedPreviewChanged.emit()
@@ -565,12 +633,30 @@ class Controller(QObject):
 						clear_fastfetch_cache()
 					except Exception:
 						self._logger.exception("Failed clearing fastfetch cache after apply")
-					self.fastfetchApplyResult.emit(True, f"Applied tinted image to {dst_path}")
+					msg = f"Applied tinted image to {dst_path}"
+					# update config image property (show new applied image)
+					self._set_fastfetch_config_image('file://' + str(dst_path))
+					# update dialog and notify backup existence
+					self._result_dialog_text = msg
+					self.resultDialogTextChanged.emit()
+					self._result_dialog_visible = True
+					self.resultDialogVisibleChanged.emit()
+					# emit that a backup likely exists now (set_fastfetch_source_inplace creates a .bak)
+					self.fastfetchBackupExistsChanged.emit()
+					self.fastfetchApplyResult.emit(True, msg)
 			except FileNotFoundError as exc:
 				self._logger.error("applyTintedImage worker: source file not found: %s", exc)
+				self._result_dialog_text = str(exc)
+				self.resultDialogTextChanged.emit()
+				self._result_dialog_visible = True
+				self.resultDialogVisibleChanged.emit()
 				self.fastfetchApplyResult.emit(False, str(exc))
 			except Exception:
 				self._logger.exception("applyTintedImage worker failed")
+				self._result_dialog_text = "Unexpected error while applying tinted image."
+				self.resultDialogTextChanged.emit()
+				self._result_dialog_visible = True
+				self.resultDialogVisibleChanged.emit()
 				self.fastfetchApplyResult.emit(False, "Unexpected error while applying tinted image.")
 
 		thr = threading.Thread(target=_worker, args=(src_path, dest_name), daemon=True)
@@ -601,16 +687,37 @@ class Controller(QObject):
 		try:
 			ok = file_utils.restore_fastfetch_config_backup(None)
 			if ok:
-				# notify UI and return result
 				# clear cache locations after restore
 				try:
 					file_utils.clear_fastfetch_cache()
 				except Exception:
 					self._logger.exception("Failed clearing fastfetch cache after restore")
-				self.fastfetchApplyResult.emit(True, "Restored fastfetch config from backup")
-				return {"success": True, "message": "Restored fastfetch config from backup"}
+				msg = "Restored fastfetch config from backup"
+				# set dialog properties on controller
+				self._result_dialog_text = msg
+				self.resultDialogTextChanged.emit()
+				self._result_dialog_visible = True
+				self.resultDialogVisibleChanged.emit()
+				# after restore, read config to update current config image shown in UI
+				try:
+					info = self.getFastfetchInfo()
+					if info and info.get("config_image"):
+						self._set_fastfetch_config_image("file://" + str(info.get("config_image")))
+					else:
+						self._set_fastfetch_config_image("")
+				except Exception:
+					self._logger.exception("Failed updating fastfetchConfigImage after restore")
+				# backup still exists after restore; notify change
+				self.fastfetchBackupExistsChanged.emit()
+				self.fastfetchApplyResult.emit(True, msg)
+				return {"success": True, "message": msg}
 			else:
-				return {"success": False, "message": "No backup found to restore"}
+				msg = "No backup found to restore"
+				self._result_dialog_text = msg
+				self.resultDialogTextChanged.emit()
+				self._result_dialog_visible = True
+				self.fastfetchApplyResult.emit(False, msg)
+				return {"success": False, "message": msg}
 		except Exception:
 			self._logger.exception("Failed restoring fastfetch backup")
 			return {"success": False, "message": "Unexpected error while restoring backup"}
@@ -678,3 +785,8 @@ class Controller(QObject):
 	selectedFolder = Property(str, _get_selected_folder, notify=selectedFolderChanged)
 	fastfetchTintedPreview = Property(str, _get_fastfetch_tinted_preview, notify=fastfetchTintedPreviewChanged)
 	fastfetchTinting = Property(bool, _get_fastfetch_tinting, notify=fastfetchTintingChanged)
+	resultDialogVisible = Property(bool, _get_result_dialog_visible, _set_result_dialog_visible, notify=resultDialogVisibleChanged)
+	resultDialogText = Property(str, _get_result_dialog_text, _set_result_dialog_text, notify=resultDialogTextChanged)
+	fastfetchDestName = Property(str, _get_fastfetch_dest_name, _set_fastfetch_dest_name, notify=fastfetchDestNameChanged)
+	hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
+	fastfetchConfigImage = Property(str, _get_fastfetch_config_image, _set_fastfetch_config_image, notify=fastfetchConfigImageChanged)
