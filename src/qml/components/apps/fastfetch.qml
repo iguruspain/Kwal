@@ -187,7 +187,7 @@ Kirigami.Page {
                     id: previewSectionTop
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 7
+                    Layout.preferredHeight: 6
 
                     Label { text: qsTr("Current (config):"); font.bold: true }
 
@@ -215,7 +215,7 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: Kirigami.Units.smallSpacing
-                    Layout.preferredHeight: 3
+                    Layout.preferredHeight: 4
 
                     GridLayout {
                         columns: 2
