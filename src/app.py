@@ -40,7 +40,7 @@ def main():
 
     if getattr(args, "install_templates", False):
         try:
-            from .utils.setup import install_templates_to_user
+            from .utils.template_installer import install_templates_to_user
 
             install_templates_to_user()
             return 0

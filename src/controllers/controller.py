@@ -356,7 +356,7 @@ class Controller(QObject):
     def installTemplates(self) -> bool:
         """Attempt to install packaged templates to user's XDG config."""
         try:
-            from ..utils.setup import install_templates_to_user
+            from ..utils.template_installer import install_templates_to_user
             install_templates_to_user()
             self._templates_installed = self._check_templates_installed()
             self.templatesInstalledChanged.emit()

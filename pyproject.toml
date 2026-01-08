@@ -42,3 +42,18 @@ include-package-data = true
 "share/applications" = ["org.kde.kwal.desktop"]
 "share/icons/hicolor/scalable/apps" = ["src/resources/icon/kwal.svg"]
 "share/kwal/templates" = ["src/resources/templates"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = []
