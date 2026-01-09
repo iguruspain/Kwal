@@ -323,6 +323,10 @@ Kirigami.Page {
                     ToolButton {
                         text: qsTr("Set as Wallpaper")
                         icon.name: "dialog-ok-apply"
+                        // Positive color styling
+                        icon.color: Kirigami.Theme.positiveTextColor
+                        palette.buttonText: Kirigami.Theme.positiveTextColor
+                        
                         onClicked: {
                             pyController.setAsWallpaper(pyController.selectedWallpaper)
                             rightPaneWallpapers.drawerOpen = false
@@ -331,6 +335,10 @@ Kirigami.Page {
                     ToolButton {
                         text: qsTr("Close")
                         icon.name: "dialog-close"
+                        // Negative color styling
+                        icon.color: Kirigami.Theme.negativeTextColor
+                        palette.buttonText: Kirigami.Theme.negativeTextColor
+                        
                         onClicked: {
                             rightPaneWallpapers.drawerOpen = false
                         }
