@@ -1,6 +1,7 @@
 json5
 toml
 cssutils
+materialyoucolor
+pywal16
 Pillow
 PySide6
-
