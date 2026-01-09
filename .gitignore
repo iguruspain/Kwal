@@ -33,6 +33,7 @@ pip-log.txt
 .coverage.*
 coverage.xml
 htmlcov/
+tests/*
 
 # Translations
 *.mo

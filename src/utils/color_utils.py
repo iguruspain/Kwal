@@ -167,16 +167,25 @@ def _extract_pywal16(path: Path) -> PaletteData:
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "pywal"
     cache.mkdir(parents=True, exist_ok=True)
     
-    # pywal16 returns a dict.
-    data = pywal_colors.get(str(path), cache_dir=str(cache))
-    
+    # pywal16 returns a dict. In some pywal versions or on certain images
+    # the backend can raise IndexError (internal color list shorter than expected).
+    # Catch such failures and fallback to the ImageMagick extractor.
+    try:
+        data = pywal_colors.get(str(path), cache_dir=str(cache))
+    except IndexError as e:
+        logger.warning("pywal returned incomplete color data for %s: %s. Falling back to ImageMagick.", path, e)
+        return _extract_imagemagick(path)
+    except Exception:
+        logger.exception("pywal.get failed for %s, falling back to ImageMagick", path)
+        return _extract_imagemagick(path)
+
     colors_dict = data.get('colors', {})
-    # Extract color0 to color15
+    # Extract color0 to color15, defaulting to #000000 if missing
     colors_list = [str(colors_dict.get(f"color{i}", "#000000")) for i in range(16)]
-    
+
     # Accents: Use a selection of the generated colors (1-6 are usually the accents)
     accents = colors_list[1:7]
-    
+
     return PaletteData(colors=colors_list, accents=accents, backend_used="pywal16", source_path=str(path))
 
 
@@ -194,8 +203,8 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
         img = img.convert("RGBA")
         img.thumbnail((128, 128))
         pixels = list(img.getdata())
-        # Convert to ints ARGB
-        pixel_ints = [((0xFF << 24) | (r << 16) | (g << 8) | b) for r,g,b,a in pixels]
+        # Convert to list of [r,g,b] as expected by QuantizeCelebi
+        pixel_ints = [[r, g, b] for r, g, b, a in pixels]
         
     with suppress_stdout():
         stats = QuantizeCelebi(pixel_ints, 128)
@@ -211,41 +220,57 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     contrast = kwargs.get("contrast", 0.0)
     
     scheme = SchemeTonalSpot(hct, is_dark, contrast)
-    
-    def hex_from_int(i):
-        # materialyoucolor returns ARGB int, we want hex RRGGBB
-        # mask 0xFFFFFF to strict RGB
+
+    def hex_from_int(i: int) -> str:
         return f"#{i & 0xFFFFFF:06x}"
 
-    # Approximation of 16 colors using material tones
-    c = []
+    # Use Hct.from_hct to generate colors for requested tones.
+    base_hue = hct.hue
+    base_chroma = max(0.0, float(getattr(hct, "chroma", 0.0)))
+    neutral_chroma = min(4.0, base_chroma)
+
+    def make_hex(hue: float, chroma: float, tone: float) -> str:
+        try:
+            nh = Hct.from_hct(hue, chroma, tone)
+            return hex_from_int(nh.to_int())
+        except Exception:
+            # Fallback: use original source color hex
+            return hex_from_int(source_color_int)
+
+    # Derive primary/secondary/tertiary hues by simple offsets (robust across versions)
+    primary_hue = base_hue
+    secondary_hue = (base_hue + 60.0) % 360.0
+    tertiary_hue = (base_hue + 120.0) % 360.0
+
+    # Approximation of 16 colors using HCT tones
+    c: list[str] = []
     # 0-7: Base/Dark
-    c.append(hex_from_int(scheme.neutral1.tone(10)))
-    c.append(hex_from_int(scheme.primary.tone(80)))
-    c.append(hex_from_int(scheme.secondary.tone(80)))
-    c.append(hex_from_int(scheme.tertiary.tone(80)))
-    c.append(hex_from_int(scheme.primary.tone(60)))
-    c.append(hex_from_int(scheme.secondary.tone(60)))
-    c.append(hex_from_int(scheme.tertiary.tone(60)))
-    c.append(hex_from_int(scheme.neutral1.tone(90)))
-    
+    c.append(make_hex(base_hue, neutral_chroma, 10))
+    c.append(make_hex(primary_hue, base_chroma, 80))
+    c.append(make_hex(secondary_hue, base_chroma, 80))
+    c.append(make_hex(tertiary_hue, base_chroma, 80))
+    c.append(make_hex(primary_hue, base_chroma, 60))
+    c.append(make_hex(secondary_hue, base_chroma, 60))
+    c.append(make_hex(tertiary_hue, base_chroma, 60))
+    c.append(make_hex(base_hue, neutral_chroma, 90))
+
     # 8-15: Bright
-    c.append(hex_from_int(scheme.neutral1.tone(30)))
-    c.append(hex_from_int(scheme.primary.tone(90)))
-    c.append(hex_from_int(scheme.secondary.tone(90)))
-    c.append(hex_from_int(scheme.tertiary.tone(90)))
-    c.append(hex_from_int(scheme.primary.tone(70)))
-    c.append(hex_from_int(scheme.secondary.tone(70)))
-    c.append(hex_from_int(scheme.tertiary.tone(70)))
-    c.append(hex_from_int(scheme.neutral1.tone(99)))
-    
+    c.append(make_hex(base_hue, neutral_chroma, 30))
+    c.append(make_hex(primary_hue, base_chroma, 90))
+    c.append(make_hex(secondary_hue, base_chroma, 90))
+    c.append(make_hex(tertiary_hue, base_chroma, 90))
+    c.append(make_hex(primary_hue, base_chroma, 70))
+    c.append(make_hex(secondary_hue, base_chroma, 70))
+    c.append(make_hex(tertiary_hue, base_chroma, 70))
+    c.append(make_hex(base_hue, neutral_chroma, 99))
+
     accents = [
         hex_from_int(source_color_int),
-        hex_from_int(scheme.primary.tone(80)),
-        hex_from_int(scheme.secondary.tone(80)),
-        hex_from_int(scheme.tertiary.tone(80))
+        make_hex(primary_hue, base_chroma, 80),
+        make_hex(secondary_hue, base_chroma, 80),
+        make_hex(tertiary_hue, base_chroma, 80),
     ]
-    
+
     return PaletteData(colors=c, accents=accents, backend_used="material-you", source_path=str(path))
 
 
