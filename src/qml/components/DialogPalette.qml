@@ -162,8 +162,8 @@ Dialog {
 
             // Extract Button
             Button {
-                text: qsTr("Extract")
-                icon.name: "color-picker"
+                //text: qsTr("Extract")
+                icon.name: "palette-symbolic"
                 Layout.fillWidth: true
                 onClicked: {
                     var path = (root.sourceMode === 0) ? root.appSelectedWallpaper : root.sourceImage
@@ -189,6 +189,7 @@ Dialog {
                     }
                 }
             }
+            Item { Layout.fillWidth: true } // Spacer
         }
         
         // 3b. Aux Controls (Contrast only for Material You)

@@ -657,27 +657,51 @@ class Controller(QObject):
     @Slot(result=str)
     def getCurrentSystemWallpaper(self) -> str:
         """Retrieve current wallpaper from KDE Plasma via config file directly (more reliable than qdbus parsing)."""
-        # Try reading plasma-org.kde.plasma.desktop-appletsrc
+        # Prefer qdbus / PlasmaShell evaluateScript parsing (uses Plasma's runtime state)
+        try:
+            qdbus_path = shutil.which("qdbus") or shutil.which("qdbus-qt6") or shutil.which("qdbus6")
+            if qdbus_path:
+                script = (
+                    "var ds = desktops();\n"
+                    "for (let i = 0; i < ds.length; i++) {\n"
+                    "  if (ds[i].screen == 0) {\n"
+                    "    ds[i].currentConfigGroup = Array('Wallpaper', ds[i].wallpaperPlugin, 'General');\n"
+                    "    if (ds[i].wallpaperPlugin == 'org.kde.image') {\n"
+                    "      print(ds[i].readConfig('Image').replace('file://', ''));\n"
+                    "    }\n"
+                    "  }\n"
+                    "}\n"
+                )
+                try:
+                    proc = subprocess.run(
+                        [qdbus_path, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", script],
+                        capture_output=True, text=True, check=False
+                    )
+                    out = (proc.stdout or "").strip()
+                    if out:
+                        # Filter empty lines and take first non-empty
+                        lines = [l.strip() for l in out.splitlines() if l.strip()]
+                        if lines:
+                            candidate = lines[0]
+                            # If value looks like a file path and exists, return it
+                            if os.path.exists(candidate):
+                                return candidate
+                except Exception:
+                    self._logger.debug("qdbus evaluateScript failed", exc_info=True)
+        except Exception:
+            # Do not fail hard on qdbus detection; fall back to config parsing below
+            self._logger.debug("Error checking qdbus for wallpaper", exc_info=True)
+
+        # Fallback: parse plasma-org.kde.plasma.desktop-appletsrc (heuristic)
         try:
             config_path = Path.home() / ".config" / "plasma-org.kde.plasma.desktop-appletsrc"
             if not config_path.exists():
-                # Fallback to last known set wallpaper if available
                 return self._last_set_wallpaper if self._last_set_wallpaper else ""
 
-            # Simple parser to find Image=... under [Wallpaper][org.kde.image][General]
-            # Since identifying the correct containment (Desktop) is hard by ID,
-            # we look for the most recently modified or just the first valid Image entry 
-            # under a Wallpaper block.
-            
-            import configparser
-            # ConfigParser is strict, INI provided by KDE might have duplicate keys or oddities.
-            # Let's do a manual scan for 'Image=file://...'
-            
             found_image = ""
             with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = f.readlines()
-            
-            # Heuristic: look for Image=file://... inside a [Wallpaper] section
+
             in_wallpaper_group = False
             for line in lines:
                 line = line.strip()
@@ -685,29 +709,22 @@ class Controller(QObject):
                     in_wallpaper_group = True
                     continue
                 if line.startswith("[") and "Wallpaper" not in line:
-                    # Leaving a wallpaper group potentially, but sections are flat in INI logic often
-                    # But KDE INI structure usually nests via [Containments][24][Wallpaper]...
                     pass
-                
+
                 if in_wallpaper_group and line.startswith("Image="):
-                    # Found an image
                     val = line.split("=", 1)[1].strip()
                     if val.startswith("file://"):
                         getPath = val[7:]
                         if os.path.exists(getPath):
                             found_image = getPath
-                            # Keep searching? Usually we want the last one or the first? 
-                            # Usually all desktops have same wallpaper if synced, or different.
-                            # We take the one found.
                             break
-            
+
             if found_image:
                 return found_image
-                
         except Exception as e:
             self._logger.error("Error reading system wallpaper: %s", e)
-            
-        # Fallback
+
+        # Final fallback
         return self._last_set_wallpaper if self._last_set_wallpaper else ""
 
     @Slot(str, str)
