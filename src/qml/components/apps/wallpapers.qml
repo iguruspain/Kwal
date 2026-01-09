@@ -311,7 +311,7 @@ Kirigami.Page {
                 Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
 
                 radius: Kirigami.Units.largeSpacing
-                color: Kirigami.Theme.backgroundColor
+                color: root.overlayBackgroundColor
                 border.color: Kirigami.Theme.textColor
                 border.width: 1
 

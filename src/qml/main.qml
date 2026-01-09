@@ -5,7 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import "components" as Components
+//import "components" as Components
 
 Kirigami.ApplicationWindow {
     id: root
@@ -14,25 +14,61 @@ Kirigami.ApplicationWindow {
     height: 610
     title: "Kwal"
     
+    // Global Safe Overlay Color
+    // Depends on the compositing state:
+    // - Enabled: Semi-transparent (80%) for modern look.
+    // - Disabled: Solid Alternate Background Color for readability fallback.
+    readonly property color overlayBackgroundColor: pyController.compositingEnabled 
+        ? Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
+        : Kirigami.Theme.backgroundColor
+    
     // Enable transparency for the main window
     color: "transparent"
+
+
+    // Global Drawer for Application Settings
+    globalDrawer: Kirigami.GlobalDrawer {
+        isMenu: true
+        modal: true
+        
+        actions: [
+            Kirigami.Action {
+                text: qsTr("Application Settings")
+                icon.name: "configure"
+                // Group actions under a header
+                Kirigami.Action {
+                    text: qsTr("Transparency Effects")
+                    checkable: true
+                    checked: pyController.compositingEnabled
+                    onToggled: pyController.toggleCompositing()
+                    icon.name: "blur-on" 
+                }
+            },
+            Kirigami.Action {
+                text: qsTr("Quit")
+                icon.name: "application-exit"
+                shortcut: StandardKey.Quit
+                onTriggered: Qt.quit()
+            }
+        ]
+    }
 
     pageStack.initialPage: settingsAltRoot
     Kirigami.Page {
         id: settingsAltRoot
         background: Rectangle {
-            color: Kirigami.Theme.backgroundColor
-            opacity: 0.8 
+            // Inherit global safe overlay color logic
+            color: root.overlayBackgroundColor
         }
         
-        // El título cambia dinámicamente según la pestaña seleccionada
+        // The title updates dynamically based on the selected tab
         title: {
             const item = pyController.settingsAppModel.get(tabBar.currentIndex);
             return item ? item.title : "Settings";
         }
 
         header: Pane {
-            // Usamos un Pane para dar un fondo consistente al header
+            // Use a Pane to give a consistent background to the header
             background: Rectangle { color: "transparent" }
             topPadding: Kirigami.Units.smallSpacing
             bottomPadding: 0
@@ -40,14 +76,14 @@ Kirigami.ApplicationWindow {
             contentItem: RowLayout {
                 width: parent.width
 
-                // Espaciador izquierdo
+                // Left spacer
                 Item { Layout.fillWidth: true }
 
                 TabBar {
                     id: tabBar
                     currentIndex: swipeView.currentIndex
                     
-                    // Quitamos el fondo por defecto de la TabBar si quieres un look más limpio
+                    // Remove the TabBar default background for a cleaner look
                     background: Rectangle { color: "transparent" }
 
                     Repeater {
@@ -56,13 +92,13 @@ Kirigami.ApplicationWindow {
                             required property string title
                             text: title
                             
-                            // Opcional: ajustar el ancho de los botones
+                            // Optional: adjust button widths
                             implicitWidth: Math.max(100, Kirigami.Units.gridUnit * 5)
                         }
                     }
                 }
 
-                // Espaciador derecho
+                // Right spacer
                 Item { Layout.fillWidth: true }
             }
         }
@@ -73,18 +109,18 @@ Kirigami.ApplicationWindow {
             currentIndex: tabBar.currentIndex
             clip: true
 
-            // Implementación con Repeater para mantener el estado de las páginas
+            // Use a Repeater to preserve page state
             Repeater {
                 model: pyController.settingsAppModel
                 delegate: Loader {
                     required property string qmlpage
                     required property int index
                     
-                    // Solo carga la página si es la actual o la adyacente para fluidez
+                    // Only load the page if it's current or adjacent for smoothness
                     active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
                     source: "components/" + qmlpage
                     
-                    // Evita que las páginas no visibles intercepten eventos o consuman CPU
+                    // Prevent non-visible pages from intercepting events or consuming CPU
                     visible: SwipeView.isCurrentItem
                 }
             }

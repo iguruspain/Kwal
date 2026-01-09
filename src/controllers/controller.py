@@ -51,6 +51,8 @@ class Controller(QObject):
     fastfetchDraftColorChanged = Signal()
     fastfetchIsFileModeChanged = Signal()
     fastfetchTemplateIndexChanged = Signal()
+    # Signal for compositing
+    compositingEnabledChanged = Signal()
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
@@ -80,6 +82,9 @@ class Controller(QObject):
         self._fastfetch_draft_color: str = "transparent"
         self._fastfetch_is_file_mode: bool = False
         self._fastfetch_template_index: int = -1
+        
+        # Compositing state (True by default for modern desktops)
+        self._compositing_enabled: bool = True
 
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
@@ -291,6 +296,22 @@ class Controller(QObject):
         return bak.exists() and bak.is_file()
 
     hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
+
+    # --- Compositing Control ---
+
+    @Property(bool, notify=compositingEnabledChanged)
+    def compositingEnabled(self) -> bool:
+        return self._compositing_enabled
+
+    @compositingEnabled.setter
+    def compositingEnabled(self, value: bool) -> None:
+        if self._compositing_enabled != value:
+            self._compositing_enabled = value
+            self.compositingEnabledChanged.emit()
+
+    @Slot()
+    def toggleCompositing(self) -> None:
+        self.compositingEnabled = not self._compositing_enabled
 
     # --- Draft Properties ---
 
