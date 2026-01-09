@@ -1,18 +1,37 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import colorsys
 import hashlib
 import logging
+import math
 import os
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
-from PIL import ImageColor
+from PIL import Image, ImageColor
+
+from src.models.models import PaletteData
+from src.utils.file_utils import check_binary
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 
 def _normalize_tint(tint_hex: str | None) -> str | None:
@@ -118,3 +137,173 @@ def clear_fastfetch_tinted_cache() -> None:
             logger.info("Cleared fastfetch tinted cache %s", cache_root)
     except Exception:
         logger.exception("Failed clearing fastfetch tinted cache")
+
+
+def extract_palette(image_path: str, backend: str, **kwargs) -> PaletteData:
+    """Extract a color palette from an image using the specified backend."""
+    path = Path(image_path).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Image not found: {path}")
+
+    logger.info("Extracting palette from %s using %s", path, backend)
+
+    if backend == "pywal16":
+        return _extract_pywal16(path)
+    elif backend == "material-you":
+        return _extract_material_you(path, **kwargs)
+    elif backend == "imagemagick":
+        return _extract_imagemagick(path)
+    else:
+        raise ValueError(f"Unknown backend: {backend}")
+
+
+def _extract_pywal16(path: Path) -> PaletteData:
+    try:
+        import pywal.colors as pywal_colors # type: ignore
+    except ImportError:
+        raise ImportError("pywal16 (pywal module) is not installed.")
+
+    # pywal16 needs a valid cache_dir even if we don't care much, or handles None poorly in some versions
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "pywal"
+    cache.mkdir(parents=True, exist_ok=True)
+    
+    # pywal16 returns a dict.
+    data = pywal_colors.get(str(path), cache_dir=str(cache))
+    
+    colors_dict = data.get('colors', {})
+    # Extract color0 to color15
+    colors_list = [str(colors_dict.get(f"color{i}", "#000000")) for i in range(16)]
+    
+    # Accents: Use a selection of the generated colors (1-6 are usually the accents)
+    accents = colors_list[1:7]
+    
+    return PaletteData(colors=colors_list, accents=accents, backend_used="pywal16", source_path=str(path))
+
+
+def _extract_material_you(path: Path, **kwargs) -> PaletteData:
+    try:
+        from materialyoucolor.quantize import QuantizeCelebi # type: ignore
+        from materialyoucolor.score.score import Score # type: ignore
+        from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot # type: ignore
+        from materialyoucolor.hct import Hct # type: ignore
+    except ImportError:
+        raise ImportError("materialyoucolor module is not installed.")
+        
+    # Read image with Pillow and reduce size for speed
+    with Image.open(path) as img:
+        img = img.convert("RGBA")
+        img.thumbnail((128, 128))
+        pixels = list(img.getdata())
+        # Convert to ints ARGB
+        pixel_ints = [((0xFF << 24) | (r << 16) | (g << 8) | b) for r,g,b,a in pixels]
+        
+    with suppress_stdout():
+        stats = QuantizeCelebi(pixel_ints, 128)
+        ranked = Score.score(stats)
+    
+    if not ranked:
+        raise ValueError("Could not extract primary color for Material You")
+        
+    source_color_int = ranked[0]
+    hct = Hct.from_int(source_color_int)
+    
+    is_dark = kwargs.get("dark_mode", True)
+    contrast = kwargs.get("contrast", 0.0)
+    
+    scheme = SchemeTonalSpot(hct, is_dark, contrast)
+    
+    def hex_from_int(i):
+        # materialyoucolor returns ARGB int, we want hex RRGGBB
+        # mask 0xFFFFFF to strict RGB
+        return f"#{i & 0xFFFFFF:06x}"
+
+    # Approximation of 16 colors using material tones
+    c = []
+    # 0-7: Base/Dark
+    c.append(hex_from_int(scheme.neutral1.tone(10)))
+    c.append(hex_from_int(scheme.primary.tone(80)))
+    c.append(hex_from_int(scheme.secondary.tone(80)))
+    c.append(hex_from_int(scheme.tertiary.tone(80)))
+    c.append(hex_from_int(scheme.primary.tone(60)))
+    c.append(hex_from_int(scheme.secondary.tone(60)))
+    c.append(hex_from_int(scheme.tertiary.tone(60)))
+    c.append(hex_from_int(scheme.neutral1.tone(90)))
+    
+    # 8-15: Bright
+    c.append(hex_from_int(scheme.neutral1.tone(30)))
+    c.append(hex_from_int(scheme.primary.tone(90)))
+    c.append(hex_from_int(scheme.secondary.tone(90)))
+    c.append(hex_from_int(scheme.tertiary.tone(90)))
+    c.append(hex_from_int(scheme.primary.tone(70)))
+    c.append(hex_from_int(scheme.secondary.tone(70)))
+    c.append(hex_from_int(scheme.tertiary.tone(70)))
+    c.append(hex_from_int(scheme.neutral1.tone(99)))
+    
+    accents = [
+        hex_from_int(source_color_int),
+        hex_from_int(scheme.primary.tone(80)),
+        hex_from_int(scheme.secondary.tone(80)),
+        hex_from_int(scheme.tertiary.tone(80))
+    ]
+    
+    return PaletteData(colors=c, accents=accents, backend_used="material-you", source_path=str(path))
+
+
+def _extract_imagemagick(path: Path) -> PaletteData:
+    im_exe = shutil.which("magick") or shutil.which("convert")
+    if not im_exe:
+        raise OSError("ImageMagick not found")
+
+    # 1. Generate 16 colors
+    # -unique-colors gets all colors found (which are 16 max due to -colors 16)
+    cmd_pal = [im_exe, str(path), "-resize", "128x128", "-colors", "16", "-unique-colors", "txt:-"]
+    res_pal = subprocess.run(cmd_pal, capture_output=True, text=True, check=True)
+    
+    colors = []
+    for line in res_pal.stdout.splitlines():
+        if "#" in line:
+            # Output format: 0,0: (87,81,87,255)  #575157  srgb(87,81,87)
+            # We look for #RRGGBB
+            parts = line.split()
+            for p in parts:
+                if p.startswith("#") and len(p) >= 7:
+                    # Take first 7 chars (#RRGGBB), ignore alpha if any
+                    colors.append(p[:7])
+                    break
+    
+    # Fill if missing (if image has fewer than 16 colors)
+    while len(colors) < 16:
+        colors.append(colors[-1] if colors else "#000000")
+    
+    # 2. Calculate best accent (Scoring logic ported from Gawk)
+    # histogram:info: Output format: 
+    #       120: ( 77,140, 84) #4D8C54 srgb(77,140,84)
+    cmd_acc = [im_exe, str(path), "-resize", "64x64", "+dither", "-colors", "8", "-format", "%c", "histogram:info:"]
+    res_acc = subprocess.run(cmd_acc, capture_output=True, text=True, check=True)
+    
+    best_score = -1.0
+    best_hex = colors[0]
+    hex_pattern = re.compile(r"#([0-9A-Fa-f]{6})")
+    
+    for line in res_acc.stdout.splitlines():
+        match = hex_pattern.search(line)
+        if match:
+            hex_code = match.group(1)
+            try:
+                r = int(hex_code[0:2], 16) / 255.0
+                g = int(hex_code[2:4], 16) / 255.0
+                b = int(hex_code[4:6], 16) / 255.0
+                h, s, v = colorsys.rgb_to_hsv(r, g, b)
+                
+                # Logic: s > 0.15 && v > 0.15 && v < 0.95
+                if s > 0.15 and v > 0.15 and v < 0.95:
+                    score = s * v
+                    if score > best_score:
+                        best_score = score
+                        # Avoid duplicates in accents if we were collecting multiple, 
+                        # but here we just want the best one.
+                        best_hex = f"#{hex_code}"
+            except ValueError:
+                continue
+
+    return PaletteData(colors=colors[:16], accents=[best_hex], backend_used="imagemagick", source_path=str(path))

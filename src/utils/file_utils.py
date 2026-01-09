@@ -217,3 +217,7 @@ def clear_fastfetch_cache() -> None:
             logger.info("Cleared cache %s", target)
     except Exception:
         logger.exception("Failed clearing fastfetch cache")
+
+def check_binary(command: str) -> bool:
+    """Check if a binary exists in the system PATH."""
+    return shutil.which(command) is not None

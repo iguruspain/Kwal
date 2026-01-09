@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import ".." as Components
 //import Qt.labs.folderlistmodel
 
 Kirigami.Page {
@@ -287,8 +288,16 @@ Kirigami.Page {
                         ToolTip.text: qsTr("Open color palette")
                         ToolTip.visible: hovered
                         onClicked: {
-                            // Open palette dialog from dialogPalette.qml
-
+                            // Identify current image being previewed
+                            var currentImg = "";
+                            if (controller.selectedFile && controller.selectedFile !== "") {
+                                currentImg = controller.selectedFile;
+                            } else if (controller.fastfetchConfigImage && controller.fastfetchConfigImage !== "") {
+                                currentImg = controller.fastfetchConfigImage.replace("file://", "");
+                            }
+                            
+                            paletteDialog.sourceImage = currentImg;
+                            paletteDialog.open();
                         }                                                   
                     }
                 }
@@ -493,6 +502,25 @@ Kirigami.Page {
                                 visible: running
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    Components.DialogPalette {
+        id: paletteDialog
+        onAccepted: {
+            if (selectedColor != "transparent") {
+                controller.fastfetchDraftColor = selectedColor
+                
+                // Refresh preview logic same as color picker
+                if (controller.selectedFile) {
+                    controller.generateTintedPreview(controller.selectedFile, selectedColor);
+                } else if (controller.fastfetchTemplateIndex !== -1 && templateSelector.model) {
+                    var info = templateSelector.model.get(controller.fastfetchTemplateIndex);
+                    if (info && info.fileUrl) {
+                        controller.generateTintedPreview(info.fileUrl, selectedColor);
                     }
                 }
             }

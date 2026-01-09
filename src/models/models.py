@@ -449,3 +449,10 @@ class FastfetchTemplateModel(QAbstractListModel):
                 "fileUrl": "file://" + str(p)
             }
         return {}
+
+@dataclass
+class PaletteData:
+    colors: list[str]      # 16 Base colors
+    accents: list[str]     # Accent colors
+    backend_used: str      # 'pywal16', 'material-you', 'imagemagick'
+    source_path: str       # Source image path

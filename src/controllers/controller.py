@@ -32,6 +32,34 @@ from ..models.models import (
 from ..utils import color_utils, file_utils
 
 
+class PaletteWorker(QThread):
+    finished = Signal(dict)
+    error = Signal(str)
+
+    def __init__(self, path: str, backend: str, kwargs: dict[str, Any]):
+        super().__init__()
+        self.path = path
+        self.backend = backend
+        self.kwargs = kwargs
+
+    def run(self):
+        try:
+            # Import here to avoid circular imports if module-level import is problematic
+            # But normally we import models at top. We just ensure we use color_utils
+            # which might import PaletteData.
+            pdata = color_utils.extract_palette(self.path, self.backend, **self.kwargs)
+            result = {
+                "colors": pdata.colors,
+                "accents": pdata.accents,
+                "backend": pdata.backend_used,
+                "source": pdata.source_path
+            }
+            self.finished.emit(result)
+        except Exception as e:
+            logging.exception("Palette extraction failed")
+            self.error.emit(str(e))
+
+
 class Controller(QObject):
     """Controller that bridges Python models and QML UI."""
 
@@ -47,6 +75,9 @@ class Controller(QObject):
     fastfetchDestNameChanged = Signal()
     fastfetchBackupExistsChanged = Signal()
     fastfetchConfigImageChanged = Signal()
+    # Palette signals
+    currentPaletteDataChanged = Signal()
+    paletteGenerationError = Signal(str)
     # Draft signals
     fastfetchDraftColorChanged = Signal()
     fastfetchIsFileModeChanged = Signal()
@@ -63,6 +94,8 @@ class Controller(QObject):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._logger = logging.getLogger(__name__)
+
+        self._current_palette_data: dict[str, Any] = {}
 
         # State Variables
         self._selected_folder: str = ""
@@ -594,7 +627,7 @@ class Controller(QObject):
         self._logger.info("Setting wallpaper to %s", abs_path)
         
         # KDE Plasma via qdbus
-        qdbus_path = shutil.which("qdbus")
+        qdbus_path = shutil.which("qdbus") or shutil.which("qdbus-qt6") or shutil.which("qdbus6")
         if qdbus_path:
             # Escape single quotes for JS string context
             safe_path = abs_path.replace("'", r"\'")
@@ -620,6 +653,62 @@ class Controller(QObject):
             self.notification.emit("qdbus executable not found (required for KDE Plasma)", "error")
             
         self._save_config()
+
+    @Slot(result=str)
+    def getCurrentSystemWallpaper(self) -> str:
+        """Retrieve current wallpaper from KDE Plasma via config file directly (more reliable than qdbus parsing)."""
+        # Try reading plasma-org.kde.plasma.desktop-appletsrc
+        try:
+            config_path = Path.home() / ".config" / "plasma-org.kde.plasma.desktop-appletsrc"
+            if not config_path.exists():
+                # Fallback to last known set wallpaper if available
+                return self._last_set_wallpaper if self._last_set_wallpaper else ""
+
+            # Simple parser to find Image=... under [Wallpaper][org.kde.image][General]
+            # Since identifying the correct containment (Desktop) is hard by ID,
+            # we look for the most recently modified or just the first valid Image entry 
+            # under a Wallpaper block.
+            
+            import configparser
+            # ConfigParser is strict, INI provided by KDE might have duplicate keys or oddities.
+            # Let's do a manual scan for 'Image=file://...'
+            
+            found_image = ""
+            with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+            
+            # Heuristic: look for Image=file://... inside a [Wallpaper] section
+            in_wallpaper_group = False
+            for line in lines:
+                line = line.strip()
+                if "[Wallpaper]" in line and "org.kde.image" in line:
+                    in_wallpaper_group = True
+                    continue
+                if line.startswith("[") and "Wallpaper" not in line:
+                    # Leaving a wallpaper group potentially, but sections are flat in INI logic often
+                    # But KDE INI structure usually nests via [Containments][24][Wallpaper]...
+                    pass
+                
+                if in_wallpaper_group and line.startswith("Image="):
+                    # Found an image
+                    val = line.split("=", 1)[1].strip()
+                    if val.startswith("file://"):
+                        getPath = val[7:]
+                        if os.path.exists(getPath):
+                            found_image = getPath
+                            # Keep searching? Usually we want the last one or the first? 
+                            # Usually all desktops have same wallpaper if synced, or different.
+                            # We take the one found.
+                            break
+            
+            if found_image:
+                return found_image
+                
+        except Exception as e:
+            self._logger.error("Error reading system wallpaper: %s", e)
+            
+        # Fallback
+        return self._last_set_wallpaper if self._last_set_wallpaper else ""
 
     @Slot(str, str)
     def addFolder(self, name: str, path: str) -> None:
@@ -827,6 +916,27 @@ class Controller(QObject):
             return dst.exists()
         except Exception:
             return False
+
+    @Property("QVariantMap", notify=currentPaletteDataChanged)
+    def currentPaletteData(self) -> dict[str, Any]:
+        return self._current_palette_data
+
+    @Slot(str, str, "QVariantMap")
+    def generatePalette(self, path: str, backend: str, params: dict[str, Any]):
+        """Starts background palette generation."""
+        if not path:
+            self.paletteGenerationError.emit("No image path provided")
+            return
+            
+        logging.info("Starting palette generation for %s with %s", path, backend)
+        self._palette_worker = PaletteWorker(path, backend, params)
+        self._palette_worker.finished.connect(self._on_palette_ready)
+        self._palette_worker.error.connect(self.paletteGenerationError)
+        self._palette_worker.start()
+
+    def _on_palette_ready(self, data: dict[str, Any]):
+        self._current_palette_data = data
+        self.currentPaletteDataChanged.emit()
 
     @Slot(result="QVariantMap")
     def restoreFastfetchBackup(self) -> dict[str, Any]:
