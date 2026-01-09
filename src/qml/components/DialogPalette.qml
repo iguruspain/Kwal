@@ -18,10 +18,15 @@ Dialog {
     property int sourceMode: 0 // 0: App (Wallpapers Tab), 1: Custom/System
     property bool darkMode: true
     property real contrastValue: 0.0
+    property bool generationActive: false
+    // Single selection across both grids: index + set name ("palette" or "accent")
+    property int selectedIndex: -1
+    property string selectedSet: ""
     
     // Dimensions
     width: Kirigami.Units.gridUnit * 32
-    height: Kirigami.Units.gridUnit * 45
+    // Allow dialog to size to its content so footer buttons stay near content
+    implicitHeight: contentItem.implicitHeight + Kirigami.Units.gridUnit * 6
 
     onOpened: {
         // Logic to determine initial image variable state on open
@@ -30,9 +35,6 @@ Dialog {
         if (sourceMode === 0) {
             // App Wallpaper Mode is default
              if (appSelectedWallpaper === "") {
-                // If nothing selected in app, maybe fallback or just leave empty
-                // We do NOT auto-switch sourceMode here to avoid confusion unless user wants it
-                // But user might want to see system wallpaper by default if app is empty
                 sys = pyController.getCurrentSystemWallpaper()
                 if (sys !== "") {
                     root.sourceMode = 1
@@ -48,8 +50,6 @@ Dialog {
                 }
             }
         }
-        // NOTE: Automatic palette generation is DISABLED as requested.
-        // User must click "Extract".
     }
 
     // --- Helper Functions ---
@@ -100,8 +100,9 @@ Dialog {
         // 2. Wallpaper Preview
         Item {
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+            Layout.fillWidth: true
             Layout.preferredHeight: Kirigami.Units.gridUnit * 12
+            //Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             
             Image {
                 anchors.fill: parent
@@ -111,12 +112,15 @@ Dialog {
                     if (finalPath) return "file://" + finalPath
                     return ""
                 }
-                fillMode: Image.PreserveAspectCrop
+                fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 cache: false 
                 
                 Rectangle {
-                    anchors.fill: parent
+                    // Match the visible image area (respect `fillMode`)
+                    width: parent.paintedWidth
+                    height: parent.paintedHeight
+                    anchors.centerIn: parent
                     color: "transparent"
                     border.color: Kirigami.Theme.highlightColor
                     border.width: 1
@@ -138,11 +142,20 @@ Dialog {
             
             // Backend
             ComboBox {
-                id: backendCombo
+                id: extractMethodCombo
                 model: ["pywal16", "material-you", "imagemagick"]
                 currentIndex: 0
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 8
-                onActivated: root.currentBackend = currentText
+                onActivated: {
+                    // Switch backend and reset any generated data
+                    root.currentBackend = currentText
+                    root.generationActive = false
+                    root.contrastValue = 0.0
+                    root.selectedColor = "transparent"
+                    root.selectedIndex = -1
+                    root.selectedSet = ""
+                    if (pyController && pyController.clearPalette) pyController.clearPalette()
+                }
             }
             
             // Mode (Dark/Light)
@@ -162,6 +175,7 @@ Dialog {
 
             // Extract Button
             Button {
+                id: extractButton
                 //text: qsTr("Extract")
                 icon.name: "palette-symbolic"
                 Layout.fillWidth: true
@@ -185,117 +199,127 @@ Dialog {
                     }
 
                     if (path) {
+                        // mark that generation was triggered from this dialog
+                        root.generationActive = true
                         root.refreshPalette(path)
                     }
                 }
             }
             Item { Layout.fillWidth: true } // Spacer
         }
-        
-        // 3b. Aux Controls (Contrast only for Material You)
-        RowLayout {
+
+        ColumnLayout {
+            id: generationGroup
             Layout.fillWidth: true
-            visible: root.currentBackend === "material-you"
-            spacing: Kirigami.Units.largeSpacing
-            
-            Label { text: qsTr("Contrast:") }
-            Slider {
+            visible: root.generationActive
+     
+            // 3b. Aux Controls (Contrast only for Material You)
+            RowLayout {
+                id: auxControls
                 Layout.fillWidth: true
-                from: -1.0
-                to: 1.0
-                value: root.contrastValue
-                stepSize: 0.1
-                onMoved: root.contrastValue = value
+                visible: root.currentBackend === "material-you"
+                spacing: Kirigami.Units.largeSpacing
+                
+                Label { text: qsTr("Contrast:") }
+                Slider {
+                    Layout.fillWidth: true
+                    from: -1.0
+                    to: 1.0
+                    value: root.contrastValue
+                    stepSize: 0.1
+                    onMoved: root.contrastValue = value
+                }
+                Label { text: root.contrastValue.toFixed(1) }
             }
-            Label { text: root.contrastValue.toFixed(1) }
-        }
 
-        // 4. Palette Colors
-        Label { 
-            text: qsTr("Palette Colors")
-            font.bold: true 
-        }
+            // 4. Palette Colors
+            Label {
+                id: paletteLabel 
+                text: qsTr("Palette Colors")
+                font.bold: true 
+            }
 
-        GridView {
-            id: paletteGrid
-            Layout.fillWidth: true
-            // Dynamic height calculation might be tricky if items flow, 
-            // but we know we usually get ~16 colors. 
-            // 8 per row = 2 rows.
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 4.5
-            
-            cellWidth: Kirigami.Units.gridUnit * 2 
-            cellHeight: Kirigami.Units.gridUnit * 2
-            model: pyController.currentPaletteData.colors
-            interactive: false
-            clip: true
+            Grid {
+                id: paletteGrid
+                columns: 8
+                // Keep grid compact rather than stretching to fill the dialog
+                spacing: Kirigami.Units.smallSpacing / 6
+                clip: true
 
-            delegate: Item {
-                width: paletteGrid.cellWidth
-                height: paletteGrid.cellHeight
+                Repeater {
+                    model: pyController.currentPaletteData.colors
+                    delegate: Item {
+                        width: Kirigami.Units.gridUnit * 1.5
+                        height: Kirigami.Units.gridUnit * 1.5
 
-                Rectangle {
-                    // 1.5 x 1.5 visual size inside the 2.0 cell
-                    width: Kirigami.Units.gridUnit * 1.5
-                    height: Kirigami.Units.gridUnit * 1.5
-                    anchors.centerIn: parent
-                    color: modelData
-                    border.width: root.selectedColor == modelData ? 2 : 0
-                    border.color: Kirigami.Theme.highlightColor
-                    radius: 3
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            color: modelData
+                            border.width: (root.selectedSet === "palette" && root.selectedIndex === index) ? 2 : 0
+                            border.color: Kirigami.Theme.highlightColor
+                            radius: 3
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.selectedColor = parent.color
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.selectedIndex = index
+                                    root.selectedSet = "palette"
+                                    root.selectedColor = modelData
+                                }
+                            }
+
+                            ToolTip.visible: hovered
+                            ToolTip.text: modelData
+                        }
                     }
-                    
-                    ToolTip.visible: hovered
-                    ToolTip.text: modelData
                 }
             }
-        }
 
-        // 5. Accent Colors 
-        Label { 
-            text: qsTr("Accent Colors")
-            font.bold: true 
-            Layout.topMargin: Kirigami.Units.smallSpacing
-        }
-        
-        // Using GridView for accents to match styling exactly
-        GridView {
-            id: accentGrid
-            Layout.fillWidth: true
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 2.5
-            cellWidth: Kirigami.Units.gridUnit * 2
-            cellHeight: Kirigami.Units.gridUnit * 2
-            model: pyController.currentPaletteData.accents
-            interactive: false
-            flow: GridView.FlowLeftToRight
+            // 5. Accent Colors 
+            Label {
+                id: accentLabel 
+                text: qsTr("Accent Colors")
+                font.bold: true 
+                Layout.topMargin: Kirigami.Units.smallSpacing
+            }
+            
+            // Using GridView for accents to match styling exactly
+            Grid {
+                id: accentGrid
+                columns: 8
+                spacing: Kirigami.Units.smallSpacing / 6
+                clip: true
 
-            delegate: Item {
-                width: accentGrid.cellWidth
-                height: accentGrid.cellHeight
+                Repeater {
+                    model: pyController.currentPaletteData.accents
+                    delegate: Item {
+                        width: Kirigami.Units.gridUnit * 1.5
+                        height: Kirigami.Units.gridUnit * 1.5
 
-                Rectangle {
-                    // Same 1.5 x 1.5 size
-                    width: Kirigami.Units.gridUnit * 1.5
-                    height: Kirigami.Units.gridUnit * 1.5
-                    anchors.centerIn: parent
-                    color: modelData
-                    border.width: root.selectedColor == modelData ? 2 : 0
-                    border.color: Kirigami.Theme.highlightColor
-                    radius: 3
-                    
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.selectedColor = parent.color
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing / 2
+                            color: modelData
+                            border.width: (root.selectedSet === "accent" && root.selectedIndex === index) ? 2 : 0
+                            border.color: Kirigami.Theme.highlightColor
+                            radius: 3
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.selectedIndex = index
+                                    root.selectedSet = "accent"
+                                    root.selectedColor = modelData
+                                }
+                            }
+                            
+                            ToolTip.visible: hovered
+                            ToolTip.text: modelData
+                        }
                     }
-                    
-                    ToolTip.visible: hovered
-                    ToolTip.text: modelData
                 }
             }
         }

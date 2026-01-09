@@ -955,6 +955,12 @@ class Controller(QObject):
         self._current_palette_data = data
         self.currentPaletteDataChanged.emit()
 
+    @Slot()
+    def clearPalette(self) -> None:
+        """Clear current palette data and notify QML."""
+        self._current_palette_data = {}
+        self.currentPaletteDataChanged.emit()
+
     @Slot(result="QVariantMap")
     def restoreFastfetchBackup(self) -> dict[str, Any]:
         """Restore the fixed fastfetch config backup."""
