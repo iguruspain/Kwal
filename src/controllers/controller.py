@@ -119,6 +119,7 @@ class Controller(QObject):
 
         # Settings App Model
         apps = [
+            SettingsApp(app_name="wallpapers", section="Apps", qml_page="apps/wallpapers.qml"), # experimental
             SettingsApp(app_name="fastfetch", section="Apps", qml_page="apps/fastfetch.qml"),
             SettingsApp(app_name="starship", section="Apps", qml_page="apps/starship.qml"),
             SettingsApp(app_name="ulauncher", section="Apps", qml_page="apps/ulauncher.qml"),

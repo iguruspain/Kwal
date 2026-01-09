@@ -1,103 +1,95 @@
+// experimental main.qml
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "components" as Components
 
 Kirigami.ApplicationWindow {
     id: root
     visible: true
     width: 800
-    height: 550
+    height: 610
     title: "Kwal"
     
     // Enable transparency for the main window
     color: "transparent"
 
-    // Models provided by Python (wallpaperFolderModel context property)
-
-    // Delegate and panels moved to separate QML files:
-    // - WallpaperDelegate.qml
-    // - SideBar.qml
-    // - ContentPreview.qml   
-    
+    pageStack.initialPage: settingsAltRoot
     Kirigami.Page {
-        id: wallpaperPage
-        title: qsTr("Wallpapers")
-
-        // Custom background to ensure content is opaque but header can be transparent
+        id: settingsAltRoot
         background: Rectangle {
             color: Kirigami.Theme.backgroundColor
             opacity: 0.8 
         }
+        
+        // El título cambia dinámicamente según la pestaña seleccionada
+        title: {
+            const item = pyController.settingsAppModel.get(tabBar.currentIndex);
+            return item ? item.title : "Settings";
+        }
 
-        RowLayout {
-            anchors.fill: parent
-            //anchors.margins: Kirigami.Units.smallSpacing
-            spacing: 0
+        header: Pane {
+            // Usamos un Pane para dar un fondo consistente al header
+            background: Rectangle { color: "transparent" }
+            topPadding: Kirigami.Units.smallSpacing
+            bottomPadding: 0
 
-            Loader {
-                id: contentPreviewLoader
-                source: "components/ContentPreview.qml"
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.leftMargin: Kirigami.Units.smallSpacing
-                onLoaded: {
-                    item.parent = contentPreviewLoader
-                    console.log("Panel de previsualización cargado")
+            contentItem: RowLayout {
+                width: parent.width
+
+                // Espaciador izquierdo
+                Item { Layout.fillWidth: true }
+
+                TabBar {
+                    id: tabBar
+                    currentIndex: swipeView.currentIndex
+                    
+                    // Quitamos el fondo por defecto de la TabBar si quieres un look más limpio
+                    background: Rectangle { color: "transparent" }
+
+                    Repeater {
+                        model: pyController.settingsAppModel
+                        delegate: TabButton {
+                            required property string title
+                            text: title
+                            
+                            // Opcional: ajustar el ancho de los botones
+                            implicitWidth: Math.max(100, Kirigami.Units.gridUnit * 5)
+                        }
+                    }
                 }
-                active: true
+
+                // Espaciador derecho
+                Item { Layout.fillWidth: true }
+            }
+        }
+
+        SwipeView {
+            id: swipeView
+            anchors.fill: parent
+            currentIndex: tabBar.currentIndex
+            clip: true
+
+            // Implementación con Repeater para mantener el estado de las páginas
+            Repeater {
+                model: pyController.settingsAppModel
+                delegate: Loader {
+                    required property string qmlpage
+                    required property int index
+                    
+                    // Solo carga la página si es la actual o la adyacente para fluidez
+                    active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+                    source: "components/" + qmlpage
+                    
+                    // Evita que las páginas no visibles intercepten eventos o consuman CPU
+                    visible: SwipeView.isCurrentItem
+                }
             }
         }
     }
-
-    pageStack.initialPage: wallpaperPage
-
-    globalDrawer: Kirigami.GlobalDrawer {
-        id: globalDrawer
-        title: qsTr("Kwal")
-        //titleIcon: Qt.resolvedUrl("../resources/images/kwal2_256.png")
-        //width: parent.width / 4
-        //opacity: 0.8
-        isMenu: true
-
-        actions: [
-            Kirigami.Action {
-                text: qsTr("Wallpapers")
-                icon.name: "edit-image"
-                onTriggered: {
-                    pageStack.replace(wallpaperPage)
-                }
-            },
-            Kirigami.Action {
-                text: qsTr("Settings")
-                icon.name: "settings-configure-symbolic"
-                visible: false
-                onTriggered: {
-                    var settingsPageComponent = Qt.createComponent("components/Settings.qml");
-                    if (settingsPageComponent.status === Component.Ready) {
-                        var settingsPage = settingsPageComponent.createObject(root);
-                        pageStack.replace(settingsPage);
-                    } else {
-                        console.error("Failed to load Settings page:", settingsPageComponent.errorString());
-                    }
-                }
-            },
-            Kirigami.Action {
-                text: qsTr("Settings")
-                icon.name: "settings-configure-symbolic"
-                onTriggered: {
-                    var altSettingsPageComponent = Qt.createComponent("components/AltSettings.qml");
-                    if (altSettingsPageComponent.status === Component.Ready) {
-                        var altSettingsPage = altSettingsPageComponent.createObject(root);
-                        pageStack.replace(altSettingsPage);
-                    } else {
-                        console.error("Failed to load Alternative Settings page:", altSettingsPageComponent.errorString());
-                    }
-                }
-            }
-        ]
-    }
-
     // First-run dialog: offer to install packaged templates to the user's config
     Dialog {
         id: templatesDialog
@@ -118,7 +110,6 @@ Kirigami.ApplicationWindow {
             Label { text: qsTr("Install default templates to your user configuration (~/.config/kwal/templates)?") }
         }
     }
-
     // Connect passive notifications from Python Controller
     Connections {
         target: pyController
