@@ -247,11 +247,18 @@ Kirigami.Page {
                         border.width: 1
                         radius: Kirigami.Units.smallSpacing
                         
-                        ToolTip.text: qsTr("Pick tint color")
-                        ToolTip.visible: hovered
-                        
+                        ToolTip.text: {
+                            if (!controller) return qsTr("Pick color")
+                            var t = controller.formatColorWithAlpha(controller.fastfetchDraftColor)
+                            return t && t !== "" ? t : qsTr("Pick color")
+                        }
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                        ToolTip.visible: colorPreviewMouse.containsMouse
+
                         MouseArea {
+                            id: colorPreviewMouse
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 if (!controller) return;
@@ -272,6 +279,17 @@ Kirigami.Page {
                                 }
                             }
                         }
+                    }
+                    Button {
+                        id: paletteColorButton
+                        icon.name: "color-picker"
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                        ToolTip.text: qsTr("Open color palette")
+                        ToolTip.visible: hovered
+                        onClicked: {
+                            // Open palette dialog from dialogPalette.qml
+
+                        }                                                   
                     }
                 }
 

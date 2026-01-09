@@ -25,9 +25,24 @@ def _normalize_tint(tint_hex: str | None) -> str | None:
         return None
     if str(tint_hex).lower() == "transparent":
         return None
+    s = str(tint_hex).strip()
+    # Accept #AARRGGBB by converting to ImageMagick-friendly rgba(r,g,b,a)
+    if s.startswith("#") and len(s) == 9:
+        try:
+            a = int(s[1:3], 16)
+            r = int(s[3:5], 16)
+            g = int(s[5:7], 16)
+            b = int(s[7:9], 16)
+            a_f = round(a / 255.0, 3)
+            return f"rgba({r},{g},{b},{a_f})"
+        except Exception:
+            logger.debug("tint_image: failed parsing ARGB hex '%s'", s)
+            return None
+
+    # For all other formats, let Pillow validate (e.g. #RRGGBB, color names, rgb(...))
     try:
-        ImageColor.getrgb(tint_hex)
-        return tint_hex
+        ImageColor.getrgb(s)
+        return s
     except Exception:
         logger.debug("tint_image: invalid tint '%s', skipping tinted generation", tint_hex)
         return None

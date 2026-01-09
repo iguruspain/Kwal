@@ -319,9 +319,67 @@ class Controller(QObject):
         return self._fastfetch_draft_color
 
     def _set_fastfetch_draft_color(self, color: str) -> None:
-        if self._fastfetch_draft_color != color:
-            self._fastfetch_draft_color = color
+        # Normalize incoming color to a consistent #AARRGGBB when possible.
+        val = color or ""
+        norm: str = val
+        try:
+            if val and val.lower() != "transparent" and QColor.isValidColor(val):
+                qc = QColor(val)
+                try:
+                    norm = qc.name(QColor.HexArgb)
+                except TypeError:
+                    # Fallback construction: #AARRGGBB
+                    norm = "#{:02x}{:02x}{:02x}{:02x}".format(qc.alpha(), qc.red(), qc.green(), qc.blue())
+        except Exception:
+            self._logger.debug("Failed normalizing color %r", val)
+
+        if self._fastfetch_draft_color != norm:
+            self._fastfetch_draft_color = norm
             self.fastfetchDraftColorChanged.emit()
+
+    @Slot(str, result=str)
+    def formatColorWithAlpha(self, color: str) -> str:
+        """Return a display string with RGB hex and alpha decimal for QML tooltips.
+
+        Examples:
+        - input: "#AARRGGBB" -> returns: "#RRGGBB alpha: 204"
+        - input: "#RRGGBB" or named color -> preserves and computes alpha
+        """
+        try:
+            if not color or str(color).lower() == "transparent":
+                return ""
+
+            s = str(color)
+            # If already in #AARRGGBB
+            if s.startswith("#") and len(s) == 9:
+                aa = s[1:3]
+                rr = s[3:5]
+                gg = s[5:7]
+                bb = s[7:9]
+                alpha_dec = int(aa, 16)
+                return f"#{rr}{gg}{bb} alpha: {alpha_dec}"
+
+            # Try to resolve via QColor to ensure we include alpha
+            if QColor.isValidColor(s):
+                qc = QColor(s)
+                try:
+                    hexargb = qc.name(QColor.HexArgb)
+                except TypeError:
+                    hexargb = "#{:02x}{:02x}{:02x}{:02x}".format(qc.alpha(), qc.red(), qc.green(), qc.blue())
+
+                if hexargb.startswith("#") and len(hexargb) == 9:
+                    aa = hexargb[1:3]
+                    rr = hexargb[3:5]
+                    gg = hexargb[5:7]
+                    bb = hexargb[7:9]
+                    alpha_dec = int(aa, 16)
+                    return f"#{rr}{gg}{bb} alpha: {alpha_dec}"
+
+            # Fallback: return original string
+            return s
+        except Exception:
+            self._logger.exception("Error formatting color tooltip for %r", color)
+            return str(color or "")
 
     fastfetchDraftColor = Property(str, _get_fastfetch_draft_color, _set_fastfetch_draft_color, notify=fastfetchDraftColorChanged)
 
@@ -647,14 +705,26 @@ class Controller(QObject):
     def openColorDialog(self, initial: str) -> str:
         """Open color dialog and return selected color hex."""
         try:
-            if not initial or not QColor.isValidColor(initial):
+            # If no valid initial color is provided, start with opaque white.
+            # If an initial color (including an alpha channel) is provided, preserve its alpha.
+            if not initial or not QColor.isValidColor(initial) or str(initial).lower() == "transparent":
                 initial_col = QColor("#ffffff")
+                try:
+                    initial_col.setAlpha(255)
+                except Exception:
+                    pass
             else:
                 initial_col = QColor(initial)
             
-            color = QColorDialog.getColor(initial_col, None, "Select color")
+            # Show alpha channel in the dialog and return hex including alpha
+            color = QColorDialog.getColor(initial_col, None, "Select color", QColorDialog.ShowAlphaChannel)
             if color.isValid():
-                return color.name()
+                try:
+                    return color.name(QColor.HexArgb)
+                except TypeError:
+                    # Fallback: construct #AARRGGBB manually if name() signature differs
+                    a = color.alpha()
+                    return "#{:02x}{:02x}{:02x}{:02x}".format(a, color.red(), color.green(), color.blue())
             return ""
         except Exception:
             self._logger.exception("Error opening color dialog")
