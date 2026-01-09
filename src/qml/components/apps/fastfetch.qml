@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import Qt.labs.folderlistmodel
+//import Qt.labs.folderlistmodel
 
 Kirigami.Page {
     id: fastfetchPage
