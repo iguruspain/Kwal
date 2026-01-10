@@ -6,6 +6,8 @@ import logging
 import os
 import re
 import shutil
+import toml
+import json
 from pathlib import Path
 from typing import Any
 
@@ -221,3 +223,65 @@ def clear_fastfetch_cache() -> None:
 def check_binary(command: str) -> bool:
     """Check if a binary exists in the system PATH."""
     return shutil.which(command) is not None
+
+def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
+    """Read starship config at `path` (or default) and return simplified JSON.
+
+    The function accepts a single optional `path`. If `path` is not
+    provided it uses the default: `~/.config/starship.toml`.
+
+    Returns `(json_str, display_path)` where `json_str` is a pretty
+    JSON containing only `config_path` and `palettes` (each palette
+    contains simple color values). If the file is missing the
+    `palettes` mapping is empty.
+    """
+    cfg_path = Path(path).expanduser() if path else (Path.home() / ".config" / "starship.toml")
+
+    # helper for logging path
+    try:
+        display_path = f"~/{cfg_path.relative_to(Path.home()).as_posix()}"
+    except Exception:
+        display_path = str(cfg_path)
+
+    if not cfg_path.exists():
+        logger.debug("Config file not found: %s", cfg_path)
+        # Return empty palettes JSON when missing
+        return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
+
+    try:
+        # Load TOML configuration
+        with cfg_path.open("r", encoding="utf-8") as fh:
+            config_data = toml.load(fh)
+
+        if not isinstance(config_data, dict):
+            return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
+
+        # Build simplified output: only config_path and palettes
+        out: dict[str, Any] = {"config_path": display_path, "palettes": {}}
+
+        palettes = config_data.get("palettes")
+        if isinstance(palettes, dict):
+            for pname, pval in palettes.items():
+                # include only dict-like palettes (e.g. 'colors')
+                if isinstance(pval, dict):
+                    cleaned: dict[str, Any] = {}
+                    for k, v in pval.items():
+                        if isinstance(v, (str, int, float, bool)) or v is None:
+                            cleaned[k] = v
+                        else:
+                            try:
+                                cleaned[k] = str(v)
+                            except Exception:
+                                cleaned[k] = None
+                    out["palettes"][pname] = cleaned
+
+        try:
+            json_str = json.dumps(out, ensure_ascii=False, indent=2)
+        except Exception:
+            json_str = json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2)
+
+        return json_str, display_path
+
+    except Exception:
+        logger.exception("Failed to read %s", cfg_path)
+        return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path

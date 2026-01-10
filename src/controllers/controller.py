@@ -27,6 +27,8 @@ from ..models.models import (
     ImageModel,
     SettingsApp,
     SettingsAppModel,
+    # Starship model will be used to expose starship config to QML
+    StarshipModel,
     WallpaperFolderModel,
 )
 from ..utils import color_utils, file_utils
@@ -169,6 +171,19 @@ class Controller(QObject):
         ]
         self._settings_app_model = SettingsAppModel(apps)
 
+        # Starship model
+        try:
+            # Default template folder similar to fastfetch
+            default_starship_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "starship")
+            self._starship_model = StarshipModel(template_folder=default_starship_templates)
+            # Attempt an initial refresh (safe no-op if file absent)
+            try:
+                self._starship_model.refresh()
+            except Exception:
+                self._logger.debug("Initial starship model refresh failed or file missing")
+        except Exception:
+            self._logger.exception("Failed initializing StarshipModel")
+
         # Connect Signals
         self.tintResult.connect(self._on_tint_done)
 
@@ -248,6 +263,11 @@ class Controller(QObject):
 
     def imageModel(self) -> ImageModel:
         return self._image_model
+
+    @Property(QObject, constant=True)
+    def starshipModel(self) -> QObject:
+        """Expose the StarshipModel instance to QML as an object."""
+        return getattr(self, "_starship_model", None)
 
     def _get_home_path(self) -> str:
         return self._home_path

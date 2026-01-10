@@ -450,6 +450,119 @@ class FastfetchTemplateModel(QAbstractListModel):
             }
         return {}
 
+
+class StarshipModel(QObject):
+    """Lightweight QObject model exposing Starship config info for QML.
+
+    Provides:
+    - `configPath` (str): path to starship.toml
+    - `templateFolder` (str): templates folder for starship
+    - `paletteNames` (list[str]): list of palette names found in config
+    - `paletteValues` (list[list[str]]): parallel list of palettes values (each is list of color strings)
+    """
+
+    configPathChanged = Signal()
+    templateFolderChanged = Signal()
+    paletteNamesChanged = Signal()
+    paletteValuesChanged = Signal()
+    paletteKeysChanged = Signal()
+
+    def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        from pathlib import Path
+        import os
+
+        default_cfg = str(Path.home() / ".config" / "starship.toml")
+        default_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "starship")
+
+        self._config_path: str = config_path or default_cfg
+        self._template_folder: str = template_folder or default_templates
+        self._palette_names: list[str] = []
+        self._palette_values: list[list[str]] = []
+        self._palette_keys: list[list[str]] = []
+
+    def _get_config_path(self) -> str:
+        return self._config_path
+
+    def _set_config_path(self, p: str) -> None:
+        val = str(p or "")
+        if self._config_path != val:
+            self._config_path = val
+            self.configPathChanged.emit()
+
+    def _get_template_folder(self) -> str:
+        return self._template_folder
+
+    def _set_template_folder(self, p: str) -> None:
+        val = str(p or "")
+        if self._template_folder != val:
+            self._template_folder = val
+            self.templateFolderChanged.emit()
+
+    def _get_palette_names(self) -> list[str]:
+        return list(self._palette_names)
+
+    def _get_palette_values(self) -> list[list[str]]:
+        return [list(x) for x in self._palette_values]
+
+    def _get_palette_keys(self) -> list[list[str]]:
+        return [list(x) for x in self._palette_keys]
+
+    configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
+    templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
+    paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
+    paletteValues = Property('QVariantList', _get_palette_values, notify=paletteValuesChanged)
+    paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
+
+    @Slot(result="QVariantMap")
+    @Slot(str, result="QVariantMap")
+    def refresh(self, path: str | None = None) -> dict:
+        """Read starship config (using utils.file_utils.read_starship_config) and update properties.
+
+        Returns a small map for QML with `config_path` and `palettes_count` for convenience.
+        """
+        try:
+            # Import inside method to avoid circular imports
+            from ..utils import file_utils
+            import json
+
+            json_str, display = file_utils.read_starship_config(path or self._config_path)
+            data = json.loads(json_str)
+
+            palettes = data.get("palettes", {}) if isinstance(data, dict) else {}
+
+            names: list[str] = []
+            values: list[list[str]] = []
+            keys: list[list[str]] = []
+
+            if isinstance(palettes, dict):
+                for pname, pvals in palettes.items():
+                    names.append(str(pname))
+                    # pvals may be dict of color entries; collect keys and values in stable key order
+                    if isinstance(pvals, dict):
+                        sorted_items = sorted(pvals.items(), key=lambda kv: str(kv[0]))
+                        klist = [str(k) for k, _ in sorted_items]
+                        vlist = [str(v) for _, v in sorted_items]
+                    else:
+                        klist = ["value"]
+                        vlist = [str(pvals)] if pvals is not None else []
+
+                    keys.append(klist)
+                    values.append(vlist)
+
+            self._palette_names = names
+            self._palette_values = values
+            self._palette_keys = keys
+
+            self.paletteNamesChanged.emit()
+            self.paletteValuesChanged.emit()
+            self.paletteKeysChanged.emit()
+
+            return {"config_path": display, "palettes_count": len(names)}
+        except Exception:
+            logger.exception("StarshipModel.refresh failed")
+            return {"config_path": self._config_path, "palettes_count": 0}
+
 @dataclass
 class PaletteData:
     colors: list[str]      # 16 Base colors
