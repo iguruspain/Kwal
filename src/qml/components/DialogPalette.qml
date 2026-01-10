@@ -99,7 +99,7 @@ Dialog {
                 
                 spacing: Kirigami.Units.largeSpacing
 
-                // 1. Wallpaper Selection Row
+                // Wallpaper Selection Row
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.largeSpacing
@@ -123,7 +123,7 @@ Dialog {
                     Item { Layout.fillWidth: true } // Spacer
                 }
 
-                // 2. Wallpaper Preview
+                // Wallpaper Preview
                 Item {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.fillWidth: true
@@ -161,7 +161,7 @@ Dialog {
                     }
                 }
 
-                // 3. Extraction Controls (Combo | Mode | Button)
+                // Extraction Controls
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.largeSpacing
@@ -219,20 +219,124 @@ Dialog {
                     Item { Layout.fillWidth: true } // Spacer
                 }
 
-                ColumnLayout {
+                RowLayout {
                     id: generationGroup
                     Layout.fillWidth: true
                     visible: root.generationActive
+                    spacing: Kirigami.Units.largeSpacing
             
-                    // 3b. Aux Controls (Contrast only for Material You)
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+
+                        // Palette Colors
+                        Label {
+                            id: paletteLabel 
+                            text: qsTr("Palette Colors")
+                            font.bold: true 
+                        }
+
+                        Grid {
+                            id: paletteGrid
+                            columns: 8
+                            // Keep grid compact rather than stretching to fill the dialog
+                            spacing: Kirigami.Units.smallSpacing / 6
+                            clip: true
+
+                            Repeater {
+                                model: pyController.currentPaletteData.colors
+                                delegate: Item {
+                                    width: Kirigami.Units.gridUnit * 1.5
+                                    height: Kirigami.Units.gridUnit * 1.5
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.margins: Kirigami.Units.smallSpacing / 2
+                                        color: modelData
+                                        border.width: (root.selectedSet === "palette" && root.selectedIndex === index) ? 2 : 0
+                                        border.color: Kirigami.Theme.highlightColor
+                                        radius: 3
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                root.selectedIndex = index
+                                                root.selectedSet = "palette"
+                                                root.selectedColor = modelData
+                                            }
+                                        }
+
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: modelData
+                                    }
+                                }
+                            }
+                        }
+
+                        // Accent Colors 
+                        Label {
+                            id: accentLabel 
+                            text: qsTr("Accent Colors")
+                            font.bold: true 
+                            Layout.topMargin: Kirigami.Units.smallSpacing
+                        }
+                        
+                        // Using GridView for accents to match styling exactly
+                        Grid {
+                            id: accentGrid
+                            columns: 8
+                            spacing: Kirigami.Units.smallSpacing / 6
+                            clip: true
+
+                            Repeater {
+                                model: pyController.currentPaletteData.accents
+                                delegate: Item {
+                                    width: Kirigami.Units.gridUnit * 1.5
+                                    height: Kirigami.Units.gridUnit * 1.5
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        anchors.margins: Kirigami.Units.smallSpacing / 2
+                                        color: modelData
+                                        border.width: (root.selectedSet === "accent" && root.selectedIndex === index) ? 2 : 0
+                                        border.color: Kirigami.Theme.highlightColor
+                                        radius: 3
+                                        
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                root.selectedIndex = index
+                                                root.selectedSet = "accent"
+                                                root.selectedColor = modelData
+                                            }
+                                        }
+                                        
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: modelData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Aux Controls (for Material You)
                     ColumnLayout {
                         id: auxControls
                         Layout.fillWidth: true
                         visible: root.currentBackend === "material-you"
                         spacing: Kirigami.Units.largeSpacing
 
+                        // Parameters Label
+                        Label {
+                            id: auxParamsLabel 
+                            text: qsTr("Parameters")
+                            font.bold: true 
+                        }                        
+
                         // Mode (Dark/Light)
                         RowLayout {
+                            id: modeRow
                             spacing: Kirigami.Units.smallSpacing
                             RadioButton {
                                 text: qsTr("Dark")
@@ -248,7 +352,8 @@ Dialog {
                         
                         Label { text: qsTr("Contrast:") }
                         Slider {
-                            Layout.fillWidth: true
+                            Layout.fillWidth: false
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                             from: -1.0
                             to: 1.0
                             value: root.contrastValue
@@ -256,97 +361,6 @@ Dialog {
                             onMoved: root.contrastValue = value
                         }
                         Label { text: root.contrastValue.toFixed(1) }
-                    }
-
-                    // 4. Palette Colors
-                    Label {
-                        id: paletteLabel 
-                        text: qsTr("Palette Colors")
-                        font.bold: true 
-                    }
-
-                    Grid {
-                        id: paletteGrid
-                        columns: 8
-                        // Keep grid compact rather than stretching to fill the dialog
-                        spacing: Kirigami.Units.smallSpacing / 6
-                        clip: true
-
-                        Repeater {
-                            model: pyController.currentPaletteData.colors
-                            delegate: Item {
-                                width: Kirigami.Units.gridUnit * 1.5
-                                height: Kirigami.Units.gridUnit * 1.5
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: Kirigami.Units.smallSpacing / 2
-                                    color: modelData
-                                    border.width: (root.selectedSet === "palette" && root.selectedIndex === index) ? 2 : 0
-                                    border.color: Kirigami.Theme.highlightColor
-                                    radius: 3
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            root.selectedIndex = index
-                                            root.selectedSet = "palette"
-                                            root.selectedColor = modelData
-                                        }
-                                    }
-
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: modelData
-                                }
-                            }
-                        }
-                    }
-
-                    // 5. Accent Colors 
-                    Label {
-                        id: accentLabel 
-                        text: qsTr("Accent Colors")
-                        font.bold: true 
-                        Layout.topMargin: Kirigami.Units.smallSpacing
-                    }
-                    
-                    // Using GridView for accents to match styling exactly
-                    Grid {
-                        id: accentGrid
-                        columns: 8
-                        spacing: Kirigami.Units.smallSpacing / 6
-                        clip: true
-
-                        Repeater {
-                            model: pyController.currentPaletteData.accents
-                            delegate: Item {
-                                width: Kirigami.Units.gridUnit * 1.5
-                                height: Kirigami.Units.gridUnit * 1.5
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    anchors.margins: Kirigami.Units.smallSpacing / 2
-                                    color: modelData
-                                    border.width: (root.selectedSet === "accent" && root.selectedIndex === index) ? 2 : 0
-                                    border.color: Kirigami.Theme.highlightColor
-                                    radius: 3
-                                    
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            root.selectedIndex = index
-                                            root.selectedSet = "accent"
-                                            root.selectedColor = modelData
-                                        }
-                                    }
-                                    
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: modelData
-                                }
-                            }
-                        }
                     }
                 }
             }
