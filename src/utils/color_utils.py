@@ -145,7 +145,7 @@ def extract_palette(image_path: str, backend: str, **kwargs) -> PaletteData:
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {path}")
 
-    logger.info("Extracting palette from %s using %s", path, backend)
+    logger.info("Extracting palette from %s using %s with kwargs: %s", path, backend, kwargs)
 
     if backend == "pywal16":
         return _extract_pywal16(path)
@@ -307,24 +307,31 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     contrast = float(kwargs.get("contrast", 0.0))
     override_seed_hex = kwargs.get("seed_color", None)
     
+    # Always extract dominant colors from image so we don't lose the "Accents" list
+    # when a manual seed is selected.
     ranked = []
-
-    if override_seed_hex:
-        rgb = ImageColor.getrgb(override_seed_hex)
-        seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
-    else:
+    try:
         with Image.open(path) as img:
             img = img.convert("RGBA")
             img.thumbnail((128, 128)) 
             pixels = list(img.getdata())
-            # FIX: QuantizeCelebi expects a list of lists [r, g, b]
             pixel_list = [[r, g, b] for r, g, b, a in pixels if a > 128]
         
         with suppress_stdout():
-            # Pass the list of [r,g,b] lists
             stats = QuantizeCelebi(pixel_list, 128)
             ranked = Score.score(stats)
-            seed_int = ranked[0] if ranked else 0xff4285F4
+    except Exception:
+        logger.exception("Failed to quantize image for accents")
+
+    if override_seed_hex:
+        try:
+            rgb = ImageColor.getrgb(override_seed_hex)
+            seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+        except ValueError:
+             logger.warning("Invalid seed color %s, falling back to auto", override_seed_hex)
+             seed_int = ranked[0] if ranked else 0xff4285F4
+    else:
+        seed_int = ranked[0] if ranked else 0xff4285F4
 
     hct_seed = Hct.from_int(seed_int)
     adjusted_hct = Hct.from_hct(
@@ -353,18 +360,18 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
         hex_f(t.tone(80 if is_dark else 40)), hex_f(n.tone(95 if is_dark else 10)),
     ]
 
-    if override_seed_hex:
-        accents = [override_seed_hex]
-    elif ranked:
+    if ranked:
         accents = [hex_f(color) for color in ranked[:8]]
     else:
+        # Fallback if image quantization failed
         accents = [hex_f(seed_int)]
 
     return PaletteData(
         colors=c, 
         accents=accents, 
         backend_used="material-you", 
-        source_path=str(path)
+        source_path=str(path),
+        seed=hex_f(seed_int)
     )
 
 def _extract_imagemagick(path: Path) -> PaletteData:
@@ -389,9 +396,10 @@ def _extract_imagemagick(path: Path) -> PaletteData:
                     colors.append(p[:7])
                     break
     
-    # Fill if missing (if image has fewer than 16 colors)
-    while len(colors) < 16:
-        colors.append(colors[-1] if colors else "#000000")
+    # Do not pad the color list with repeated values. Keep only the detected colors
+    # (limit to 16 maximum) so the UI can render a variable-length palette.
+    # This avoids visual duplication and matches UX expectations when the image
+    # has fewer distinct colors.
     
     # 2. Calculate best accent (Scoring logic ported from Gawk)
     # histogram:info: Output format: 

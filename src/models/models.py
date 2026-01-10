@@ -456,6 +456,7 @@ class PaletteData:
     accents: list[str]     # Accent colors
     backend_used: str      # 'pywal16', 'material-you', 'imagemagick'
     source_path: str       # Source image path
+    seed: str = ""         # Seed color used (hex)
     
     # def to_dict(self):
     #         return {

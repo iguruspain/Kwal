@@ -33,7 +33,8 @@ from ..utils import color_utils, file_utils
 
 
 class PaletteWorker(QThread):
-    finished = Signal(dict)
+    # Renamed to avoid shadowing QThread.finished
+    dataReady = Signal(dict)
     error = Signal(str)
 
     def __init__(self, path: str, backend: str, kwargs: dict[str, Any]):
@@ -52,9 +53,10 @@ class PaletteWorker(QThread):
                 "colors": pdata.colors,
                 "accents": pdata.accents,
                 "backend": pdata.backend_used,
-                "source": pdata.source_path
+                "source": pdata.source_path,
+                "seed": pdata.seed
             }
-            self.finished.emit(result)
+            self.dataReady.emit(result)
         except Exception as e:
             logging.exception("Palette extraction failed")
             self.error.emit(str(e))
@@ -122,6 +124,9 @@ class Controller(QObject):
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
         self._apply_thread: Optional[threading.Thread] = None
+        # Palette workers (to avoid premature destruction and track latest request)
+        self._palette_workers: set[PaletteWorker] = set()
+        self._latest_palette_request_id: int = 0
 
         # Helper Paths
         # expose home path for QML convenience (ensure trailing slash)
@@ -946,14 +951,37 @@ class Controller(QObject):
             return
             
         logging.info("Starting palette generation for %s with %s", path, backend)
-        self._palette_worker = PaletteWorker(path, backend, params)
-        self._palette_worker.finished.connect(self._on_palette_ready)
-        self._palette_worker.error.connect(self.paletteGenerationError)
-        self._palette_worker.start()
+        
+        # Increment request ID
+        self._latest_palette_request_id += 1
+        request_id = self._latest_palette_request_id
+        
+        worker = PaletteWorker(path, backend, params)
+        self._palette_workers.add(worker)
+        
+        # Connect signals
+        worker.dataReady.connect(lambda data: self._on_palette_ready(data, request_id))
+        worker.error.connect(self.paletteGenerationError)
+        
+        # Cleanup when thread finishes (using standard QThread.finished signal)
+        # Using lambda allows proper closure over 'worker'
+        worker.finished.connect(lambda: self._cleanup_palette_worker(worker))
+        
+        worker.start()
 
-    def _on_palette_ready(self, data: dict[str, Any]):
-        self._current_palette_data = data
-        self.currentPaletteDataChanged.emit()
+    def _cleanup_palette_worker(self, worker: PaletteWorker):
+        if worker in self._palette_workers:
+            self._palette_workers.remove(worker)
+        # Schedule for deletion
+        worker.deleteLater()
+
+    def _on_palette_ready(self, data: dict[str, Any], request_id: int):
+        # Only update if this is the latest request
+        if request_id == self._latest_palette_request_id:
+            self._current_palette_data = data
+            self.currentPaletteDataChanged.emit()
+        else:
+            logging.debug("Ignoring stale palette result (req %d, latest %d)", request_id, self._latest_palette_request_id)
 
     @Slot()
     def clearPalette(self) -> None:
