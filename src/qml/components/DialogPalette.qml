@@ -282,6 +282,8 @@ Dialog {
                         //text: qsTr("Extract")
                         icon.name: "palette-symbolic"
                         Layout.fillWidth: false
+                        ToolTip.text: qsTr("Extract Color Palette")
+                        ToolTip.visible: hovered
                         onClicked: {
                             var path = (root.sourceMode === 0) ? root.appSelectedWallpaper : root.sourceImage
                             if (!path && root.sourceMode === 0 && root.appSelectedWallpaper === "") {

@@ -408,6 +408,7 @@ Kirigami.Page {
                     Layout.fillHeight: true
                     spacing: Kirigami.Units.smallSpacing
                     Layout.preferredHeight: 4
+                    visible: controller ? (controller.fastfetchIsFileMode || controller.fastfetchTemplateIndex !== -1) : false
 
                     GridLayout {
                         columns: 2
