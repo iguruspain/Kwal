@@ -88,3 +88,6 @@ ordenes.txt
 *.backup
 *.bak
 backups/
+
+#TODO files
+*.todo
