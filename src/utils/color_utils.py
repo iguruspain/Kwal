@@ -188,91 +188,184 @@ def _extract_pywal16(path: Path) -> PaletteData:
 
     return PaletteData(colors=colors_list, accents=accents, backend_used="pywal16", source_path=str(path))
 
+# def _extract_material_you(path: Path, **kwargs) -> PaletteData:
+#     try:
+#         from materialyoucolor.quantize import QuantizeCelebi
+#         from materialyoucolor.score.score import Score
+#         from materialyoucolor.hct import Hct
+#         from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot
+#         from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
+#         from materialyoucolor.scheme.scheme_expressive import SchemeExpressive
+#         from materialyoucolor.scheme.scheme_content import SchemeContent
+#         from materialyoucolor.scheme.scheme_fruit_salad import SchemeFruitSalad
+#         from materialyoucolor.scheme.scheme_rainbow import SchemeRainbow
+#         from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome
+#         from materialyoucolor.scheme.scheme_neutral import SchemeNeutral
+#         from materialyoucolor.scheme.scheme_fidelity import SchemeFidelity
+#     except ImportError:
+#         raise ImportError("materialyoucolor module is not installed.")
+
+#     # Mapeo de nombres de QML a clases de la librería
+#     schemes = {
+#         "TonalSpot": SchemeTonalSpot, "Vibrant": SchemeVibrant,
+#         "Expressive": SchemeExpressive, "Content": SchemeContent,
+#         "FruitSalad": SchemeFruitSalad, "Rainbow": SchemeRainbow,
+#         "Monochrome": SchemeMonochrome, "Neutral": SchemeNeutral,
+#         "Fidelity": SchemeFidelity,
+#     }
+
+#     # Inputs externos
+#     selected_scheme_name = kwargs.get("scheme", "TonalSpot")
+#     scheme_class = schemes.get(selected_scheme_name, SchemeTonalSpot)
+#     is_dark = kwargs.get("dark_mode", True)
+#     contrast = float(kwargs.get("contrast", 0.0))
+#     colorfulness = float(kwargs.get("colorfulness", 1.0))
+#     brightness = float(kwargs.get("brightness", 0.8))
+#     override_seed_hex = kwargs.get("seed_color", None)
+
+#     # Determinación del color semilla (Seed Color)
+#     if override_seed_hex:
+#         rgb = ImageColor.getrgb(override_seed_hex)
+#         seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+#     else:
+#         # with Image.open(path) as img:
+#         #     img = img.convert("RGBA").thumbnail((128, 128))
+#         #     pixels = list(img.getdata())
+        
+#         # NEW (Fixed)
+#         with Image.open(path) as img:
+#             img = img.convert("RGBA")
+#             img.thumbnail((128, 128))  # Modifies img in-place
+#             pixels = list(img.getdata()) # img is still the Image object
+#             pixel_ints = [(r << 16) | (g << 8) | b for r, g, b, a in pixels if a > 128]
+        
+#         with suppress_stdout():
+#             stats = QuantizeCelebi(pixel_ints, 128)
+#             ranked = Score.score(stats)
+#             seed_int = ranked[0] if ranked else 0xff4285F4
+    
+#     print(f"Seed int: {seed_int}")
+
+#     # Aplicar modificadores de Colorfulness y Brightness al HCT
+#     hct_seed = Hct.from_int(seed_int)
+#     adjusted_hct = Hct.from_hct(
+#         hct_seed.hue,
+#         hct_seed.chroma * kwargs.get("colorfulness", 1.0),
+#         hct_seed.tone * kwargs.get("brightness", 0.8)
+#     )
+
+#     scheme_class = schemes.get(kwargs.get("scheme", "TonalSpot"))
+#     scheme = scheme_class(adjusted_hct, is_dark, contrast)
+#     def hex_f(i: int) -> str: return f"#{i & 0xFFFFFF:06x}"
+
+#     # Generación de 16 colores ANSI
+#     p, s, t, n = scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette, scheme.neutral_palette
+#     c = [
+#         hex_f(n.get_tone(10 if is_dark else 95)), hex_f(p.get_tone(40 if is_dark else 60)),
+#         hex_f(s.get_tone(40 if is_dark else 60)), hex_f(t.get_tone(40 if is_dark else 60)),
+#         hex_f(p.get_tone(50 if is_dark else 50)), hex_f(s.get_tone(50 if is_dark else 50)),
+#         hex_f(t.get_tone(50 if is_dark else 50)), hex_f(n.get_tone(80 if is_dark else 20)),
+#         hex_f(n.get_tone(30 if is_dark else 85)), hex_f(p.get_tone(70 if is_dark else 30)),
+#         hex_f(s.get_tone(70 if is_dark else 30)), hex_f(t.get_tone(70 if is_dark else 30)),
+#         hex_f(p.get_tone(80 if is_dark else 40)), hex_f(s.get_tone(80 if is_dark else 40)),
+#         hex_f(t.get_tone(80 if is_dark else 40)), hex_f(n.get_tone(95 if is_dark else 10)),
+#     ]
+
+#     # Lista de acentos para el QML (usamos los dominantes detectados)
+#     accents = [hex_f(color) for color in ranked[:8]] if not override_seed_hex else [override_seed_hex]
+
+#     return PaletteData(colors=c, accents=accents, backend_used="material-you", source_path=str(path))
 
 def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     try:
-        from materialyoucolor.quantize import QuantizeCelebi # type: ignore
-        from materialyoucolor.score.score import Score # type: ignore
-        from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot # type: ignore
-        from materialyoucolor.hct import Hct # type: ignore
+        from materialyoucolor.quantize import QuantizeCelebi
+        from materialyoucolor.score.score import Score
+        from materialyoucolor.hct import Hct
+        from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot
+        from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
+        from materialyoucolor.scheme.scheme_expressive import SchemeExpressive
+        from materialyoucolor.scheme.scheme_content import SchemeContent
+        from materialyoucolor.scheme.scheme_fruit_salad import SchemeFruitSalad
+        from materialyoucolor.scheme.scheme_rainbow import SchemeRainbow
+        from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome
+        from materialyoucolor.scheme.scheme_neutral import SchemeNeutral
+        from materialyoucolor.scheme.scheme_fidelity import SchemeFidelity
     except ImportError:
         raise ImportError("materialyoucolor module is not installed.")
-        
-    # Read image with Pillow and reduce size for speed
-    with Image.open(path) as img:
-        img = img.convert("RGBA")
-        img.thumbnail((128, 128))
-        pixels = list(img.getdata())
-        # Convert to list of [r,g,b] as expected by QuantizeCelebi
-        pixel_ints = [[r, g, b] for r, g, b, a in pixels]
-        
-    with suppress_stdout():
-        stats = QuantizeCelebi(pixel_ints, 128)
-        ranked = Score.score(stats)
-    
-    if not ranked:
-        raise ValueError("Could not extract primary color for Material You")
-        
-    source_color_int = ranked[0]
-    hct = Hct.from_int(source_color_int)
-    
-    is_dark = kwargs.get("dark_mode", True)
-    contrast = kwargs.get("contrast", 0.0)
-    
-    scheme = SchemeTonalSpot(hct, is_dark, contrast)
 
-    def hex_from_int(i: int) -> str:
+    schemes = {
+        "TonalSpot": SchemeTonalSpot, "Vibrant": SchemeVibrant,
+        "Expressive": SchemeExpressive, "Content": SchemeContent,
+        "FruitSalad": SchemeFruitSalad, "Rainbow": SchemeRainbow,
+        "Monochrome": SchemeMonochrome, "Neutral": SchemeNeutral,
+        "Fidelity": SchemeFidelity,
+    }
+
+    selected_scheme_name = kwargs.get("scheme", "TonalSpot")
+    scheme_class = schemes.get(selected_scheme_name, SchemeTonalSpot)
+    is_dark = kwargs.get("dark_mode", True)
+    contrast = float(kwargs.get("contrast", 0.0))
+    override_seed_hex = kwargs.get("seed_color", None)
+    
+    ranked = []
+
+    if override_seed_hex:
+        rgb = ImageColor.getrgb(override_seed_hex)
+        seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+    else:
+        with Image.open(path) as img:
+            img = img.convert("RGBA")
+            img.thumbnail((128, 128)) 
+            pixels = list(img.getdata())
+            # FIX: QuantizeCelebi expects a list of lists [r, g, b]
+            pixel_list = [[r, g, b] for r, g, b, a in pixels if a > 128]
+        
+        with suppress_stdout():
+            # Pass the list of [r,g,b] lists
+            stats = QuantizeCelebi(pixel_list, 128)
+            ranked = Score.score(stats)
+            seed_int = ranked[0] if ranked else 0xff4285F4
+
+    hct_seed = Hct.from_int(seed_int)
+    adjusted_hct = Hct.from_hct(
+        hct_seed.hue,
+        hct_seed.chroma * float(kwargs.get("colorfulness", 1.0)),
+        hct_seed.tone * float(kwargs.get("brightness", 0.8))
+    )
+
+    scheme = scheme_class(adjusted_hct, is_dark, contrast)
+    
+    def hex_f(i: int | list) -> str:
+        if isinstance(i, list):
+            return f"#{i[0]:02x}{i[1]:02x}{i[2]:02x}"
         return f"#{i & 0xFFFFFF:06x}"
 
-    # Use Hct.from_hct to generate colors for requested tones.
-    base_hue = hct.hue
-    base_chroma = max(0.0, float(getattr(hct, "chroma", 0.0)))
-    neutral_chroma = min(4.0, base_chroma)
-
-    def make_hex(hue: float, chroma: float, tone: float) -> str:
-        try:
-            nh = Hct.from_hct(hue, chroma, tone)
-            return hex_from_int(nh.to_int())
-        except Exception:
-            # Fallback: use original source color hex
-            return hex_from_int(source_color_int)
-
-    # Derive primary/secondary/tertiary hues by simple offsets (robust across versions)
-    primary_hue = base_hue
-    secondary_hue = (base_hue + 60.0) % 360.0
-    tertiary_hue = (base_hue + 120.0) % 360.0
-
-    # Approximation of 16 colors using HCT tones
-    c: list[str] = []
-    # 0-7: Base/Dark
-    c.append(make_hex(base_hue, neutral_chroma, 10))
-    c.append(make_hex(primary_hue, base_chroma, 80))
-    c.append(make_hex(secondary_hue, base_chroma, 80))
-    c.append(make_hex(tertiary_hue, base_chroma, 80))
-    c.append(make_hex(primary_hue, base_chroma, 60))
-    c.append(make_hex(secondary_hue, base_chroma, 60))
-    c.append(make_hex(tertiary_hue, base_chroma, 60))
-    c.append(make_hex(base_hue, neutral_chroma, 90))
-
-    # 8-15: Bright
-    c.append(make_hex(base_hue, neutral_chroma, 30))
-    c.append(make_hex(primary_hue, base_chroma, 90))
-    c.append(make_hex(secondary_hue, base_chroma, 90))
-    c.append(make_hex(tertiary_hue, base_chroma, 90))
-    c.append(make_hex(primary_hue, base_chroma, 70))
-    c.append(make_hex(secondary_hue, base_chroma, 70))
-    c.append(make_hex(tertiary_hue, base_chroma, 70))
-    c.append(make_hex(base_hue, neutral_chroma, 99))
-
-    accents = [
-        hex_from_int(source_color_int),
-        make_hex(primary_hue, base_chroma, 80),
-        make_hex(secondary_hue, base_chroma, 80),
-        make_hex(tertiary_hue, base_chroma, 80),
+    p, s, t, n = scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette, scheme.neutral_palette
+    
+    c = [
+        hex_f(n.tone(10 if is_dark else 95)), hex_f(p.tone(40 if is_dark else 60)),
+        hex_f(s.tone(40 if is_dark else 60)), hex_f(t.tone(40 if is_dark else 60)),
+        hex_f(p.tone(50 if is_dark else 50)), hex_f(s.tone(50 if is_dark else 50)),
+        hex_f(t.tone(50 if is_dark else 50)), hex_f(n.tone(80 if is_dark else 20)),
+        hex_f(n.tone(30 if is_dark else 85)), hex_f(p.tone(70 if is_dark else 30)),
+        hex_f(s.tone(70 if is_dark else 30)), hex_f(t.tone(70 if is_dark else 30)),
+        hex_f(p.tone(80 if is_dark else 40)), hex_f(s.tone(80 if is_dark else 40)),
+        hex_f(t.tone(80 if is_dark else 40)), hex_f(n.tone(95 if is_dark else 10)),
     ]
 
-    return PaletteData(colors=c, accents=accents, backend_used="material-you", source_path=str(path))
+    if override_seed_hex:
+        accents = [override_seed_hex]
+    elif ranked:
+        accents = [hex_f(color) for color in ranked[:8]]
+    else:
+        accents = [hex_f(seed_int)]
 
+    return PaletteData(
+        colors=c, 
+        accents=accents, 
+        backend_used="material-you", 
+        source_path=str(path)
+    )
 
 def _extract_imagemagick(path: Path) -> PaletteData:
     im_exe = shutil.which("magick") or shutil.which("convert")

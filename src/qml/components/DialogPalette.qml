@@ -14,14 +14,19 @@ Dialog {
     // Internal state
     property string sourceImage: "" 
     property color selectedColor: "transparent"
-    property string currentBackend: "pywal16"
+    property string currentBackend: "material-you" // "pywal16", "material-you", "imagemagick"
     property int sourceMode: 0 // 0: App (Wallpapers Tab), 1: Custom/System
-    property bool darkMode: true
-    property real contrastValue: 0.0
     property bool generationActive: false
     // Single selection across both grids: index + set name ("palette" or "accent")
     property int selectedIndex: -1
     property string selectedSet: ""
+    //["TonalSpot", "Vibrant", "Expressive", "Content", "FruitSalad", "Rainbow", "Monochrome", "Neutral", "Fidelity"]
+    property bool darkMode: true
+    property  int toneValue: 1
+    property real colorfulnessValue: 1.0
+    property real brightnessValue: 0.8
+    property real contrastValue: 0.0
+    property string seed_color: ""
     
     // Dimensions
     width: Kirigami.Units.gridUnit * 32
@@ -56,10 +61,14 @@ Dialog {
     // --- Helper Functions ---
 
     function refreshPalette(path) {
-        if (path !== "") {
+        if (path !== "" && currentBackend === "material-you") {
              var params = {
-                 "dark_mode": root.darkMode,
-                 "contrast": root.contrastValue
+                "dark_mode": root.darkMode,
+                "tone": root.toneValue,
+                "colorfulness": root.colorfulnessValue,
+                "brightness": root.brightnessValue,
+                "contrast": root.contrastValue,
+                "seed_color": root.seed_color
              }
              pyController.generatePalette(path, currentBackend, params)
         }
@@ -170,16 +179,20 @@ Dialog {
                     ComboBox {
                         id: extractMethodCombo
                         model: ["pywal16", "material-you", "imagemagick"]
-                        currentIndex: 0
+                        currentIndex: 1
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                         onActivated: {
                             // Switch backend and reset any generated data
                             root.currentBackend = currentText
                             root.generationActive = false
-                            root.contrastValue = 0.0
                             root.selectedColor = "transparent"
                             root.selectedIndex = -1
                             root.selectedSet = ""
+                            root.contrastValue = 0.0
+                            root.brightnessValue = 0.8
+                            root.colorfulnessValue = 1.0
+                            root.toneValue = 1
+                            root.darkMode = true
                             if (pyController && pyController.clearPalette) pyController.clearPalette()
                         }
                     }
@@ -306,13 +319,19 @@ Dialog {
                                         MouseArea {
                                             anchors.fill: parent
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
+                                            onClicked: (mouse) => {
+                                                if (mouse.button === Qt.LeftButton) {
                                                 root.selectedIndex = index
                                                 root.selectedSet = "accent"
                                                 root.selectedColor = modelData
+                                                }
+                                                // else if (mouse.button === Qt.RightButton) {
+                                                //     // Right-click to copy color to clipboard
+                                                //     root.seed_color = modelData
+                                                //     pyController.RefreshPalette(root.sourceImage)
+                                                // }
                                             }
                                         }
-                                        
                                         ToolTip.visible: hovered
                                         ToolTip.text: modelData
                                     }
@@ -342,25 +361,88 @@ Dialog {
                                 text: qsTr("Dark")
                                 checked: root.darkMode
                                 onToggled: if (checked) root.darkMode = true
+                                onCheckedChanged: {
+                                    // To be defined, will update palette with new mode
+                                }
                             }
                             RadioButton {
                                 text: qsTr("Light")
                                 checked: !root.darkMode
                                 onToggled: if (checked) root.darkMode = false
+                                onCheckedChanged: {
+                                    // To be defined, will update palette with new mode
+                                }
                             }
                         }
                         
-                        Label { text: qsTr("Contrast:") }
-                        Slider {
-                            Layout.fillWidth: false
-                            Layout.preferredWidth: Kirigami.Units.gridUnit * 12
-                            from: -1.0
-                            to: 1.0
-                            value: root.contrastValue
-                            stepSize: 0.1
-                            onMoved: root.contrastValue = value
+                        // Parameters laid out in a GridLayout: Label | Slider | Value
+                        GridLayout {
+                            id: auxGrid
+                            Layout.fillWidth: true
+                            columns: 3
+                            rowSpacing: Kirigami.Units.smallSpacing
+                            columnSpacing: Kirigami.Units.smallSpacing
+
+                            Label { text: qsTr("Tone:") }
+                            Slider {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                                from: 1
+                                to: 9
+                                value: root.toneValue
+                                stepSize: 1
+                                onMoved: root.toneValue = value
+                                onValueChanged: {
+                                    //To be defined, will update palette with new tone
+                                }
+                            }
+                            Label { text: root.toneValue.toFixed(0) }
+
+                            Label { text: qsTr("Colorfulness:") }
+                            Slider {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                                from: -1.0
+                                to: 1.0
+                                value: root.colorfulnessValue
+                                stepSize: 0.1
+                                onMoved: root.colorfulnessValue = value
+                                onValueChanged: {
+                                    //To be defined, will update palette with new colorfulness
+                                }
+                            }
+                            Label { text: root.colorfulnessValue.toFixed(1) }
+
+                            Label { text: qsTr("Brightness:") }
+                            Slider {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                                from: -1.0
+                                to: 1.0
+                                value: root.brightnessValue
+                                stepSize: 0.1
+                                onMoved: root.brightnessValue = value
+                                onValueChanged: {
+                                    //To be defined, will update palette with new brightness
+                                }
+                            }
+                            Label { text: root.brightnessValue.toFixed(1) }
+
+                            Label { text: qsTr("Contrast:") }
+                            Slider {
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                                from: -1.0
+                                to: 1.0
+                                value: root.contrastValue
+                                stepSize: 0.1
+                                onMoved: root.contrastValue = value
+                                onValueChanged: {
+                                    //To be defined, will update palette with new contrast
+                                }
+                            }
+                            Label { text: root.contrastValue.toFixed(1) }
                         }
-                        Label { text: root.contrastValue.toFixed(1) }
                     }
                 }
             }
