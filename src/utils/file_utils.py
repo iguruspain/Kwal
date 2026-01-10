@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import shutil
-import toml
+import tomlkit
 import json
 from pathlib import Path
 from typing import Any
@@ -224,6 +224,25 @@ def check_binary(command: str) -> bool:
     """Check if a binary exists in the system PATH."""
     return shutil.which(command) is not None
 
+def list_starship_templates(folder: str | Path) -> list[str]:
+    """Return list of absolute file paths for starship template toml files in `folder`."""
+    try:
+        p = Path(folder)
+        if not p.is_dir():
+            return []
+            
+        exts = {".toml"}
+        files: list[str] = []
+        
+        # Sorted mainly for UI stability
+        for f in sorted(p.iterdir()):
+            if f.is_file() and f.suffix.lower() in exts:
+                files.append(str(f.resolve()))
+        return files
+    except Exception:
+        logger.exception("Error listing starship templates in %s", folder)
+        return []
+
 def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
     """Read starship config at `path` (or default) and return simplified JSON.
 
@@ -251,7 +270,7 @@ def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
     try:
         # Load TOML configuration
         with cfg_path.open("r", encoding="utf-8") as fh:
-            config_data = toml.load(fh)
+            config_data = tomlkit.load(fh)
 
         if not isinstance(config_data, dict):
             return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
@@ -285,3 +304,67 @@ def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
     except Exception:
         logger.exception("Failed to read %s", cfg_path)
         return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
+
+
+def restore_starship_config_backup(config_path: str | None = None) -> bool:
+    """Restore starship.toml.bak."""
+    cfg = Path(config_path).expanduser() if config_path else (Path.home() / ".config" / "starship.toml")
+    bak = cfg.with_name(cfg.name + ".bak")
+    
+    if not bak.is_file():
+        return False
+        
+    try:
+        shutil.copyfile(bak, cfg)
+        logger.info("Restored starship backup %s", bak)
+        return True
+    except Exception:
+        logger.exception("Failed restoring starship backup")
+        return False
+
+def apply_starship_palette_surgical(
+    config_path: str, palette_name: str, palette_data: dict[str, str]
+) -> bool:
+    """Apply a palette to starship.toml using tomlkit to preserve formatted comments.
+
+    1. Updates `palette = "palette_name"` at root level.
+    2. Updates or creates `[palettes.palette_name]` block.
+    """
+    path = Path(config_path)
+    if not path.exists():
+        return False
+        
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            doc = tomlkit.parse(f.read())
+        
+        # 1. Update root 'palette' reference
+        doc["palette"] = palette_name
+        
+        # 2. Ensure 'palettes' table exists
+        if "palettes" not in doc:
+            doc.add("palettes", tomlkit.table())
+            
+        palettes: Any = doc["palettes"]
+        
+        # 3. Update the specific palette
+        # We replace the content to ensure it matches our data, but keep the key
+        
+        # Sanitize colors: ensure #RRGGBB format (strip alpha from #AARRGGBB)
+        cleaned_data = {}
+        for k, v in palette_data.items():
+            if isinstance(v, str) and v.startswith("#") and len(v) == 9:
+                 # Qt color.toString() returns #AARRGGBB. Starship generally needs #RRGGBB
+                 # We strip the first 2 chars of the hex component (Alpha)
+                 cleaned_data[k] = "#" + v[3:]
+            else:
+                 cleaned_data[k] = v
+                 
+        palettes[palette_name] = cleaned_data
+
+        # 4. Write back preserving structure
+        return _write_config_atomic(path, doc.as_string())
+
+    except Exception:
+        logger.exception("Failed surgical update of starship config")
+        return False

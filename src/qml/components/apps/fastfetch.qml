@@ -43,21 +43,7 @@ Kirigami.Page {
 
     // --- Dialogs ---
 
-    Dialog {
-        id: resultDialog
-        visible: controller ? controller.resultDialogVisible : false
-        modal: true
-        title: qsTr("Fastfetch")
-        onVisibleChanged: {
-            if (!visible && controller) controller.resultDialogVisible = false;
-        }
-        contentItem: Label {
-            text: controller ? controller.resultDialogText : ""
-            wrapMode: Text.WordWrap
-            leftPadding: Kirigami.Units.smallSpacing
-            rightPadding: Kirigami.Units.smallSpacing
-        }
-    }
+    // resultDialog moved to main.qml for global access
 
     Dialog {
         id: confirmDialog

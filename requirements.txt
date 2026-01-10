@@ -1,5 +1,5 @@
 json5
-toml
+tomlkit
 cssutils
 materialyoucolor
 pywal16

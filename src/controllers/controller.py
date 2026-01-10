@@ -29,6 +29,7 @@ from ..models.models import (
     SettingsAppModel,
     # Starship model will be used to expose starship config to QML
     StarshipModel,
+    StarshipTemplateModel,
     WallpaperFolderModel,
 )
 from ..utils import color_utils, file_utils
@@ -86,6 +87,11 @@ class Controller(QObject):
     fastfetchDraftColorChanged = Signal()
     fastfetchIsFileModeChanged = Signal()
     fastfetchTemplateIndexChanged = Signal()
+    # Starship Draft signals
+    starshipDraftColorChanged = Signal()
+    starshipIsFileModeChanged = Signal()
+    starshipTemplateIndexChanged = Signal()
+    starshipBackupExistsChanged = Signal()
     # Signal for compositing
     compositingEnabledChanged = Signal()
 
@@ -120,6 +126,11 @@ class Controller(QObject):
         self._fastfetch_is_file_mode: bool = False
         self._fastfetch_template_index: int = -1
         
+        # Starship Draft State (Persist across tabs)
+        self._starship_draft_color: str = "transparent"
+        self._starship_is_file_mode: bool = False
+        self._starship_template_index: int = -1
+
         # Compositing state (True by default for modern desktops)
         self._compositing_enabled: bool = True
 
@@ -176,6 +187,8 @@ class Controller(QObject):
             # Default template folder similar to fastfetch
             default_starship_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "starship")
             self._starship_model = StarshipModel(template_folder=default_starship_templates)
+            self._starship_template_model = StarshipTemplateModel()
+            self._starship_template_model.refresh(default_starship_templates)
             # Attempt an initial refresh (safe no-op if file absent)
             try:
                 self._starship_model.refresh()
@@ -461,6 +474,54 @@ class Controller(QObject):
 
     fastfetchTemplateIndex = Property(int, _get_fastfetch_template_index, _set_fastfetch_template_index, notify=fastfetchTemplateIndexChanged)
 
+    # --- Starship Properties ---
+
+    def _get_starship_draft_color(self) -> str:
+        return self._starship_draft_color
+    
+    def _set_starship_draft_color(self, val: str) -> None:
+        if self._starship_draft_color != val:
+            self._starship_draft_color = val
+            self.starshipDraftColorChanged.emit()
+    
+    starshipDraftColor = Property(str, _get_starship_draft_color, _set_starship_draft_color, notify=starshipDraftColorChanged)
+
+    def _get_starship_is_file_mode(self) -> bool:
+        return self._starship_is_file_mode
+    
+    def _set_starship_is_file_mode(self, val: bool) -> None:
+        if self._starship_is_file_mode != val:
+            self._starship_is_file_mode = val
+            self.starshipIsFileModeChanged.emit()
+
+    starshipIsFileMode = Property(bool, _get_starship_is_file_mode, _set_starship_is_file_mode, notify=starshipIsFileModeChanged)
+
+    def _get_starship_template_index(self) -> int:
+        return self._starship_template_index
+
+    def _set_starship_template_index(self, val: int) -> None:
+        if self._starship_template_index != val:
+            self._starship_template_index = val
+            self.starshipTemplateIndexChanged.emit()
+
+    starshipTemplateIndex = Property(int, _get_starship_template_index, _set_starship_template_index, notify=starshipTemplateIndexChanged)
+
+    @Property(QObject, constant=True)
+    def starshipTemplateModel(self) -> StarshipTemplateModel:
+        return self._starship_template_model
+
+    def _get_starship_backup_exists(self) -> bool:
+        cfg = Path.home() / ".config" / "starship.toml"
+        bak = cfg.with_name(cfg.name + ".bak")
+        return bak.exists() and bak.is_file()
+
+    hasStarshipBackup = Property(bool, _get_starship_backup_exists, notify=starshipBackupExistsChanged)
+
+    @Property(bool, notify=starshipBackupExistsChanged) # Re-using signal for simplicity as file IO usually affects both
+    def hasStarshipConfig(self) -> bool:
+        cfg = Path.home() / ".config" / "starship.toml"
+        return cfg.exists() and cfg.is_file()
+
     # --- Slots & Logic ---
 
     @Slot(result=str)
@@ -651,7 +712,7 @@ class Controller(QObject):
         self._last_set_wallpaper = abs_path
         self._logger.info("Setting wallpaper to %s", abs_path)
         
-        # KDE Plasma via qdbus
+        # KDE Plasma via qdbus 
         qdbus_path = shutil.which("qdbus") or shutil.which("qdbus-qt6") or shutil.which("qdbus6")
         if qdbus_path:
             # Escape single quotes for JS string context
@@ -681,6 +742,7 @@ class Controller(QObject):
 
     @Slot(result=str)
     def getCurrentSystemWallpaper(self) -> str:
+        #NEVER TOUCH THIS getCurrentSystemWallpaper FUNCTION ITS CORRECT 
         """Retrieve current wallpaper from KDE Plasma via config file directly (more reliable than qdbus parsing)."""
         # Prefer qdbus / PlasmaShell evaluateScript parsing (uses Plasma's runtime state)
         try:
@@ -1060,3 +1122,136 @@ class Controller(QObject):
                 thread.join(timeout=0.2)
             except Exception:
                 pass
+
+    @Slot()
+    def starshipClearSelection(self) -> None:
+        """Clear starship selection state."""
+        self._set_starship_is_file_mode(False)
+        self._set_starship_template_index(-1)
+        self.clearSelectedFile()
+        self._set_starship_draft_color("transparent")
+
+    @Slot()
+    def restoreStarshipBackup(self) -> None:
+        """Restore the starship config backup."""
+        try:
+            ok = file_utils.restore_starship_config_backup(None)
+            if ok:
+                msg = "Restored starship config from backup"
+                self._show_result_dialog(msg)
+                self.starshipBackupExistsChanged.emit()
+                
+                # Refresh model
+                self._starship_model.refresh()
+                # Clear selection
+                self.starshipClearSelection()
+            else:
+                msg = "No backup found to restore"
+                self._show_result_dialog(msg)
+        except Exception:
+            self._logger.exception("Failed restoring starship backup")
+            self._show_result_dialog("Unexpected error restoring backup")
+
+    @Slot()
+    def applyStarshipConfig(self) -> None:
+        """Apply the current starship configuration state to ~/.config/starship.toml."""
+        from ..utils.file_utils import apply_starship_palette_surgical
+        try:
+            # Determine Source
+            source_path = ""
+            if self._starship_is_file_mode and self._selected_file:
+                source_path = self._selected_file.replace("file://", "")
+            elif self._starship_template_index >= 0:
+                data = self._starship_template_model.get(self._starship_template_index)
+                if data and "filePath" in data:
+                    source_path = data["filePath"]
+            else:
+                # Use current config as base if no template selected (just applying palette edits to current)
+                source_path = self._starship_model.configPath
+
+            if not source_path or not os.path.exists(source_path):
+                self._show_result_dialog("Invalid source configuration.")
+                return
+
+            dest_path = Path.home() / ".config" / "starship.toml"
+            self._logger.info("Applying starship config (Surgical) Source: %s -> Dest: %s", source_path, dest_path)
+            
+            # 1. Ensure Destination File Exists (Initialize from source if needed)
+            if not dest_path.exists():
+                try:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    if source_path and os.path.exists(source_path):
+                         # Initial copy of instructions/format from template
+                         shutil.copy2(source_path, dest_path)
+                    else:
+                         dest_path.touch()
+                except Exception as e:
+                    self._logger.error("Failed to initialize config file: %s", e)
+                    self._show_result_dialog(f"Failed to initialize config file: {e}")
+                    return
+
+            # 2. Create Backup
+            bak_path = dest_path.with_name(dest_path.name + ".bak")
+            if dest_path.exists(): 
+                 try:
+                     shutil.copyfile(dest_path, bak_path)
+                     # self._logger.info("Created backup at %s", bak_path) 
+                     self.starshipBackupExistsChanged.emit()
+                 except Exception:
+                     self._logger.warning("Failed creating starship backup")
+
+            # 3. Prepare Data from Model (which holds the current edited state)
+            names = self._starship_model._palette_names
+            values = self._starship_model._palette_values
+            keys = self._starship_model._palette_keys
+            
+            if not names:
+                 self._show_result_dialog("No palette data available to apply.")
+                 return
+
+            # 4. Construct Palette Dictionaries
+            palettes_to_save = []
+            for idx, pname in enumerate(names):
+                if idx < len(values) and idx < len(keys):
+                    pvals = values[idx]
+                    pkeys = keys[idx]
+                    
+                    palette_dict = {}
+                    # Single value check logic preserved from original, though rare for starship palettes
+                    if len(pkeys) == 1 and pkeys[0] == "value":
+                         # If it's a single value, surgical tool can't handle it as a [block]
+                         # Skip or warn? For now, skip to avoid breaking standard palettes
+                         continue
+                    else:
+                         for k, v in zip(pkeys, pvals):
+                             palette_dict[k] = v
+                    palettes_to_save.append((pname, palette_dict))
+
+            # 5. Apply Updates Surgically
+            # Important: The surgical tool Sets `palette = "name"` for every call.
+            # We want the *last* applied palette to be the active one.
+            # Usually index 0 is the intended active palette from the template/selection.
+            # So, move index 0 to the end of the list.
+            if palettes_to_save:
+                active_palette = palettes_to_save.pop(0)
+                palettes_to_save.append(active_palette)
+
+            success = True
+            for pname, pdata in palettes_to_save:
+                if not apply_starship_palette_surgical(str(dest_path), pname, pdata):
+                    success = False
+                    self._logger.error("Surgical update failed for palette: %s", pname)
+                    break
+            
+            if not success:
+                 self._show_result_dialog("Failed writing to config file (Surgical Error).")
+                 return
+
+            self._show_result_dialog("Starship configuration applied successfully.")
+            
+            # Refresh to reflect disk state
+            self._starship_model.refresh(str(dest_path))
+
+        except Exception as e:
+            self._logger.exception("Failed processing starship config")
+            self._show_result_dialog(f"Error applying config: {e}")

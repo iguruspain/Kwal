@@ -15,28 +15,27 @@ Kirigami.Page{
     Item {
         id: starshipModelProxy
         // Underlying Python QObject
-        property var model: (controller && controller.starshipModel) ? controller.starshipModel : null
-        // Index of the palette within the current file to display/edit
-        property int paletteIndex: -1
-        
-        property string configFile: model ? model.configPath : ""
-        property string templateFolder: model ? model.templateFolder : ""
-        
+        property var model: (pyController && pyController.starshipModel) ? pyController.starshipModel : null
+        property int selectedIndex: -1
+        property string configFile: model ? model.configPath : "~/.config/starship.toml"
+        property string templateFolder: model ? model.templateFolder : "~/.config/kwal/templates/starship/"
         property var paletteNames: model ? model.paletteNames : []
         property var paletteValues: model ? model.paletteValues : []
         property var paletteKeys: model ? model.paletteKeys : []
         property bool paletteExpanded: true
         // Editing context for palette dialog
         property int editIndex: -1
+        property string editSet: "palette"
 
         Component.onCompleted: {
-            if (model && model.paletteNames && model.paletteNames.length > 0) paletteIndex = 0
+            if (model && model.refresh) model.refresh()
+            if (model && model.paletteNames && model.paletteNames.length > 0) selectedIndex = 0
         }
 
         // Update derived properties when local `paletteNames` changes
         onPaletteNamesChanged: {
-            if (paletteNames && paletteNames.length > 0) paletteIndex = 0
-            else paletteIndex = -1
+            if (paletteNames && paletteNames.length > 0) selectedIndex = 0
+            else selectedIndex = -1
         }
     }
 
@@ -46,50 +45,10 @@ Kirigami.Page{
     Components.DialogPalette {
         id: paletteDialog
         onAccepted: {
-            // explicit toString() for safety when passing to Python
-            if (selectedColor != "transparent") {
-                // If we have an edit index set, write back using Controller
-                if (starshipModelProxy.paletteIndex >= 0 && starshipModelProxy.editIndex >= 0 && controller) {
-                    controller.starshipModel.setPaletteColor(starshipModelProxy.paletteIndex, starshipModelProxy.editIndex, selectedColor.toString())
-                }
-            }
-        }
-    }
-
-    Dialog {
-        id: confirmApplyDialog
-        title: qsTr("Confirm overwrite")
-        modal: true
-        visible: false
-        x: (parent.width - width) / 2
-        y: (parent.height - height) / 2
-        
-        contentItem: ColumnLayout {
-            spacing: Kirigami.Units.smallSpacing
-            Label { 
-                text: {
-                    if (!controller) return ""
-                    if (controller.hasStarshipConfig) {
-                        return qsTr("This will overwrite your current ~/.config/starship.toml configuration.\nAn automatic backup will be created.\n\nContinue?") 
-                    } else {
-                        return qsTr("No existing configuration found.\nA new ~/.config/starship.toml will be created from your selection.\n\nContinue?")
-                    }
-                }
-                wrapMode: Text.WordWrap
-                Layout.maximumWidth: 400
-            }
-            RowLayout {
-                Layout.alignment: Qt.AlignRight
-                Button {
-                    text: qsTr("Cancel")
-                    onClicked: { confirmApplyDialog.close() }
-                }
-                Button {
-                    text: qsTr("Apply")
-                    onClicked: {
-                        confirmApplyDialog.close()
-                        if (controller) controller.applyStarshipConfig()
-                    }
+            if (selectedColor && selectedColor !== "transparent") {
+                // If we have an edit index set, write back into the model proxy
+                if (starshipModelProxy.selectedIndex >= 0 && starshipModelProxy.editIndex >= 0) {
+                    starshipModelProxy.paletteValues[starshipModelProxy.selectedIndex][starshipModelProxy.editIndex] = selectedColor
                 }
             }
         }
@@ -130,51 +89,17 @@ Kirigami.Page{
                     }
                     ToolButton {
                             icon.name: "edit-clear"
-                            ToolTip.text: qsTr("Reset to current config")
-                            onClicked: { 
-                                if (controller) {
-                                    controller.starshipClearSelection();
-                                    controller.starshipModel.refresh(); 
-                                }
-                            }
+                            onClicked: { /* logic to be implemented, like fastfetch.qml, reset all */ }
                     }
                 }
 
                 ComboBox {
+                    //All here is wrong, must display ["Current config","*All templates in kwal templates starship*"], to be fixed
                     id: templateCombo
                     Layout.fillWidth: true
-                    model: controller ? controller.starshipTemplateModel : null
-                    textRole: "fileName"
-                    
-                    currentIndex: controller ? controller.starshipTemplateIndex : -1
-                    // Logic equivalent to fastfetch: disabled if file mode is active
-                    enabled: (controller && !controller.starshipIsFileMode) && (model ? model.rowCount() > 0 : false)
-                    opacity: enabled ? 1.0 : 0.5
-                    
-                    displayText: currentIndex === -1 ? qsTr("Current Config") : currentText
-                    
-                    onActivated: {
-                        if (controller) {
-                             controller.starshipIsFileMode = false;
-                             controller.clearSelectedFile();
-                             controller.starshipTemplateIndex = currentIndex;
-                             
-                             if (currentIndex >= 0 && model) {
-                                 var info = model.get(currentIndex);
-                                 if (info) controller.starshipModel.refresh(info.filePath);
-                             } else {
-                                 controller.starshipModel.refresh();
-                             }
-                        }
-                    }
-                    
-                    Component.onCompleted: {
-                        // Restore state on load
-                        if (controller && currentIndex >= 0 && model) {
-                              var info = model.get(currentIndex);
-                              if (info) controller.starshipModel.refresh(info.filePath);
-                        }
-                    }
+                    model: starshipModelProxy.paletteNames
+                    currentIndex: starshipModelProxy.selectedIndex
+                    onCurrentIndexChanged: starshipModelProxy.selectedIndex = currentIndex
                 }
 
                 RowLayout {
@@ -186,13 +111,10 @@ Kirigami.Page{
                         placeholderText: qsTr("Select your own config")
                         readOnly: true
                         text: {
-                            if (!controller) return ""
-                            if (controller.starshipIsFileMode && controller.selectedFile) {
-                                var f = controller.selectedFile.replace("file://", "")
-                                var parts = f.split("/")
-                                return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 2).join("/") : f
-                            }
-                            return ""
+                            if (!controller || !controller.selectedFile) return ""
+                            var f = controller.selectedFile.replace("file://", "")
+                            var parts = f.split("/")
+                            return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 2).join("/") : f
                         }
                     }
                     ToolButton {
@@ -205,14 +127,12 @@ Kirigami.Page{
                         ToolTip.delay: Kirigami.Units.toolTipDelay
                         
                         onClicked: {
-                            if (!controller) return;
-                            controller.openFileDialog();
-                            if (controller.selectedFile) {
-                                controller.starshipIsFileMode = true; 
-                                controller.starshipTemplateIndex = -1;
-                                var f = controller.selectedFile.replace("file://", "");
-                                controller.starshipModel.refresh(f);
-                            }
+                            // if (!controller) return;
+                            // controller.openFileDialog();
+                            // if (controller.selectedFile) {
+                            //     controller.starshipIsFileMode = true; // missing in controller, to be implemented
+                            //     //Here logic to read the custom file and update the model
+                            // }
                         }
                     }     
                 }
@@ -245,14 +165,14 @@ Kirigami.Page{
                             spacing: Kirigami.Units.smallSpacing
 
                             Repeater {
-                                model: (starshipModelProxy.paletteIndex >= 0) ? starshipModelProxy.paletteValues[starshipModelProxy.paletteIndex] : []
+                                model: (starshipModelProxy.selectedIndex >= 0) ? starshipModelProxy.paletteValues[starshipModelProxy.selectedIndex] : []
                                 delegate: RowLayout {
                                     Layout.fillWidth: true
                                     spacing: Kirigami.Units.smallSpacing
 
                                     Label {
                                         id: colorNameLabel
-                                        text: (starshipModelProxy.paletteKeys.length > 0 && starshipModelProxy.paletteIndex < starshipModelProxy.paletteKeys.length) ? starshipModelProxy.paletteKeys[starshipModelProxy.paletteIndex][index] : ""
+                                        text: (starshipModelProxy.paletteKeys.length > 0) ? starshipModelProxy.paletteKeys[starshipModelProxy.selectedIndex][index] : ""
                                         Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                                         // Layout.maximumWidth: 120
                                         elide: Text.ElideRight
@@ -269,6 +189,8 @@ Kirigami.Page{
                                         border.width: 1
                                         border.color: Kirigami.Theme.disabledTextColor
                                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                                        // Bind to controller property
+                                        //color: controller ? (controller.starshipDraftColor === "" ? "transparent" : controller.starshipDraftColor) : "transparent"
                                         
                                         ToolTip.text: {
                                             if (!controller) return qsTr("Pick color")
@@ -285,10 +207,21 @@ Kirigami.Page{
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 if (!controller) return;
+                                                //var currentColor = controller.starshipDraftColor;
                                                 var currentColor = modelData || "transparent";
                                                 var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
                                                 if (color) {
-                                                    controller.starshipModel.setPaletteColor(starshipModelProxy.paletteIndex, index, color)
+                                                    controller.starshipDraftColor = color;
+                                                    
+                                                    // Regenerate preview
+                                                    if (controller.selectedFile) {
+                                                        controller.generateTintedPreview(controller.selectedFile, color);
+                                                    } else if (controller.starshipTemplateIndex !== -1 && templateSelector.model) {
+                                                        var info = templateSelector.model.get(controller.starshipTemplateIndex);
+                                                        if (info && info.fileUrl) {
+                                                            controller.generateTintedPreview(info.fileUrl, color);
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }                                        
@@ -302,8 +235,6 @@ Kirigami.Page{
                                         ToolTip.visible: hovered
                                         onClicked: {
                                             starshipModelProxy.editIndex = index
-                                            // Reset selection state in dialog to prevent stale values
-                                            paletteDialog.selectedColor = "transparent"
                                             paletteDialog.open()
                                         }
                                     }
@@ -318,25 +249,14 @@ Kirigami.Page{
                 RowLayout {
                     Layout.fillWidth: true
                     Button {
-                        id: applyButton
-                        text: qsTr("Apply Config")
+                        text: qsTr("Apply colors")
                         Layout.fillWidth: true
-                        onClicked: { 
-                            if (controller) confirmApplyDialog.open()
-                        }
+                        onClicked: { /* ... */ }
                     }
                     Button {
-                        text: qsTr("Restore Backup")
+                        text: qsTr("Restore")
                         Layout.fillWidth: true
-                        enabled: controller && controller.hasStarshipBackup
-                        ToolTip.text: (enabled) ? qsTr("Restore starship config from backup") : qsTr("No backup available")
-                        ToolTip.visible: hovered
-                        onClicked: {
-                             if (controller) {
-                                controller.restoreStarshipBackup();
-                                controller.starshipModel.refresh(); 
-                             }
-                        }
+                        onClicked: { /* ... */ }
                     }
                 }
             }
@@ -357,35 +277,34 @@ Kirigami.Page{
                 ColumnLayout {
                     id: previewSectionTop
                     Layout.fillWidth: true
-                    
-                    Label { text: qsTr("Active Source:"); font.bold: true }
-                    // Preview current config path
-                    Label { 
-                        text: starshipModelProxy.configFile
-                        font.italic: true 
-                        wrapMode: Text.WrapAnywhere
-                        Layout.fillWidth: true
-                    }
+                    Layout.fillHeight: true
+                    //Layout.preferredHeight: 6
+
+                    Label { text: qsTr("Current (config):"); font.bold: true }
+                    // Preview current config
+                    Label { text: starshipModelProxy.configFile; font.italic: true }
                 
                 }
-                // Bottom: Selection Status
+                // Bottom: Selection & Preview
                 ColumnLayout {
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
                     spacing: Kirigami.Units.smallSpacing
+                    //Layout.preferredHeight: 4
 
+                        
                     Label {
-                        text: qsTr("Status:")
+                        id: selectedTemplateLabel
+                        visible: text !== qsTr("Template:")
                         font.bold: true
                     }
-                    
+                    // Preview with selected template applied
                     Label {
-                        text: {
-                            if (!controller) return ""
-                            if (controller.starshipIsFileMode) return qsTr("Custom File Mode")
-                            if (controller.starshipTemplateIndex >= 0) return qsTr("Template Mode")
-                            return qsTr("Current Config Mode")
-                        }
-                    }
+                        id: withColorsAppliedLabel
+                        visible: text !== qsTr("Template with colors:")
+                        font.bold: true
+                    }                    
+                    // Preview with selected template and colors applied            
                 }
             }
         }

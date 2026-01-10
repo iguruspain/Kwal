@@ -451,6 +451,71 @@ class FastfetchTemplateModel(QAbstractListModel):
         return {}
 
 
+class StarshipTemplateModel(QAbstractListModel):
+    FileNameRole = Qt.UserRole + 1
+    FilePathRole = Qt.UserRole + 2
+    FileUrlRole = Qt.UserRole + 3
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._files: list[Path] = []
+
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return len(self._files)
+
+    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+        if not index.isValid() or not (0 <= index.row() < self.rowCount()):
+            return None
+        p = self._files[index.row()]
+        if role == StarshipTemplateModel.FileNameRole:
+            return p.name
+        if role == StarshipTemplateModel.FilePathRole:
+            return str(p)
+        if role == StarshipTemplateModel.FileUrlRole:
+            return "file://" + str(p)
+        return None
+
+    def roleNames(self) -> dict[int, bytes]:
+        return {
+            StarshipTemplateModel.FileNameRole: b"fileName",
+            StarshipTemplateModel.FilePathRole: b"filePath",
+            StarshipTemplateModel.FileUrlRole: b"fileUrl",
+        }
+
+    @Slot(str)
+    def refresh(self, folder_path: str | None = None) -> None:
+        """Populate model from a folder path."""
+        try:
+            if not folder_path:
+                self.beginResetModel()
+                self._files.clear()
+                self.endResetModel()
+                return
+
+            # Import here to avoid circular dependencies if utils imports models
+            from ..utils.file_utils import list_starship_templates
+
+            startship_files = list_starship_templates(folder_path)
+            
+            self.beginResetModel()
+            self._files = [Path(x) for x in startship_files]
+            self.endResetModel()
+            logger.debug("StarshipTemplateModel refreshed %d files", len(self._files))
+        except Exception:
+            logger.exception("Failed refreshing StarshipTemplateModel")
+
+    @Slot(int, result="QVariantMap")
+    def get(self, row: int) -> dict[str, str]:
+        if 0 <= row < self.rowCount():
+            p = self._files[row]
+            return {
+                "fileName": p.name, 
+                "filePath": str(p), 
+                "fileUrl": "file://" + str(p)
+            }
+        return {}
+
+
 class StarshipModel(QObject):
     """Lightweight QObject model exposing Starship config info for QML.
 
@@ -513,6 +578,17 @@ class StarshipModel(QObject):
     paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
     paletteValues = Property('QVariantList', _get_palette_values, notify=paletteValuesChanged)
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
+
+    @Slot(int, int, str)
+    def setPaletteColor(self, palette_idx: int, color_idx: int, color: str) -> None:
+        try:
+            if 0 <= palette_idx < len(self._palette_values):
+                # We need to make a copy if we want to ensure immutability paradigms, but modifying in place is fine
+                # self._palette_values is a list of lists of strings
+                self._palette_values[palette_idx][color_idx] = str(color)
+                self.paletteValuesChanged.emit()
+        except Exception:
+            logger.exception("Failed setting palette color")
 
     @Slot(result="QVariantMap")
     @Slot(str, result="QVariantMap")

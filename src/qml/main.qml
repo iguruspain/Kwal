@@ -155,4 +155,29 @@ Kirigami.ApplicationWindow {
             }
         }
     }
+
+    // Generic Result Dialog (Global)
+    Dialog {
+        id: resultDialog
+        visible: pyController.resultDialogVisible
+        modal: true
+        title: qsTr("Notification") 
+        standardButtons: Dialog.Ok
+        onAccepted: pyController.resultDialogVisible = false
+        onRejected: pyController.resultDialogVisible = false
+        
+        // Ensure close from X button also updates controller state
+        onVisibleChanged: {
+            if (!visible) pyController.resultDialogVisible = false
+        }
+
+        contentItem: Label {
+            text: pyController.resultDialogText
+            wrapMode: Text.WordWrap
+            topPadding: Kirigami.Units.smallSpacing
+            bottomPadding: Kirigami.Units.smallSpacing
+            leftPadding: Kirigami.Units.smallSpacing
+            rightPadding: Kirigami.Units.smallSpacing
+        }
+    }
 }
