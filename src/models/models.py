@@ -616,9 +616,9 @@ class StarshipModel(QObject):
                     names.append(str(pname))
                     # pvals may be dict of color entries; collect keys and values in stable key order
                     if isinstance(pvals, dict):
-                        sorted_items = sorted(pvals.items(), key=lambda kv: str(kv[0]))
-                        klist = [str(k) for k, _ in sorted_items]
-                        vlist = [str(v) for _, v in sorted_items]
+                        # Preserve file order as provided by the TOML parser (do not sort)
+                        klist = [str(k) for k in pvals.keys()]
+                        vlist = [str(v) for v in pvals.values()]
                     else:
                         klist = ["value"]
                         vlist = [str(pvals)] if pvals is not None else []

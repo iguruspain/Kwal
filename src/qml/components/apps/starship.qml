@@ -143,36 +143,59 @@ Kirigami.Page{
                 ComboBox {
                     id: templateCombo
                     Layout.fillWidth: true
-                    model: controller ? controller.starshipTemplateModel : null
                     textRole: "fileName"
-                    
-                    currentIndex: controller ? controller.starshipTemplateIndex : -1
-                    // Logic equivalent to fastfetch: disabled if file mode is active
-                    enabled: (controller && !controller.starshipIsFileMode) && (model ? model.rowCount() > 0 : false)
+
+                    // Build a transient model array where index 0 = Current Config (or "No current config")
+                    model: (function() {
+                        var list = [];
+                        list.push({ fileName: (controller && controller.hasStarshipConfig) ? qsTr("Current Config") : qsTr("No current config"), filePath: "" });
+                        if (controller && controller.starshipTemplateModel) {
+                            var tm = controller.starshipTemplateModel;
+                            for (var i = 0; i < tm.rowCount(); i++) {
+                                var it = tm.get(i);
+                                // ensure we provide the same shape
+                                list.push({ fileName: it.fileName || "", filePath: it.filePath || "" });
+                            }
+                        }
+                        return list;
+                    })()
+
+                    // Map controller index (-1 = current config) to combo index (0 = current config)
+                    currentIndex: controller ? (controller.starshipTemplateIndex >= 0 ? controller.starshipTemplateIndex + 1 : 0) : 0
+
+                    // Keep original enabled logic based on template model availability
+                    enabled: (controller && !controller.starshipIsFileMode) && (controller && controller.starshipTemplateModel ? controller.starshipTemplateModel.rowCount() > 0 : false)
                     opacity: enabled ? 1.0 : 0.5
-                    
-                    displayText: currentIndex === -1 ? qsTr("Current Config") : currentText
-                    
+
                     onActivated: {
-                        if (controller) {
-                             controller.starshipIsFileMode = false;
-                             controller.clearSelectedFile();
-                             controller.starshipTemplateIndex = currentIndex;
-                             
-                             if (currentIndex >= 0 && model) {
-                                 var info = model.get(currentIndex);
-                                 if (info) controller.starshipModel.refresh(info.filePath);
-                             } else {
-                                 controller.starshipModel.refresh();
-                             }
+                        if (!controller) return;
+                        controller.starshipIsFileMode = false;
+                        controller.clearSelectedFile();
+
+                        if (currentIndex === 0) {
+                            // User chose Current Config
+                            controller.starshipTemplateIndex = -1;
+                            controller.starshipModel.refresh();
+                        } else {
+                            // Template chosen; adjust index mapping (-1 offset)
+                            var tmplIdx = currentIndex - 1;
+                            controller.starshipTemplateIndex = tmplIdx;
+                            var info = controller.starshipTemplateModel.get(tmplIdx);
+                            if (info) controller.starshipModel.refresh(info.filePath);
                         }
                     }
-                    
+
                     Component.onCompleted: {
-                        // Restore state on load
-                        if (controller && currentIndex >= 0 && model) {
-                              var info = model.get(currentIndex);
-                              if (info) controller.starshipModel.refresh(info.filePath);
+                        if (!controller) return;
+                        // Restore state: if a template was selected, refresh it; otherwise refresh current config
+                        if (controller.starshipTemplateIndex >= 0) {
+                            var ci = controller.starshipTemplateIndex + 1;
+                            currentIndex = ci;
+                            var info = controller.starshipTemplateModel.get(controller.starshipTemplateIndex);
+                            if (info) controller.starshipModel.refresh(info.filePath);
+                        } else {
+                            currentIndex = 0;
+                            controller.starshipModel.refresh();
                         }
                     }
                 }
@@ -183,7 +206,7 @@ Kirigami.Page{
                     TextField {
                         id: customTemplateField
                         Layout.fillWidth: true
-                        placeholderText: qsTr("Select your own config")
+                        placeholderText: qsTr("Select your own template")
                         readOnly: true
                         text: {
                             if (!controller) return ""
@@ -245,6 +268,7 @@ Kirigami.Page{
                             spacing: Kirigami.Units.smallSpacing
 
                             Repeater {
+                                id: paletteColorRepeater
                                 model: (starshipModelProxy.paletteIndex >= 0) ? starshipModelProxy.paletteValues[starshipModelProxy.paletteIndex] : []
                                 delegate: RowLayout {
                                     Layout.fillWidth: true
@@ -358,10 +382,10 @@ Kirigami.Page{
                     id: previewSectionTop
                     Layout.fillWidth: true
                     
-                    Label { text: qsTr("Active Source:"); font.bold: true }
+                    Label { text: qsTr("Starship config file:"); font.bold: true }
                     // Preview current config path
                     Label { 
-                        text: starshipModelProxy.configFile
+                        text: (controller && controller.hasStarshipConfig) ? starshipModelProxy.configFile : qsTr("No starship.toml found")
                         font.italic: true 
                         wrapMode: Text.WrapAnywhere
                         Layout.fillWidth: true
@@ -383,6 +407,7 @@ Kirigami.Page{
                             if (!controller) return ""
                             if (controller.starshipIsFileMode) return qsTr("Custom File Mode")
                             if (controller.starshipTemplateIndex >= 0) return qsTr("Template Mode")
+                            if (!controller.hasStarshipConfig) return qsTr("No current starship.toml")
                             return qsTr("Current Config Mode")
                         }
                     }
