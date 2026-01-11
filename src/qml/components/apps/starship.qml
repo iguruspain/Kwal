@@ -103,6 +103,9 @@ Kirigami.Page{
                 Button {
                     text: qsTr("Cancel")
                     onClicked: { confirmApplyDialog.close() }
+                    ToolTip.text: qsTr("Cancel and return without applying")
+                    ToolTip.visible: hovered
+                    ToolTip.delay: Kirigami.Units.toolTipDelay
                 }
                 Button {
                     text: qsTr("Apply")
@@ -110,6 +113,9 @@ Kirigami.Page{
                         confirmApplyDialog.close()
                         if (controller) controller.applyStarshipConfig()
                     }
+                    ToolTip.text: qsTr("Overwrite current starship.toml with the selected configuration")
+                    ToolTip.visible: hovered
+                    ToolTip.delay: Kirigami.Units.toolTipDelay
                 }
             }
         }
@@ -151,6 +157,8 @@ Kirigami.Page{
                     ToolButton {
                             icon.name: "edit-clear"
                             ToolTip.text: qsTr("Reset to current config")
+                            ToolTip.visible: hovered
+                            ToolTip.delay: Kirigami.Units.toolTipDelay
                             onClicked: { 
                                 if (controller) {
                                     controller.starshipClearSelection();
@@ -185,7 +193,7 @@ Kirigami.Page{
                             }
                         }
                         return list;
-                    })()
+                    })
 
                     // Map controller index (-1 = current config) to combo index (0 = current config)
                     currentIndex: controller ? (controller.starshipTemplateIndex >= 0 ? controller.starshipTemplateIndex + 1 : 0) : 0
@@ -284,13 +292,20 @@ Kirigami.Page{
 
                         RowLayout {
                             Layout.fillWidth: true
-                            Label { text: qsTr("Palette colors"); font.bold: true }
+                            Label {
+                                text: qsTr("Palette: " + (starshipModelProxy.paletteIndex >= 0 ? starshipModelProxy.paletteNames[starshipModelProxy.paletteIndex] : ""))
+                                font.bold: true
+                            }
                             Item { Layout.fillWidth: true }
                             ToolButton {
                                 icon.name: starshipModelProxy.paletteExpanded ? "arrow-down" : "arrow-right"
                                 onClicked: starshipModelProxy.paletteExpanded = !starshipModelProxy.paletteExpanded
+                                ToolTip.text: starshipModelProxy.paletteExpanded ? qsTr("Collapse palettes") : qsTr("Expand palettes")
+                                ToolTip.visible: hovered
+                                ToolTip.delay: Kirigami.Units.toolTipDelay
                             }
                         }
+                        MenuSeparator { Layout.fillWidth: true }
 
                         ColumnLayout {
                             id: paletteContent
@@ -379,6 +394,9 @@ Kirigami.Page{
                         onClicked: { 
                             if (controller) confirmApplyDialog.open()
                         }
+                        ToolTip.text: qsTr("Apply selected configuration to your Starship config (starship.toml)")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
                     }
                     Button {
                         text: qsTr("Restore Backup")
@@ -435,7 +453,7 @@ Kirigami.Page{
                         Layout.fillHeight: true
                         Text {
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.smallSpacing
+                            anchors.margins: Kirigami.Units.largeSpacing
                             textFormat: Text.RichText
                             elide: Text.ElideRight
                             //font.pointSize: 9
@@ -458,13 +476,17 @@ Kirigami.Page{
                     
                     Label {
                         id: statusModeLabel
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: parent ? parent.width : undefined
                         text: {
                             if (!controller) return ""
-                            if (controller.starshipIsFileMode) return qsTr("Custom File Mode")
-                            if (controller.starshipTemplateIndex >= 0) return qsTr("Template Mode")
+                            if (controller.starshipIsFileMode) return qsTr("Custom File Mode: "+ controller.selectedFile.replace("file://", ""))
+                            if (controller.starshipTemplateIndex >= 0) return qsTr("Template Mode: "+ starshipModelProxy.templateFolder + "/" + controller.starshipTemplateModel.get(controller.starshipTemplateIndex).fileName)
                             if (!controller.hasStarshipConfig) return qsTr("No current starship.toml")
-                            return qsTr("Current Config Mode")
+                            return qsTr("Local Config Mode: "+ starshipModelProxy.configFile)
                         }
+                        elide: Text.ElideMiddle
+                        wrapMode: Text.ElideRight
                     }
                     // Status preview
                     Rectangle {
@@ -479,7 +501,7 @@ Kirigami.Page{
                         Layout.fillHeight: true
                         Text {
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.smallSpacing
+                            anchors.margins: Kirigami.Units.largeSpacing
                             textFormat: Text.RichText
                             elide: Text.ElideRight
                             //font.pointSize: 9
