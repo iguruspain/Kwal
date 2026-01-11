@@ -17,8 +17,8 @@ from typing import Optional, cast
 
 from PIL import Image, ImageColor
 
-from src.models.models import PaletteData
-from src.utils.file_utils import check_binary
+from ..models.models import PaletteData
+from .file_utils import check_binary
 
 logger = logging.getLogger(__name__)
 
@@ -187,94 +187,6 @@ def _extract_pywal16(path: Path) -> PaletteData:
     accents = colors_list[1:7]
 
     return PaletteData(colors=colors_list, accents=accents, backend_used="pywal16", source_path=str(path))
-
-# def _extract_material_you(path: Path, **kwargs) -> PaletteData:
-#     try:
-#         from materialyoucolor.quantize import QuantizeCelebi
-#         from materialyoucolor.score.score import Score
-#         from materialyoucolor.hct import Hct
-#         from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot
-#         from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
-#         from materialyoucolor.scheme.scheme_expressive import SchemeExpressive
-#         from materialyoucolor.scheme.scheme_content import SchemeContent
-#         from materialyoucolor.scheme.scheme_fruit_salad import SchemeFruitSalad
-#         from materialyoucolor.scheme.scheme_rainbow import SchemeRainbow
-#         from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome
-#         from materialyoucolor.scheme.scheme_neutral import SchemeNeutral
-#         from materialyoucolor.scheme.scheme_fidelity import SchemeFidelity
-#     except ImportError:
-#         raise ImportError("materialyoucolor module is not installed.")
-
-#     # Mapeo de nombres de QML a clases de la librería
-#     schemes = {
-#         "TonalSpot": SchemeTonalSpot, "Vibrant": SchemeVibrant,
-#         "Expressive": SchemeExpressive, "Content": SchemeContent,
-#         "FruitSalad": SchemeFruitSalad, "Rainbow": SchemeRainbow,
-#         "Monochrome": SchemeMonochrome, "Neutral": SchemeNeutral,
-#         "Fidelity": SchemeFidelity,
-#     }
-
-#     # Inputs externos
-#     selected_scheme_name = kwargs.get("scheme", "TonalSpot")
-#     scheme_class = schemes.get(selected_scheme_name, SchemeTonalSpot)
-#     is_dark = kwargs.get("dark_mode", True)
-#     contrast = float(kwargs.get("contrast", 0.0))
-#     colorfulness = float(kwargs.get("colorfulness", 1.0))
-#     brightness = float(kwargs.get("brightness", 0.8))
-#     override_seed_hex = kwargs.get("seed_color", None)
-
-#     # Determinación del color semilla (Seed Color)
-#     if override_seed_hex:
-#         rgb = ImageColor.getrgb(override_seed_hex)
-#         seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
-#     else:
-#         # with Image.open(path) as img:
-#         #     img = img.convert("RGBA").thumbnail((128, 128))
-#         #     pixels = list(img.getdata())
-        
-#         # NEW (Fixed)
-#         with Image.open(path) as img:
-#             img = img.convert("RGBA")
-#             img.thumbnail((128, 128))  # Modifies img in-place
-#             pixels = list(img.getdata()) # img is still the Image object
-#             pixel_ints = [(r << 16) | (g << 8) | b for r, g, b, a in pixels if a > 128]
-        
-#         with suppress_stdout():
-#             stats = QuantizeCelebi(pixel_ints, 128)
-#             ranked = Score.score(stats)
-#             seed_int = ranked[0] if ranked else 0xff4285F4
-    
-#     print(f"Seed int: {seed_int}")
-
-#     # Aplicar modificadores de Colorfulness y Brightness al HCT
-#     hct_seed = Hct.from_int(seed_int)
-#     adjusted_hct = Hct.from_hct(
-#         hct_seed.hue,
-#         hct_seed.chroma * kwargs.get("colorfulness", 1.0),
-#         hct_seed.tone * kwargs.get("brightness", 0.8)
-#     )
-
-#     scheme_class = schemes.get(kwargs.get("scheme", "TonalSpot"))
-#     scheme = scheme_class(adjusted_hct, is_dark, contrast)
-#     def hex_f(i: int) -> str: return f"#{i & 0xFFFFFF:06x}"
-
-#     # Generación de 16 colores ANSI
-#     p, s, t, n = scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette, scheme.neutral_palette
-#     c = [
-#         hex_f(n.get_tone(10 if is_dark else 95)), hex_f(p.get_tone(40 if is_dark else 60)),
-#         hex_f(s.get_tone(40 if is_dark else 60)), hex_f(t.get_tone(40 if is_dark else 60)),
-#         hex_f(p.get_tone(50 if is_dark else 50)), hex_f(s.get_tone(50 if is_dark else 50)),
-#         hex_f(t.get_tone(50 if is_dark else 50)), hex_f(n.get_tone(80 if is_dark else 20)),
-#         hex_f(n.get_tone(30 if is_dark else 85)), hex_f(p.get_tone(70 if is_dark else 30)),
-#         hex_f(s.get_tone(70 if is_dark else 30)), hex_f(t.get_tone(70 if is_dark else 30)),
-#         hex_f(p.get_tone(80 if is_dark else 40)), hex_f(s.get_tone(80 if is_dark else 40)),
-#         hex_f(t.get_tone(80 if is_dark else 40)), hex_f(n.get_tone(95 if is_dark else 10)),
-#     ]
-
-#     # Lista de acentos para el QML (usamos los dominantes detectados)
-#     accents = [hex_f(color) for color in ranked[:8]] if not override_seed_hex else [override_seed_hex]
-
-#     return PaletteData(colors=c, accents=accents, backend_used="material-you", source_path=str(path))
 
 def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     try:
