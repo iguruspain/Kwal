@@ -388,11 +388,22 @@ Dialog {
                         }
 
                         // Accent Colors 
-                        Label {
-                            id: accentLabel 
-                            text: root.currentBackend === "material-you" ? qsTr("Accent Colors (right click to set seed)") : qsTr("Accent Colors")
-                            font.bold: true 
+                        Row {
+                            spacing: Kirigami.Units.smallSpacing
                             Layout.topMargin: Kirigami.Units.smallSpacing
+
+                            Label {
+                                text: qsTr("Accent Colors")
+                                font.bold: true
+                            }
+
+                            Label {
+                                text: root.currentBackend === "material-you" ? qsTr("(Right click to set seed)") : ""
+                                font.pixelSize: parent.children[0].font.pixelSize * 0.8
+                                font.italic: true
+                                color: Kirigami.Theme.disabledTextColor
+                                anchors.baseline: parent.children[0].baseline
+                            }
                         }
                         
                         // Using GridView for accents to match styling exactly
