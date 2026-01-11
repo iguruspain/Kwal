@@ -531,6 +531,7 @@ class StarshipModel(QObject):
     paletteNamesChanged = Signal()
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
+    previewChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -545,6 +546,8 @@ class StarshipModel(QObject):
         self._palette_names: list[str] = []
         self._palette_values: list[list[str]] = []
         self._palette_keys: list[list[str]] = []
+        self._preview_html: str = ""
+        self._full_config_data: dict[str, Any] = {}
 
     def _get_config_path(self) -> str:
         return self._config_path
@@ -573,11 +576,15 @@ class StarshipModel(QObject):
     def _get_palette_keys(self) -> list[list[str]]:
         return [list(x) for x in self._palette_keys]
 
+    def _get_preview_html(self) -> str:
+        return str(self._preview_html)
+
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
     paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
     paletteValues = Property('QVariantList', _get_palette_values, notify=paletteValuesChanged)
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
+    previewHtml = Property(str, _get_preview_html, notify=previewChanged)
 
     @Slot(int, int, str)
     def setPaletteColor(self, palette_idx: int, color_idx: int, color: str) -> None:
@@ -587,8 +594,49 @@ class StarshipModel(QObject):
                 # self._palette_values is a list of lists of strings
                 self._palette_values[palette_idx][color_idx] = str(color)
                 self.paletteValuesChanged.emit()
+                # regenerate preview for the palette we modified
+                try:
+                    self._regenerate_preview(palette_idx)
+                except Exception:
+                    logger.exception("Failed regenerating preview after setPaletteColor")
         except Exception:
             logger.exception("Failed setting palette color")
+
+    def _regenerate_preview(self, palette_index: int | None = None) -> None:
+        """Build a minimal data structure from current palette arrays and regenerate preview HTML."""
+        try:
+            from ..utils import starship_preview
+
+            # Start with full config data to preserve format, modules, etc.
+            out = self._full_config_data.copy() if self._full_config_data else {}
+            
+            # Ensure basic structure exists if full config missing
+            if "config_path" not in out:
+                out["config_path"] = self._config_path
+            if "palettes" not in out:
+                out["palettes"] = {}
+
+            # Override/Update palettes with current values from QML model
+            for i, name in enumerate(self._palette_names):
+                klist = self._palette_keys[i] if i < len(self._palette_keys) else []
+                vlist = self._palette_values[i] if i < len(self._palette_values) else []
+                mapping: dict[str, str] = {}
+                for j, k in enumerate(klist):
+                    mapping[k] = vlist[j] if j < len(vlist) else ""
+                out["palettes"][name] = mapping
+            
+            # Generate preview using our internal generator
+            self._preview_html = starship_preview.generate_preview_html(out, palette_index)
+            self.previewChanged.emit()
+        except Exception:
+            logger.exception("Failed regenerating preview")
+
+    @Slot(int)
+    def setPreviewPaletteIndex(self, idx: int) -> None:
+        try:
+            self._regenerate_preview(int(idx) if idx is not None else 0)
+        except Exception:
+            logger.exception("setPreviewPaletteIndex failed")
 
     @Slot(result="QVariantMap")
     @Slot(str, result="QVariantMap")
@@ -604,6 +652,9 @@ class StarshipModel(QObject):
 
             json_str, display = file_utils.read_starship_config(path or self._config_path)
             data = json.loads(json_str)
+            
+            # Store full data for preview generation
+            self._full_config_data = data
 
             palettes = data.get("palettes", {}) if isinstance(data, dict) else {}
 
@@ -633,6 +684,12 @@ class StarshipModel(QObject):
             self.paletteNamesChanged.emit()
             self.paletteValuesChanged.emit()
             self.paletteKeysChanged.emit()
+
+            # regenerate preview using first palette by default
+            try:
+                self._regenerate_preview(0 if len(names) > 0 else None)
+            except Exception:
+                logger.exception("Failed to generate preview after refresh")
 
             return {"config_path": display, "palettes_count": len(names)}
         except Exception:

@@ -275,8 +275,8 @@ def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
         if not isinstance(config_data, dict):
             return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
 
-        # Build simplified output: only config_path and palettes
-        out: dict[str, Any] = {"config_path": display_path, "palettes": {}}
+        # Build simplified output: include config_path, palettes, top-level format/palette and a small preview mapping
+        out: dict[str, Any] = {"config_path": display_path, "palettes": {}, "preview": {}, "format": None, "palette": None}
 
         palettes = config_data.get("palettes")
         if isinstance(palettes, dict):
@@ -293,6 +293,40 @@ def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
                             except Exception:
                                 cleaned[k] = None
                     out["palettes"][pname] = cleaned
+
+            # Collect all top-level keys that might be modules (everything except palettes)
+            # We flatten this into the root of the output so StarshipRenderer can find them easily.
+            # We still clean values to ensure JSON serializability.
+            
+            ignored_keys = {"palettes"} # handled above
+            
+            for key, val in config_data.items():
+                if key in ignored_keys:
+                    continue
+                    
+                # If it's a table/dict (module config)
+                if isinstance(val, dict):
+                    cleaned_mod: dict[str, Any] = {}
+                    for k, v in val.items():
+                        try:
+                            # Basic types or stringify
+                            if isinstance(v, (str, int, float, bool)) or v is None:
+                                cleaned_mod[k] = v
+                            else:
+                                cleaned_mod[k] = str(v)
+                        except Exception:
+                             pass
+                    out[key] = cleaned_mod
+                    
+                # If it's a simple value (like 'format' or 'palette' string)
+                elif isinstance(val, (str, int, float, bool)) or val is None:
+                    out[key] = val
+                else:
+                    # Fallback stringify
+                    try:
+                        out[key] = str(val)
+                    except Exception:
+                        pass
 
         try:
             json_str = json.dumps(out, ensure_ascii=False, indent=2)

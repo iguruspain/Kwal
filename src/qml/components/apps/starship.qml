@@ -38,6 +38,13 @@ Kirigami.Page{
             if (paletteNames && paletteNames.length > 0) paletteIndex = 0
             else paletteIndex = -1
         }
+        onPaletteIndexChanged: {
+            if (model && paletteIndex >= 0) {
+                try {
+                    model.setPreviewPaletteIndex(paletteIndex)
+                } catch (e) {}
+            }
+        }
     }
 
     // Controller helper like in fastfetch.qml
@@ -390,6 +397,25 @@ Kirigami.Page{
                         wrapMode: Text.WrapAnywhere
                         Layout.fillWidth: true
                     }
+                    // Preview rendering
+                    Rectangle {
+                        Kirigami.Theme.colorSet: Kirigami.Theme.View
+                        color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
+                        border.width: 1
+                        border.color: (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
+                        radius: Kirigami.Units.smallSpacing
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        Text {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            textFormat: Text.RichText
+                            elide: Text.ElideRight
+                            font.pointSize: 9
+                            text: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
+                            wrapMode: Text.WordWrap
+                        }
+                    }
                 
                 }
                 // Bottom: Selection Status
@@ -409,6 +435,25 @@ Kirigami.Page{
                             if (controller.starshipTemplateIndex >= 0) return qsTr("Template Mode")
                             if (!controller.hasStarshipConfig) return qsTr("No current starship.toml")
                             return qsTr("Current Config Mode")
+                        }
+                    }
+                    // Status preview
+                    Rectangle {
+                        Kirigami.Theme.colorSet: Kirigami.Theme.View
+                        color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
+                        border.width: 1
+                        border.color: (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
+                        radius: Kirigami.Units.smallSpacing
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        Text {
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.smallSpacing
+                            textFormat: Text.RichText
+                            elide: Text.ElideRight
+                            font.pointSize: 9
+                            text: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
+                            wrapMode: Text.WordWrap
                         }
                     }
                 }
