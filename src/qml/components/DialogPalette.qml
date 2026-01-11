@@ -217,9 +217,9 @@ Dialog {
 
                 // Wallpaper Preview
                 Item {
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 12
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 8
                     //Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                     
                     Image {

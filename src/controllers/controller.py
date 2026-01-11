@@ -1126,10 +1126,39 @@ class Controller(QObject):
     @Slot()
     def starshipClearSelection(self) -> None:
         """Clear starship selection state."""
-        self._set_starship_is_file_mode(False)
-        self._set_starship_template_index(-1)
+        # Use public Property assignments so QML bindings reliably receive
+        # notifications. Also refresh the Starship template model to ensure
+        # the UI (ComboBox) reflects the cleared state.
+        try:
+            self.starshipIsFileMode = False
+        except Exception:
+            self._set_starship_is_file_mode(False)
+
+        try:
+            self.starshipTemplateIndex = -1
+        except Exception:
+            self._set_starship_template_index(-1)
+
+        # Clear any selected custom file and reset draft color
         self.clearSelectedFile()
-        self._set_starship_draft_color("transparent")
+        try:
+            self.starshipDraftColor = "transparent"
+        except Exception:
+            self._set_starship_draft_color("transparent")
+
+        # Ensure template model is refreshed from the StarshipModel's template folder
+        try:
+            if hasattr(self, "_starship_template_model") and hasattr(self, "_starship_model") and getattr(self._starship_model, "_template_folder", None):
+                self._starship_template_model.refresh(self._starship_model._template_folder)
+            elif hasattr(self, "_starship_template_model"):
+                # Fallback: try refreshing with None (model should handle missing path)
+                try:
+                    self._starship_template_model.refresh()
+                except Exception:
+                    pass
+        except Exception:
+            # Best-effort refresh; ignore failures here
+            pass
 
     @Slot()
     def restoreStarshipBackup(self) -> None:
@@ -1158,7 +1187,7 @@ class Controller(QObject):
     @Slot()
     def applyStarshipConfig(self) -> None:
         """Apply the current starship configuration state to ~/.config/starship.toml."""
-        from ..utils.file_utils import apply_starship_palette_surgical
+        from ..utils.file_utils import apply_starship_palettes_atomic
         try:
             # Determine Source
             source_path = ""
@@ -1178,30 +1207,44 @@ class Controller(QObject):
 
             dest_path = Path.home() / ".config" / "starship.toml"
             self._logger.info("Applying starship config (Surgical) Source: %s -> Dest: %s", source_path, dest_path)
-            
-            # 1. Ensure Destination File Exists (Initialize from source if needed)
-            if not dest_path.exists():
+
+            # Decide if we should copy the selected source into the dest.
+            # Per spec:
+            # - If dest does not exist -> copy source (template/file/current) to initialize
+            # - If dest exists and user selected a template/file (not Current Config) -> overwrite dest with source
+            # - If dest exists and user selected Current Config -> do NOT overwrite, only apply palette edits
+            is_template_selection = bool(self._starship_template_index >= 0 or self._starship_is_file_mode)
+            should_copy_to_dest = (not dest_path.exists()) or is_template_selection
+
+            # Create Backup of existing config (do this before any filesystem changes)
+            bak_path = dest_path.with_name(dest_path.name + ".bak")
+            if dest_path.exists():
                 try:
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(dest_path, bak_path)
+                    self.starshipBackupExistsChanged.emit()
+                except Exception:
+                    self._logger.warning("Failed creating starship backup")
+
+            # Ensure destination directory exists (after attempting backup)
+            try:
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                self._logger.exception("Failed ensuring starship config dir")
+                self._show_result_dialog("Failed ensuring config directory")
+                return
+
+            # If we should initialize/overwrite dest from the selected source, do it now
+            if should_copy_to_dest:
+                try:
                     if source_path and os.path.exists(source_path):
-                         # Initial copy of instructions/format from template
-                         shutil.copy2(source_path, dest_path)
+                        shutil.copy2(source_path, dest_path)
                     else:
-                         dest_path.touch()
+                        # If no valid source, create an empty file so surgical updater has something to work on
+                        dest_path.touch()
                 except Exception as e:
-                    self._logger.error("Failed to initialize config file: %s", e)
+                    self._logger.error("Failed to initialize config file from source: %s", e)
                     self._show_result_dialog(f"Failed to initialize config file: {e}")
                     return
-
-            # 2. Create Backup
-            bak_path = dest_path.with_name(dest_path.name + ".bak")
-            if dest_path.exists(): 
-                 try:
-                     shutil.copyfile(dest_path, bak_path)
-                     # self._logger.info("Created backup at %s", bak_path) 
-                     self.starshipBackupExistsChanged.emit()
-                 except Exception:
-                     self._logger.warning("Failed creating starship backup")
 
             # 3. Prepare Data from Model (which holds the current edited state)
             names = self._starship_model._palette_names
@@ -1230,25 +1273,23 @@ class Controller(QObject):
                              palette_dict[k] = v
                     palettes_to_save.append((pname, palette_dict))
 
-            # 5. Apply Updates Surgically
-            # Important: The surgical tool Sets `palette = "name"` for every call.
-            # We want the *last* applied palette to be the active one.
-            # Usually index 0 is the intended active palette from the template/selection.
-            # So, move index 0 to the end of the list.
+            # 5. Apply Updates atomically in a single write to avoid multiple
+            # overwrites and duplicated log entries. Move first palette to the end
+            # so the original index 0 becomes the active palette.
             if palettes_to_save:
-                active_palette = palettes_to_save.pop(0)
-                palettes_to_save.append(active_palette)
+                ordered = palettes_to_save[1:] + [palettes_to_save[0]] if len(palettes_to_save) > 1 else palettes_to_save
+                active_name = ordered[-1][0]
+            else:
+                ordered = []
+                active_name = None
 
-            success = True
-            for pname, pdata in palettes_to_save:
-                if not apply_starship_palette_surgical(str(dest_path), pname, pdata):
-                    success = False
-                    self._logger.error("Surgical update failed for palette: %s", pname)
-                    break
+            if ordered:
+                if not apply_starship_palettes_atomic(str(dest_path), ordered, active_name):
+                    self._logger.error("Atomic update failed for starship config")
+                    self._show_result_dialog("Failed writing to config file (Atomic Error).")
+                    return
             
-            if not success:
-                 self._show_result_dialog("Failed writing to config file (Surgical Error).")
-                 return
+              # success path continues
 
             self._show_result_dialog("Starship configuration applied successfully.")
             

@@ -179,10 +179,16 @@ def _write_config_atomic(cfg_path: Path, content: str) -> bool:
     """Write config content atomically, creating backup first."""
     try:
         bak = cfg_path.with_name(cfg_path.name + ".bak")
-        try:
-            shutil.copyfile(cfg_path, bak)
-        except Exception:
-            logger.warning("Failed creating backup %s", bak)
+        # Only create a backup if one does not already exist. This prevents
+        # accidentally overwriting the user's original backup when multiple
+        # layers of code (controller + surgical writer) both attempt a
+        # backup. If a backup already exists, keep it to preserve the
+        # original config state.
+        if cfg_path.exists() and not bak.exists():
+            try:
+                shutil.copyfile(cfg_path, bak)
+            except Exception:
+                logger.warning("Failed creating backup %s", bak)
 
         cfg_path.write_text(content, encoding="utf-8")
         logger.info("Updated config %s", cfg_path)
@@ -401,4 +407,48 @@ def apply_starship_palette_surgical(
 
     except Exception:
         logger.exception("Failed surgical update of starship config")
+        return False
+
+
+def apply_starship_palettes_atomic(
+    config_path: str, palettes: list[tuple[str, dict[str, str]]], active_palette: str | None = None
+) -> bool:
+    """Apply multiple palettes in a single atomic write.
+
+    This writes all provided palettes to the `[palettes]` table and sets
+    the root `palette` key to `active_palette` (if provided). Writing is
+    performed once to avoid multiple overwrites and duplicated logs.
+    """
+    path = Path(config_path)
+    if not path.exists():
+        return False
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            doc = tomlkit.parse(f.read())
+
+        # Ensure 'palettes' table exists
+        if "palettes" not in doc:
+            doc.add("palettes", tomlkit.table())
+
+        palettes_table: Any = doc["palettes"]
+
+        # Sanitize and set each palette
+        for pname, pdata in palettes:
+            cleaned_data: dict[str, Any] = {}
+            for k, v in pdata.items():
+                if isinstance(v, str) and v.startswith("#") and len(v) == 9:
+                    cleaned_data[k] = "#" + v[3:]
+                else:
+                    cleaned_data[k] = v
+            palettes_table[pname] = cleaned_data
+
+        # Set active palette if provided
+        if active_palette:
+            doc["palette"] = active_palette
+
+        return _write_config_atomic(path, doc.as_string())
+
+    except Exception:
+        logger.exception("Failed atomic update of starship config")
         return False

@@ -155,6 +155,8 @@ Kirigami.Page{
                                 if (controller) {
                                     controller.starshipClearSelection();
                                     controller.starshipModel.refresh(); 
+                                    // Force ComboBox visual update to index 0 (current config)
+                                    templateCombo.currentIndex = 0
                                 }
                             }
                     }
@@ -165,16 +167,21 @@ Kirigami.Page{
                     Layout.fillWidth: true
                     textRole: "fileName"
 
-                    // Build a transient model array where index 0 = Current Config (or "No current config")
+                    // Build a transient model array where the first entry is the
+                    // actual starship.toml (if present) followed by all template files.
+                    // This ensures ComboBox indices align with the controller's
+                    // template indices (index 0 == current config file).
                     model: (function() {
                         var list = [];
-                        list.push({ fileName: (controller && controller.hasStarshipConfig) ? qsTr("Current Config") : qsTr("No current config"), filePath: "" });
+                        var cfgPath = (controller && controller.starshipModel && controller.starshipModel.configPath) ? controller.starshipModel.configPath : "";
+                        var cfgName = cfgPath ? cfgPath.split("/").pop() : qsTr("No starship.toml");
+                        list.push({ fileName: cfgName, filePath: cfgPath, fileUrl: cfgPath ? "file://" + cfgPath : "" });
                         if (controller && controller.starshipTemplateModel) {
                             var tm = controller.starshipTemplateModel;
                             for (var i = 0; i < tm.rowCount(); i++) {
                                 var it = tm.get(i);
                                 // ensure we provide the same shape
-                                list.push({ fileName: it.fileName || "", filePath: it.filePath || "" });
+                                list.push({ fileName: it.fileName || "", filePath: it.filePath || "", fileUrl: it.fileUrl || "" });
                             }
                         }
                         return list;
@@ -191,17 +198,21 @@ Kirigami.Page{
                         if (!controller) return;
                         controller.starshipIsFileMode = false;
                         controller.clearSelectedFile();
+                        // Determine selected entry's filePath from the transient model
+                        var entry = (model && model.length > currentIndex) ? model[currentIndex] : null;
+                        var selectedPath = entry && entry.filePath ? entry.filePath : "";
 
                         if (currentIndex === 0) {
-                            // User chose Current Config
+                            // User chose the actual config file (index 0)
                             controller.starshipTemplateIndex = -1;
-                            controller.starshipModel.refresh();
+                            // Refresh explicitly using the config path (or default if empty)
+                            controller.starshipModel.refresh(selectedPath || undefined);
                         } else {
                             // Template chosen; adjust index mapping (-1 offset)
                             var tmplIdx = currentIndex - 1;
                             controller.starshipTemplateIndex = tmplIdx;
-                            var info = controller.starshipTemplateModel.get(tmplIdx);
-                            if (info) controller.starshipModel.refresh(info.filePath);
+                            // Refresh using the selected template file path
+                            controller.starshipModel.refresh(selectedPath || undefined);
                         }
                     }
 
