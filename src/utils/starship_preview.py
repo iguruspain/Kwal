@@ -403,7 +403,7 @@ class StarshipRenderer:
             
             # Wrap in reasonable defaults for preview visibility
             return (
-                f'<div style="font-family: \'CaskaydiaCove Nerd Font\', \'CaskaydiaCove NF\', \'Cascadia Code NF\', \'FiraCode Nerd Font\', \'JetBrainsMono Nerd Font\', monospace; font-size: 9pt; white-space: pre-wrap;">'
+                f'<div style="font-family: \'CaskaydiaCove Nerd Font\', \'CaskaydiaCove NF\', \'Cascadia Code NF\', \'FiraCode Nerd Font\', \'JetBrainsMono Nerd Font\', monospace; font-size: 10pt; white-space: pre-wrap;">'
                 f'{rendered_content}'
                 f'</div>'
             )

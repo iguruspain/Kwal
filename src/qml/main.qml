@@ -10,7 +10,7 @@ import org.kde.kirigami as Kirigami
 Kirigami.ApplicationWindow {
     id: root
     visible: true
-    width: 800
+    width: 820
     height: 610
     title: "Kwal"
     

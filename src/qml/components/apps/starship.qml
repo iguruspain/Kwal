@@ -50,11 +50,24 @@ Kirigami.Page{
     // Controller helper like in fastfetch.qml
     readonly property var controller: (typeof pyController !== "undefined") ? pyController : null
 
+    // Utility: return a safe palette key string or empty string to avoid assigning undefined to QString
+    function safePaletteKey(proxy, idx) {
+        if (!proxy || !proxy.paletteKeys) return "";
+        var pk = proxy.paletteKeys;
+        var pi = proxy.paletteIndex;
+        if (!(pk && pk.length > 0)) return "";
+        if (pi === undefined || pi === null || pi < 0 || pi >= pk.length) return "";
+        var inner = pk[pi];
+        if (!inner) return "";
+        var v = inner[idx];
+        return (v === undefined || v === null) ? "" : v;
+    }
+
     Components.DialogPalette {
         id: paletteDialog
         onAccepted: {
             // explicit toString() for safety when passing to Python
-            if (selectedColor != "transparent") {
+            if (selectedColor !== "transparent") {
                 // If we have an edit index set, write back using Controller
                 if (starshipModelProxy.paletteIndex >= 0 && starshipModelProxy.editIndex >= 0 && controller) {
                     controller.starshipModel.setPaletteColor(starshipModelProxy.paletteIndex, starshipModelProxy.editIndex, selectedColor.toString())
@@ -112,7 +125,7 @@ Kirigami.Page{
         Rectangle {
             id: leftPaneStarship
             color: Kirigami.Theme.backgroundColor
-            Layout.preferredWidth: 280
+            Layout.preferredWidth: 250
             Layout.fillHeight: true
 
             ColumnLayout {
@@ -283,7 +296,7 @@ Kirigami.Page{
 
                                     Label {
                                         id: colorNameLabel
-                                        text: (starshipModelProxy.paletteKeys.length > 0 && starshipModelProxy.paletteIndex < starshipModelProxy.paletteKeys.length) ? starshipModelProxy.paletteKeys[starshipModelProxy.paletteIndex][index] : ""
+                                        text: safePaletteKey(starshipModelProxy, index)
                                         Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                                         // Layout.maximumWidth: 120
                                         elide: Text.ElideRight
@@ -404,16 +417,17 @@ Kirigami.Page{
                         Kirigami.Theme.colorSet: Kirigami.Theme.View
                         color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
                         border.width: 1
-                        border.color: (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
+                        //border.color: Kirigami.Theme.disabledTextColor // (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
                         radius: Kirigami.Units.smallSpacing
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 36
+                        //Layout.preferredHeight: 50
+                        Layout.fillHeight: true
                         Text {
                             anchors.fill: parent
                             anchors.margins: Kirigami.Units.smallSpacing
                             textFormat: Text.RichText
                             elide: Text.ElideRight
-                            font.pointSize: 9
+                            //font.pointSize: 9
                             text: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
                             wrapMode: Text.WordWrap
                         }
@@ -447,16 +461,17 @@ Kirigami.Page{
                         Kirigami.Theme.colorSet: Kirigami.Theme.View
                         color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
                         border.width: 1
-                        border.color: (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
+                        //border.color: Kirigami.Theme.disabledTextColor //(typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
                         radius: Kirigami.Units.smallSpacing
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 36
+                        //Layout.preferredHeight: 50
+                        Layout.fillHeight: true
                         Text {
                             anchors.fill: parent
                             anchors.margins: Kirigami.Units.smallSpacing
                             textFormat: Text.RichText
                             elide: Text.ElideRight
-                            font.pointSize: 9
+                            //font.pointSize: 9
                             text: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
                             wrapMode: Text.WordWrap
                         }
