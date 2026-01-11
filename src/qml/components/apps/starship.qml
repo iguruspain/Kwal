@@ -193,7 +193,7 @@ Kirigami.Page{
                             }
                         }
                         return list;
-                    })
+                    })()
 
                     // Map controller index (-1 = current config) to combo index (0 = current config)
                     currentIndex: controller ? (controller.starshipTemplateIndex >= 0 ? controller.starshipTemplateIndex + 1 : 0) : 0
