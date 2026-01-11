@@ -216,39 +216,56 @@ Dialog {
                 }
 
                 // Wallpaper Preview
-                Item {
-                    Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 8
-                    //Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                    spacing: Kirigami.Units.largeSpacing
                     
-                    Image {
-                        anchors.fill: parent
-                        // Show what we *would* extract from
-                        source: {
-                            var finalPath = (root.sourceMode === 0) ? root.appSelectedWallpaper : root.sourceImage
-                            if (finalPath) return "file://" + finalPath
-                            return ""
-                        }
-                        fillMode: Image.PreserveAspectFit
-                        asynchronous: true
-                        cache: false 
+                    Item {
+                        id: wallpaperPreviewContainer
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 8
                         
-                        Rectangle {
-                            // Match the visible image area (respect `fillMode`)
-                            width: parent.paintedWidth
-                            height: parent.paintedHeight
-                            anchors.centerIn: parent
-                            color: "transparent"
-                            border.color: Kirigami.Theme.highlightColor
-                            border.width: 1
-                            visible: parent.status === Image.Ready
-                        }
-                        
-                        Label {
-                            anchors.centerIn: parent
-                            text: qsTr("No Image selected")
-                            visible: parent.status !== Image.Ready
+                        Image {
+                            id: wallpaperPreview
+                            // 1. Ocupamos todo el contenedor para tener el área de dibujo
+                            anchors.fill: parent
+                            
+                            // 2. Alineamos el dibujo internamente a la izquierda
+                            horizontalAlignment: Image.AlignLeft
+                            verticalAlignment: Image.AlignTop
+                            
+                            // 3. Mantenemos proporción sin estirar
+                            fillMode: Image.PreserveAspectFit
+                            
+                            source: {
+                                var finalPath = (root.sourceMode === 0) ? root.appSelectedWallpaper : root.sourceImage
+                                return finalPath ? "file://" + finalPath : ""
+                            }
+                            
+                            asynchronous: true
+                            cache: false
+
+                            // El Borde
+                            Rectangle {
+                                id: imageBorder
+                                // 4. Usamos las propiedades 'painted' para que el borde
+                                // se ajuste automáticamente a los píxeles visibles.
+                                width: parent.paintedWidth
+                                height: parent.paintedHeight
+                                x: 0 // Como alineamos a la izquierda, x siempre es 0
+                                
+                                color: "transparent"
+                                border.color: Kirigami.Theme.highlightColor
+                                border.width: 1
+                                visible: parent.status === Image.Ready
+                            }
+
+                            Label {
+                                anchors.centerIn: parent // Mejor centrado en el contenedor
+                                text: qsTr("No Image selected")
+                                visible: parent.status !== Image.Ready
+                            }
                         }
                     }
                 }
