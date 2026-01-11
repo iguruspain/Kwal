@@ -532,6 +532,7 @@ class StarshipModel(QObject):
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
     previewChanged = Signal()
+    currentConfigPreviewChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -547,6 +548,7 @@ class StarshipModel(QObject):
         self._palette_values: list[list[str]] = []
         self._palette_keys: list[list[str]] = []
         self._preview_html: str = ""
+        self._current_config_preview_html: str = ""
         self._full_config_data: dict[str, Any] = {}
 
     def _get_config_path(self) -> str:
@@ -579,12 +581,42 @@ class StarshipModel(QObject):
     def _get_preview_html(self) -> str:
         return str(self._preview_html)
 
+    def _get_current_config_preview_html(self) -> str:
+        return str(self._current_config_preview_html)
+
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
     paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
     paletteValues = Property('QVariantList', _get_palette_values, notify=paletteValuesChanged)
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
     previewHtml = Property(str, _get_preview_html, notify=previewChanged)
+    currentConfigPreviewHtml = Property(str, _get_current_config_preview_html, notify=currentConfigPreviewChanged)
+
+    @Slot()
+    def reloadCurrentConfigPreview(self) -> None:
+        """Reads the actual config file from disk and updates currentConfigPreviewHtml."""
+        try:
+            from ..utils import file_utils, starship_preview
+            import json
+            
+            # Read from the configured active path (usually ~/.config/starship.toml)
+            # If it doesn't exist, we'll get default or error, which is fine
+            if not os.path.exists(self._config_path):
+                self._current_config_preview_html = ""
+                self.currentConfigPreviewChanged.emit()
+                return
+
+            json_str, _ = file_utils.read_starship_config(self._config_path)
+            data = json.loads(json_str)
+            html = starship_preview.generate_preview_html(data)
+            
+            if self._current_config_preview_html != html:
+                self._current_config_preview_html = html
+                self.currentConfigPreviewChanged.emit()
+        except Exception:
+            logger.exception("Failed reloading current config preview")
+            self._current_config_preview_html = ""
+            self.currentConfigPreviewChanged.emit()
 
     @Slot(int, int, str)
     def setPaletteColor(self, palette_idx: int, color_idx: int, color: str) -> None:
@@ -690,6 +722,14 @@ class StarshipModel(QObject):
                 self._regenerate_preview(0 if len(names) > 0 else None)
             except Exception:
                 logger.exception("Failed to generate preview after refresh")
+
+            # Also reload current config preview if this was a refresh of the main config
+            if path is None or path == self._config_path:
+                 self.reloadCurrentConfigPreview()
+            else:
+                 # If we loaded a template, make sure we still have the current system preview loaded
+                 if not self._current_config_preview_html:
+                      self.reloadCurrentConfigPreview()
 
             return {"config_path": display, "palettes_count": len(names)}
         except Exception:

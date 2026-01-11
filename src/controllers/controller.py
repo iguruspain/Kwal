@@ -1143,6 +1143,9 @@ class Controller(QObject):
                 
                 # Refresh model
                 self._starship_model.refresh()
+                # Reload current preview since we changed disk state
+                self._starship_model.reloadCurrentConfigPreview()
+                
                 # Clear selection
                 self.starshipClearSelection()
             else:
@@ -1251,6 +1254,8 @@ class Controller(QObject):
             
             # Refresh to reflect disk state
             self._starship_model.refresh(str(dest_path))
+            # Force reload of current preview
+            self._starship_model.reloadCurrentConfigPreview()
 
         except Exception as e:
             self._logger.exception("Failed processing starship config")

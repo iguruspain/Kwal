@@ -391,7 +391,8 @@ Kirigami.Page{
                     
                     Label { text: qsTr("Starship config file:"); font.bold: true }
                     // Preview current config path
-                    Label { 
+                    Label {
+                        id: currentConfigPathLabel 
                         text: (controller && controller.hasStarshipConfig) ? starshipModelProxy.configFile : qsTr("No starship.toml found")
                         font.italic: true 
                         wrapMode: Text.WrapAnywhere
@@ -399,6 +400,7 @@ Kirigami.Page{
                     }
                     // Preview rendering
                     Rectangle {
+                        id: previewCurrentConfig
                         Kirigami.Theme.colorSet: Kirigami.Theme.View
                         color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
                         border.width: 1
@@ -412,7 +414,7 @@ Kirigami.Page{
                             textFormat: Text.RichText
                             elide: Text.ElideRight
                             font.pointSize: 9
-                            text: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
+                            text: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -424,11 +426,13 @@ Kirigami.Page{
                     spacing: Kirigami.Units.smallSpacing
 
                     Label {
+                        id: statusLabel
                         text: qsTr("Status:")
                         font.bold: true
                     }
                     
                     Label {
+                        id: statusModeLabel
                         text: {
                             if (!controller) return ""
                             if (controller.starshipIsFileMode) return qsTr("Custom File Mode")
@@ -439,6 +443,7 @@ Kirigami.Page{
                     }
                     // Status preview
                     Rectangle {
+                        id: previewStatus
                         Kirigami.Theme.colorSet: Kirigami.Theme.View
                         color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
                         border.width: 1
