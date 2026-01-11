@@ -75,9 +75,12 @@ instance/
 # QML build/artifacts (if any)
 qmlcache/
 
-# Copilot instructions
+# Copilot instructions or other rules
 .github/
 .github/copilot-instructions.md
+.continue/
+.continue/rules
+.continue/*
 
 # Run
 run.py
