@@ -5,3 +5,4 @@ materialyoucolor
 pywal16
 Pillow
 PySide6
+modern_colorthief

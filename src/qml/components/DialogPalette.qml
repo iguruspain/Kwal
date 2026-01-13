@@ -14,7 +14,7 @@ Dialog {
     // Internal state
     property string sourceImage: "" 
     property color selectedColor: "transparent"
-    property string currentBackend: "material-you" // "pywal16", "material-you", "imagemagick"
+    property string currentBackend: "material-you-kwal" // "pywal16", "material-you-kwal", "material-you", "imagemagick"
     property int sourceMode: 0 // 0: App (Wallpapers Tab), 1: Custom/System
     property bool generationActive: false
     // Single selection across both grids: index + set name ("palette" or "accent")
@@ -77,7 +77,7 @@ Dialog {
         if (path === "") return
 
         var params = {}
-        if (currentBackend === "material-you") {
+        if (currentBackend === "material-you-kwal") {
              params = {
                 "dark_mode": root.darkMode,
                 "scheme": root.selectedScheme,
@@ -85,6 +85,15 @@ Dialog {
                 "brightness": root.brightnessValue,
                 "contrast": root.contrastValue,
                 "seed_color": root.seed_color
+             }
+        } else if (currentBackend === "material-you") {
+             params = {
+                "dark_mode": root.darkMode,
+                "scheme": root.selectedScheme
+             }
+        } else if (currentBackend === "pywal16") {
+             params = {
+                "dark_mode": root.darkMode
              }
         }
         pyController.generatePalette(path, currentBackend, params)
@@ -278,7 +287,7 @@ Dialog {
                     // Backend
                     ComboBox {
                         id: extractMethodCombo
-                        model: ["pywal16", "material-you", "imagemagick"]
+                        model: ["pywal16", "material-you-kwal", "material-you", "imagemagick"]
                         currentIndex: 1
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                         onActivated: {
@@ -398,7 +407,7 @@ Dialog {
                             }
 
                             Label {
-                                text: root.currentBackend === "material-you" ? qsTr("(Right click to set seed)") : ""
+                                text: root.currentBackend === "material-you-kwal" ? qsTr("(Right click to set seed)") : ""
                                 font.pixelSize: parent.children[0].font.pixelSize * 0.8
                                 font.italic: true
                                 color: Kirigami.Theme.disabledTextColor
@@ -439,8 +448,8 @@ Dialog {
                                                     root.selectedSet = "accent"
                                                     root.selectedColor = modelData
                                                 }
-                                                else if (mouse.button === Qt.RightButton) {
-                                                    // Right-click sets this color as seed and refreshes
+                                                else if (mouse.button === Qt.RightButton && root.currentBackend === "material-you-kwal") {
+                                                    // Right-click sets this color as seed (only for Kwal variant)
                                                     root.seed_color = modelData
                                                     triggerRefresh()
                                                 }
@@ -449,14 +458,19 @@ Dialog {
 
                                         ToolTip.visible: maAccent.containsMouse
                                         ToolTip.text: modelData
-                                        // Star icon for the accent currently set as manual seed
+                                        // Star icon for the accent currently set as seed
                                         Item {
                                             anchors.top: parent.top
                                             anchors.right: parent.right
                                             anchors.margins: Kirigami.Units.smallSpacing / 4
                                             width: Kirigami.Units.gridUnit * 0.6
                                             height: width
-                                            visible: root.currentBackend === "material-you" && root.seed_color === modelData
+                                            // Show star if:
+                                            // 1. Manual seed matches this accent, OR
+                                            // 2. No manual seed and this is the auto seed (actualSeed from backend)
+                                            visible: root.currentBackend === "material-you-kwal" && 
+                                                    (root.seed_color === modelData || 
+                                                     (root.seed_color === "" && root.actualSeed === modelData))
 
                                             Rectangle {
                                                 anchors.fill: parent
@@ -467,7 +481,6 @@ Dialog {
                                                 text: "\u2605"
                                                 color: Kirigami.Theme.positiveTextColor
                                                 font.pixelSize: Math.max(10, parent.width * 0.6)
-                                                //opacity: 0.95
                                                 style: Text.Outline
                                                 styleColor: Kirigami.Theme.backgroundColor
                                             }
@@ -478,11 +491,11 @@ Dialog {
                         }
                         Item { Layout.fillHeight: true }
                     }
-                    // Aux Controls (for Material You)
+                    // Aux Controls (for Material You and pywal16)
                     ColumnLayout {
                         id: auxControls
                         Layout.fillWidth: true
-                        visible: root.currentBackend === "material-you"
+                        visible: root.currentBackend === "material-you-kwal" || root.currentBackend === "material-you" || root.currentBackend === "pywal16"
                         spacing: Kirigami.Units.largeSpacing
 
                         // Parameters Label
@@ -492,10 +505,12 @@ Dialog {
                             font.bold: true 
                         }                        
 
-                        // Mode (Dark/Light)
+                        // Mode (Dark/Light) + Seed visualization
                         RowLayout {
                             id: modeRow
+                            Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
+                            
                             RadioButton {
                                 text: qsTr("Dark")
                                 checked: root.darkMode
@@ -516,53 +531,49 @@ Dialog {
                                     }
                                 }
                             }
-                            Item { Layout.fillWidth: true }
-                            // Seed visualization
+                            
+                            // Seed visualization (only for Kwal variant) - compact
                             Label {
+                                visible: root.currentBackend === "material-you-kwal"
                                 textFormat: Text.StyledText
-                                text: qsTr("Seed") + 
-                                    "<font color='" + Kirigami.Theme.positiveTextColor + "'>\u2605</font>:"
-                                
-                                // If you need to adjust the star size specifically,
-                                // you can use <font> tags or inline CSS:
-                                // text: qsTr("Seed") + " <span style='color:" + Kirigami.Theme.positiveTextColor + "; font-size:12px;'>\u2605</span>:"
+                                text: qsTr("Seed") + "<font color='" + Kirigami.Theme.positiveTextColor + "'>★</font>:"
+                                Layout.leftMargin: Kirigami.Units.largeSpacing
                             }
-                            RowLayout {
-                                Layout.columnSpan: 3
-                                spacing: Kirigami.Units.smallSpacing
-                                Rectangle {
-                                    width: Kirigami.Units.gridUnit
-                                    height: width
-                                    radius: 3
-                                    color: (root.seed_color !== "") ? root.seed_color : root.actualSeed
-                                    border.color: Kirigami.Theme.highlightColor
-                                    border.width: 1
-                                    
-                                    ToolTip.visible: seedMouse.containsMouse
-                                    ToolTip.text: (root.seed_color !== "") ? (root.seed_color + " (Manual)") : (root.actualSeed + " (Auto)")
-                                    
-                                    MouseArea {
-                                        id: seedMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                    }
+                            Rectangle {
+                                visible: root.currentBackend === "material-you-kwal"
+                                width: Kirigami.Units.gridUnit
+                                height: width
+                                radius: 3
+                                color: (root.seed_color !== "") ? root.seed_color : root.actualSeed
+                                border.color: Kirigami.Theme.highlightColor
+                                border.width: 1
+                                
+                                ToolTip.visible: seedMouse.containsMouse
+                                ToolTip.text: (root.seed_color !== "") ? (root.seed_color + " (Manual)") : (root.actualSeed + " (Auto)")
+                                
+                                MouseArea {
+                                    id: seedMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
                                 }
-                                Label {
-                                    text: (root.seed_color !== "") ? qsTr("Manual") : qsTr("Auto")
-                                    opacity: 0.7
+                            }
+                            Label {
+                                visible: root.currentBackend === "material-you-kwal"
+                                text: (root.seed_color !== "") ? qsTr("Manual") : qsTr("Auto")
+                                opacity: 0.7
+                            }
+                            Button {
+                                visible: root.currentBackend === "material-you-kwal" && root.seed_color !== ""
+                                icon.name: "edit-clear"
+                                flat: true
+                                ToolTip.text: qsTr("Reset to Auto")
+                                onClicked: {
+                                    root.seed_color = ""
+                                    triggerRefresh()
                                 }
-                                Button {
-                                    icon.name: "edit-clear"
-                                    visible: root.seed_color !== ""
-                                    flat: true
-                                    ToolTip.text: qsTr("Reset to Auto")
-                                    onClicked: {
-                                        root.seed_color = ""
-                                        triggerRefresh()
-                                    }
-                                }
-                                Item { Layout.fillWidth: true }
-                            }                            
+                            }
+                            
+                            Item { Layout.fillWidth: true }
                         }
                         
                         // Parameters laid out in a GridLayout: Label | Slider | Value | Reset
@@ -573,10 +584,14 @@ Dialog {
                             rowSpacing: Kirigami.Units.smallSpacing
                             columnSpacing: Kirigami.Units.smallSpacing
 
-                            Label { text: qsTr("Tone:") }
+                            Label { 
+                                text: qsTr("Tone:")
+                                visible: root.currentBackend !== "pywal16"
+                            }
                             ComboBox {
                                 Layout.fillWidth: true
                                 Layout.columnSpan: 2
+                                visible: root.currentBackend !== "pywal16"
                                 model: ["TonalSpot", "Vibrant", "Expressive", "Content", "FruitSalad", "Rainbow", "Monochrome", "Neutral", "Fidelity"]
                                 currentIndex: model.indexOf(root.selectedScheme)
                                 onActivated: {
@@ -592,6 +607,7 @@ Dialog {
                             Button {
                                 icon.name: "edit-clear"
                                 flat: true
+                                visible: root.currentBackend !== "pywal16"
                                 opacity: (root.selectedScheme !== "TonalSpot") ? 1.0 : 0.0
                                 enabled: (root.selectedScheme !== "TonalSpot")
                                 ToolTip.text: qsTr("Reset to TonalSpot")
@@ -601,7 +617,11 @@ Dialog {
                                 }
                             }
 
-                            Label { text: qsTr("Colorfulness:") }
+                            // Custom parameters (only for Kwal variant)
+                            Label { 
+                                text: qsTr("Colorfulness:")
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Slider {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: Kirigami.Units.gridUnit * 16
@@ -609,17 +629,22 @@ Dialog {
                                 to: 2.0
                                 value: root.colorfulnessValue
                                 stepSize: 0.1
+                                visible: root.currentBackend === "material-you-kwal"
                                 onMoved: {
                                     root.colorfulnessValue = Math.round(value * 10) / 10
                                     debounceRefresh()
                                 }
                             }
-                            Label { text: root.colorfulnessValue.toFixed(1) }
+                            Label { 
+                                text: root.colorfulnessValue.toFixed(1)
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Button {
                                 icon.name: "edit-clear"
                                 flat: true
                                 opacity: (Math.abs(root.colorfulnessValue - 1.0) > 0.01) ? 1.0 : 0.0
                                 enabled: (Math.abs(root.colorfulnessValue - 1.0) > 0.01)
+                                visible: root.currentBackend === "material-you-kwal"
                                 ToolTip.text: qsTr("Reset to 1.0")
                                 onClicked: {
                                     root.colorfulnessValue = 1.0
@@ -627,7 +652,10 @@ Dialog {
                                 }
                             }
 
-                            Label { text: qsTr("Brightness:") }
+                            Label { 
+                                text: qsTr("Brightness:")
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Slider {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: Kirigami.Units.gridUnit * 16
@@ -635,17 +663,22 @@ Dialog {
                                 to: 2.0
                                 value: root.brightnessValue
                                 stepSize: 0.1
+                                visible: root.currentBackend === "material-you-kwal"
                                 onMoved: {
                                     root.brightnessValue = Math.round(value * 10) / 10
                                     debounceRefresh()
                                 }
                             }
-                            Label { text: root.brightnessValue.toFixed(1) }
+                            Label { 
+                                text: root.brightnessValue.toFixed(1)
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Button {
                                 icon.name: "edit-clear"
                                 flat: true
                                 opacity: (Math.abs(root.brightnessValue - 0.8) > 0.01) ? 1.0 : 0.0
                                 enabled: (Math.abs(root.brightnessValue - 0.8) > 0.01)
+                                visible: root.currentBackend === "material-you-kwal"
                                 ToolTip.text: qsTr("Reset to 0.8")
                                 onClicked: {
                                     root.brightnessValue = 0.8
@@ -653,7 +686,10 @@ Dialog {
                                 }
                             }
 
-                            Label { text: qsTr("Contrast:") }
+                            Label { 
+                                text: qsTr("Contrast:")
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Slider {
                                 Layout.fillWidth: true
                                 Layout.preferredWidth: Kirigami.Units.gridUnit * 16
@@ -661,17 +697,22 @@ Dialog {
                                 to: 1.0
                                 value: root.contrastValue
                                 stepSize: 0.1
+                                visible: root.currentBackend === "material-you-kwal"
                                 onMoved: {
                                     root.contrastValue = Math.round(value * 10) / 10
                                     debounceRefresh()
                                 }
                             }
-                            Label { text: root.contrastValue.toFixed(1) }
+                            Label { 
+                                text: root.contrastValue.toFixed(1)
+                                visible: root.currentBackend === "material-you-kwal"
+                            }
                             Button {
                                 icon.name: "edit-clear"
                                 flat: true
                                 opacity: (Math.abs(root.contrastValue - 0.0) > 0.01) ? 1.0 : 0.0
                                 enabled: (Math.abs(root.contrastValue - 0.0) > 0.01)
+                                visible: root.currentBackend === "material-you-kwal"
                                 ToolTip.text: qsTr("Reset to 0.0")
                                 onClicked: {
                                     root.contrastValue = 0.0
