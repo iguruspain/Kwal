@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
+from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from .controllers.controller import Controller
 
 
@@ -66,6 +67,9 @@ def main():
 
     logger.info("QT_QPA_PLATFORM: %s", os.environ.get("QT_QPA_PLATFORM"))    
     logger.info("QT_QUICK_CONTROLS_STYLE: %s", os.environ.get("QT_QUICK_CONTROLS_STYLE"))
+
+    # WebEngine must be initialized BEFORE the application object is created
+    QtWebEngineQuick.initialize()
 
     # Use QApplication because we use Qt Widgets (QFileDialog) in controller
     app = QApplication(sys.argv)

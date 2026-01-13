@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional, cast
 
 from PIL import Image, ImageColor
+from PySide6.QtGui import QColor
 
 from ..models.models import PaletteData
 from .file_utils import check_binary
@@ -345,3 +346,78 @@ def _extract_imagemagick(path: Path) -> PaletteData:
                 continue
 
     return PaletteData(colors=colors[:16], accents=[best_hex], backend_used="imagemagick", source_path=str(path))
+
+
+# Validates and parses CSS color strings into QColor
+# Handles: #hex, rgb(r,g,b), rgba(r,g,b,a)
+def parse_css_color(color_str: str) -> QColor:
+    """Robustly parse a CSS color string into a QColor object.
+    
+    Supports:
+    - Hex: #RRGGBB, #AARRGGBB
+    - Functional: rgb(r, g, b), rgba(r, g, b, a)
+    - Named: transparent, red, etc.
+    
+    Handles float alpha (0.0-1.0) by converting to 0-255.
+    """
+    s = str(color_str).strip()
+    if not s or s.lower() == "transparent":
+        return QColor(0, 0, 0, 0)
+
+    # 1. Regex for funky css syntax that QColor might miss (especially rgba with float alpha)
+    # Matches: rgba( r, g, b, a ) or rgb(...)
+    # We accommodate comma or space separation if needed, but CSS is usually comma
+    rgba_match = re.match(r'rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d\.]+))?\s*\)', s, re.IGNORECASE)
+    if rgba_match:
+        r, g, b, a_str = rgba_match.groups()
+        r, g, b = int(r), int(g), int(b)
+        alpha = 255
+        if a_str:
+            try:
+                val = float(a_str)
+                # CSS alpha is 0.0 to 1.0, but sometimes users might use 0-255 ints if they are confused.
+                # Standard CSS3/4 is 0-1 (or percentage).
+                # Logic: if <= 1.0, treat as float factor. If > 1.0, treat as byte.
+                if val <= 1.0:
+                    alpha = int(val * 255)
+                else:
+                    alpha = int(val)
+                
+                # Clamp
+                alpha = max(0, min(255, alpha))
+            except ValueError:
+                pass
+        return QColor(r, g, b, alpha)
+
+    # 2. Fallback to QColor's native parsing (Hex, names, etc)
+    c = QColor(s)
+    if c.isValid():
+        return c
+
+    return QColor() # Invalid
+
+
+def format_css_color(color: str | QColor) -> str:
+    """Format a color for CSS usage.
+    
+    - If Alpha is 255: Returns Hex #RRGGBB
+    - If Alpha < 255: Returns rgba(r, g, b, 0.X)
+    """
+    if isinstance(color, QColor):
+        c = color
+    else:
+        c = parse_css_color(color)
+        
+    if not c.isValid():
+        return str(color)
+        
+    if c.alpha() == 255:
+        # Solid -> Hex
+        # name() returns #AARRGGBB usually or #RRGGBB depending on setting, 
+        # but we want pure RGB hex if solid
+        return f"#{c.red():02x}{c.green():02x}{c.blue():02x}"
+    else:
+        # Transparent -> rgba
+        # Round alpha float to ~3 decimals for reasonable precision without being verbose
+        a_float = round(c.alpha() / 255.0, 3) 
+        return f"rgba({c.red()}, {c.green()}, {c.blue()}, {a_float})"

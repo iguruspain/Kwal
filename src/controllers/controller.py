@@ -17,6 +17,7 @@ from PySide6.QtCore import (
     QThread,
     Signal,
     Slot,
+    Qt,
 )
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QColorDialog, QFileDialog
@@ -31,6 +32,8 @@ from ..models.models import (
     StarshipModel,
     StarshipTemplateModel,
     WallpaperFolderModel,
+    UlauncherModel,
+    UlauncherTemplateModel,
 )
 from ..utils import color_utils, file_utils
 
@@ -196,6 +199,20 @@ class Controller(QObject):
                 self._logger.debug("Initial starship model refresh failed or file missing")
         except Exception:
             self._logger.exception("Failed initializing StarshipModel")
+
+        # Ulauncher model
+        try:
+            default_ulauncher_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "ulauncher")
+            self._ulauncher_model = UlauncherModel(template_folder=default_ulauncher_templates)
+            self._ulauncher_template_model = UlauncherTemplateModel()
+            self._ulauncher_template_model.refresh(default_ulauncher_templates)
+            try:
+                self._ulauncher_model.refresh()
+            except Exception:
+                self._logger.debug("Initial ulauncher model refresh failed or no theme set")
+            self._ulauncher_model.configPathChanged.connect(self.ulauncherBackupExistsChanged)
+        except Exception:
+            self._logger.exception("Failed initializing UlauncherModel")
 
         # Connect Signals
         self.tintResult.connect(self._on_tint_done)
@@ -409,45 +426,37 @@ class Controller(QObject):
             self.fastfetchDraftColorChanged.emit()
 
     @Slot(str, result=str)
+    def normalizeColor(self, color: str) -> str:
+        """Convert CSS color string to QML-compatible hex string (#AARRGGBB)."""
+        try:
+            c = color_utils.parse_css_color(color)
+            if c.isValid():
+                return c.name(QColor.HexArgb)
+            return str(color)
+        except Exception:
+            return str(color)
+
+    @Slot(str, result=str)
     def formatColorWithAlpha(self, color: str) -> str:
         """Return a display string with RGB hex and alpha decimal for QML tooltips.
 
         Examples:
         - input: "#AARRGGBB" -> returns: "#RRGGBB alpha: 204"
-        - input: "#RRGGBB" or named color -> preserves and computes alpha
+        - input: "rgba(32, 24, 18, 0.8)" -> returns: "#201812 alpha: 204"
         """
         try:
-            if not color or str(color).lower() == "transparent":
-                return ""
+            c = color_utils.parse_css_color(color)
+            if not c.isValid():
+                return str(color)
 
-            s = str(color)
-            # If already in #AARRGGBB
-            if s.startswith("#") and len(s) == 9:
-                aa = s[1:3]
-                rr = s[3:5]
-                gg = s[5:7]
-                bb = s[7:9]
-                alpha_dec = int(aa, 16)
-                return f"#{rr}{gg}{bb} alpha: {alpha_dec}"
-
-            # Try to resolve via QColor to ensure we include alpha
-            if QColor.isValidColor(s):
-                qc = QColor(s)
-                try:
-                    hexargb = qc.name(QColor.HexArgb)
-                except TypeError:
-                    hexargb = "#{:02x}{:02x}{:02x}{:02x}".format(qc.alpha(), qc.red(), qc.green(), qc.blue())
-
-                if hexargb.startswith("#") and len(hexargb) == 9:
-                    aa = hexargb[1:3]
-                    rr = hexargb[3:5]
-                    gg = hexargb[5:7]
-                    bb = hexargb[7:9]
-                    alpha_dec = int(aa, 16)
-                    return f"#{rr}{gg}{bb} alpha: {alpha_dec}"
-
-            # Fallback: return original string
-            return s
+            # Format manually to ensure consistent output
+            alpha = c.alpha()
+            # Calculate percent (0-100)
+            val = alpha / 255.0
+            perc = int(round(val * 100))
+            
+            # If standard hex form is requested by QML tooltip style
+            return f"#{c.red():02x}{c.green():02x}{c.blue():02x} alpha: {alpha} ({perc}%)"
         except Exception:
             self._logger.exception("Error formatting color tooltip for %r", color)
             return str(color or "")
@@ -898,16 +907,12 @@ class Controller(QObject):
     def openColorDialog(self, initial: str) -> str:
         """Open color dialog and return selected color hex."""
         try:
-            # If no valid initial color is provided, start with opaque white.
-            # If an initial color (including an alpha channel) is provided, preserve its alpha.
-            if not initial or not QColor.isValidColor(initial) or str(initial).lower() == "transparent":
-                initial_col = QColor("#ffffff")
-                try:
-                    initial_col.setAlpha(255)
-                except Exception:
-                    pass
-            else:
-                initial_col = QColor(initial)
+            # Parse initial color robustly
+            initial_col = color_utils.parse_css_color(initial)
+            if not initial_col.isValid() or initial.lower() == "transparent" or initial_col.alpha() == 0:
+                if not initial_col.isValid():
+                    initial_col = QColor("#ffffff")
+                initial_col.setAlpha(255)
             
             # Show alpha channel in the dialog and return hex including alpha
             color = QColorDialog.getColor(initial_col, None, "Select color", QColorDialog.ShowAlphaChannel)
@@ -1301,3 +1306,252 @@ class Controller(QObject):
         except Exception as e:
             self._logger.exception("Failed processing starship config")
             self._show_result_dialog(f"Error applying config: {e}")
+
+    # --- Ulauncher Properties and Slots ---
+
+    # Signals (Must be defined before Properties)
+    ulauncherDraftColorChanged = Signal()
+    ulauncherIsFileModeChanged = Signal()
+    ulauncherTemplateIndexChanged = Signal()
+    ulauncherBackupExistsChanged = Signal()
+    ulauncherNewThemeNameChanged = Signal()
+
+    def _get_ulauncher_draft_color(self) -> str:
+        # Re-use simple string storage for draft (persisted per session if needed)
+        return getattr(self, "_ulauncher_draft_color", "transparent")
+
+    def _set_ulauncher_draft_color(self, val: str) -> None:
+        if getattr(self, "_ulauncher_draft_color", "") != val:
+            self._ulauncher_draft_color = val
+            self.ulauncherDraftColorChanged.emit()
+
+    ulauncherDraftColor = Property(str, _get_ulauncher_draft_color, _set_ulauncher_draft_color, notify=ulauncherDraftColorChanged)
+
+    def _get_ulauncher_is_file_mode(self) -> bool:
+        return getattr(self, "_ulauncher_is_file_mode", False)
+
+    def _set_ulauncher_is_file_mode(self, val: bool) -> None:
+        if getattr(self, "_ulauncher_is_file_mode", False) != val:
+            self._ulauncher_is_file_mode = val
+            self.ulauncherIsFileModeChanged.emit()
+
+    ulauncherIsFileMode = Property(bool, _get_ulauncher_is_file_mode, _set_ulauncher_is_file_mode, notify=ulauncherIsFileModeChanged)
+
+    def _get_ulauncher_template_index(self) -> int:
+        return getattr(self, "_ulauncher_template_index", -1)
+
+    def _set_ulauncher_template_index(self, val: int) -> None:
+        if getattr(self, "_ulauncher_template_index", -1) != val:
+            self._ulauncher_template_index = val
+            self.ulauncherTemplateIndexChanged.emit()
+
+    ulauncherTemplateIndex = Property(int, _get_ulauncher_template_index, _set_ulauncher_template_index, notify=ulauncherTemplateIndexChanged)
+
+    def _get_ulauncher_new_theme_name(self) -> str:
+        return getattr(self, "_ulauncher_new_theme_name", "")
+
+    def _set_ulauncher_new_theme_name(self, val: str) -> None:
+        if getattr(self, "_ulauncher_new_theme_name", "") != val:
+            self._ulauncher_new_theme_name = val
+            self.ulauncherNewThemeNameChanged.emit()
+
+    ulauncherNewThemeName = Property(str, _get_ulauncher_new_theme_name, _set_ulauncher_new_theme_name, notify=ulauncherNewThemeNameChanged)
+
+    @Property(QObject, constant=True)
+    def ulauncherModel(self) -> QObject:
+        return getattr(self, "_ulauncher_model", None)
+
+    @Property(QObject, constant=True)
+    def ulauncherTemplateModel(self) -> QObject:
+        return getattr(self, "_ulauncher_template_model", None)
+    
+
+    @Property(bool, notify=ulauncherBackupExistsChanged)
+    def hasUlauncherBackup(self) -> bool:
+        if self._ulauncher_model:
+            return self._ulauncher_model.hasBackup
+        return False
+
+    @Slot()
+    def restoreUlauncherBackup(self) -> None:
+        """Restore Ulauncher backups (settings and theme) and notify user."""
+        try:
+            if self._ulauncher_model:
+                self._ulauncher_model.restore()
+                self._show_result_dialog("Restored Ulauncher settings and theme from backups.")
+                self.ulauncherBackupExistsChanged.emit()
+                # Clear any transient selection state
+                self.ulauncherClearSelection()
+        except Exception:
+            self._logger.exception("Failed restoring Ulauncher backup")
+            self._show_result_dialog("Error restoring Ulauncher backup.")
+
+    @Slot()
+    def ulauncherClearSelection(self) -> None:
+        self.ulauncherIsFileMode = False
+        self.ulauncherTemplateIndex = -1
+        self.clearSelectedFile()
+        self.ulauncherDraftColor = "transparent"
+        # Refresh from current config
+        if hasattr(self, "_ulauncher_model"):
+            self._ulauncher_model.refresh()
+            
+    @Slot()
+    def applyUlauncherConfig(self) -> None:
+        """Apply Ulauncher configuration.
+        
+        If a template is selected:
+        1. Copy template to user-themes with NEW name.
+        2. update manifest.json metadata with NEW name.
+        3. updates settings.json to use that theme.
+        4. Saves current palette modifications to the new theme files.
+        
+        If an existing theme is selected:
+        1. Just saves palette modifications (performed by model.apply()).
+        """
+        try:
+            import json
+            
+            # 1. Determine Intent
+            is_template_entry = False
+            source_info = {}
+            if self.ulauncherTemplateIndex >= 0:
+                source_info = self._ulauncher_template_model.get(self.ulauncherTemplateIndex)
+                is_template_entry = source_info.get("isTemplate", False)
+            
+            target_theme_path = ""
+            theme_name = ""
+            
+            if is_template_entry:
+                # NEW THEME FROM TEMPLATE FLOW
+                theme_name = self.ulauncherNewThemeName.strip()
+                if not theme_name:
+                    self._show_result_dialog("Please provide a name for the new theme.")
+                    return
+                
+                # Validation: Ensure all mandatory colors (placeholders) are set
+                if not self._ulauncher_model.allColorsFilled:
+                    self._show_result_dialog("Please fill all mandatory colors before creating the theme.\n(Empty color boxes must be assigned a value).")
+                    return
+                
+                source_path = source_info.get("filePath")
+                if not source_path or not os.path.exists(source_path):
+                    self._show_result_dialog("Invalid template source path.")
+                    return
+
+                # Determine Destination
+                dest_root = Path.home() / ".config" / "ulauncher" / "user-themes"
+                dest_root.mkdir(parents=True, exist_ok=True)
+                target_theme_path = str(dest_root / theme_name)
+                
+                # Copy Template
+                if os.path.exists(target_theme_path):
+                    # We could auto-increment or warn. User spec says "skip backup" for new,
+                    # but if it exists, let's just overwrite for now.
+                    try:
+                        shutil.rmtree(target_theme_path)
+                    except Exception:
+                        pass
+                
+                try:
+                    shutil.copytree(source_path, target_theme_path)
+                except Exception as e:
+                    self._show_result_dialog(f"Failed creating theme directory: {e}")
+                    return
+
+                # Update manifest.json metadata (name and display_name)
+                manifest_path = Path(target_theme_path) / "manifest.json"
+                if manifest_path.exists():
+                    try:
+                        with manifest_path.open("r", encoding="utf-8") as f:
+                            import json5 # using json5 for manifests as they often have comments
+                            mdata = json5.load(f)
+                        mdata["name"] = theme_name
+                        mdata["display_name"] = theme_name
+                        with manifest_path.open("w", encoding="utf-8") as f:
+                            json.dump(mdata, f, indent=4, ensure_ascii=False)
+                    except Exception as e:
+                        self._logger.warning("Failed updating manifest metadata: %s", e)
+
+                # Update settings.json (No backup for NEW theme creation per spec)
+                settings_path = Path.home() / ".config" / "ulauncher" / "settings.json"
+                settings_data = {}
+                if settings_path.exists():
+                     try:
+                         with settings_path.open("r", encoding="utf-8") as f:
+                             settings_data = json.load(f)
+                     except Exception:
+                         pass
+                
+                settings_data["theme_name"] = theme_name
+                try:
+                    with settings_path.open("w", encoding="utf-8") as f:
+                        json.dump(settings_data, f, indent=4)
+                except Exception as e:
+                    self._show_result_dialog(f"Failed updating settings.json: {e}")
+                    return
+                
+                # Update model's config path to point to the new location so apply() works on it
+                # We also need to refresh the template model so it shows the new theme in the list
+                self._ulauncher_model._set_config_path(target_theme_path)
+
+            else:
+                # EDITING EXISTING THEME FLOW
+                if self.ulauncherTemplateIndex >= 0:
+                    # Chose an existing theme from user-themes or system themes
+                    theme_name = source_info.get("fileName")
+                    target_theme_path = source_info.get("filePath")
+                    
+                    # If it's a system theme, we should probably copy it to user-themes first 
+                    # before editing, but for now let's follow plan: "apply directly with backup"
+                    # Wait, if it's system theme, we CANT apply directly.
+                    if target_theme_path.startswith("/usr/share"):
+                        self._show_result_dialog("System themes cannot be edited directly. Please use them as templates.")
+                        return
+                    
+                    # Update settings.json to ensure it matches selection
+                    settings_path = Path.home() / ".config" / "ulauncher" / "settings.json"
+                    settings_data = {}
+                    if settings_path.exists():
+                        try:
+                            with settings_path.open("r", encoding="utf-8") as f:
+                                settings_data = json.load(f)
+                        except Exception:
+                            pass
+                    
+                    if settings_data.get("theme_name") != theme_name:
+                        settings_data["theme_name"] = theme_name
+                        try:
+                            with settings_path.open("w", encoding="utf-8") as f:
+                                json.dump(settings_data, f, indent=4)
+                        except Exception:
+                            pass
+                    
+                    self._ulauncher_model._set_config_path(target_theme_path)
+                else:
+                    # Current config (already loaded in model)
+                    if not self._ulauncher_model.configPath:
+                         self._show_result_dialog("No active theme found to edit.")
+                         return
+
+            # 2. Apply Palette Changes (Handles theme.css / manifest.json with backups if not template)
+            # Apply if colors were modified OR if we are creating a new theme from a template
+            if self._ulauncher_model.isModified or is_template_entry:
+                success = self._ulauncher_model.apply(skip_backup=is_template_entry)
+            else:
+                self._logger.info("No color changes detected for Ulauncher, skipping theme file writes.")
+                success = True # Settings update was already done above
+            
+            if success:
+                self._show_result_dialog("Ulauncher configuration applied.")
+                # Refresh everything
+                self._ulauncher_model.refresh()
+                self._ulauncher_template_model.refresh()
+                # Clear new theme name after success
+                self.ulauncherNewThemeName = ""
+            else:
+                self._show_result_dialog("Failed applying palette changes.")
+
+        except Exception as e:
+            self._logger.exception("Failed applying Ulauncher config")
+            self._show_result_dialog(f"Error: {e}")

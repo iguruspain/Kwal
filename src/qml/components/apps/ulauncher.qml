@@ -2,120 +2,414 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import QtWebEngine
+import ".." as Components
 
-Kirigami.Page{
+Kirigami.Page {
     id: ulauncherPage
-    title: qsTr("ulauncher Settings")
+    title: qsTr("Ulauncher Settings")
 
     background: Rectangle {
         color: "transparent"
     }
-    // Sample model for ulauncher settings, later will by replaced and adapted in models.py
-    ListModel {
-        id: ulauncherModel
-        ListElement {
-            configFile: "~/.config//ulauncher/settings.json" // logic to get current config file in file_utils.py
-            configCurrentTheme: "KDE_theme" // logic to get current theme name from settings.json in file_utils.py ("theme_name": "KDE_theme")
-            templateFolder: "~/.config/kwal/templates/ulauncher/"
-            paletteThemeNameColors: []   // Placeholder for future color palette integration
-            paletteManifestNameColors: []   // Placeholder for future color palette integration
-            paletteThemeValuesColors: []  // Placeholder for future color palette integration
-            paletteManifestValuesColors: []  // Placeholder for future color palette integration
-            paletteDraftColors: []   // Placeholder for future color palette integration in panel (State Management)
-            targetThemeName: "" // Placeholder for future target theme name when applying colors
-            targetThemeFolder: "" // Placeholder for future target theme folder when applying colors
+
+    // Proxy to Python Ulauncher model
+    Item {
+        id: ulauncherModelProxy
+        property var model: (controller && controller.ulauncherModel) ? controller.ulauncherModel : null
+        
+        property string configPath: model ? model.configPath : ""
+        property string templateFolder: model ? model.templateFolder : ""
+        
+        property var paletteNames: model ? model.paletteNames : []
+        property var paletteValues: model ? model.paletteValues : []
+        property var paletteKeys: model ? model.paletteKeys : []
+        
+        property int editSectionIndex: -1
+        property int editColorIndex: -1
+    }
+
+    readonly property var controller: (typeof pyController !== "undefined") ? pyController : null
+
+    function safePaletteKey(proxy, sectionIdx, colorIdx) {
+        if (!proxy || !proxy.paletteKeys) return "";
+        var pk = proxy.paletteKeys;
+        if (!(pk && pk.length > sectionIdx)) return "";
+        var inner = pk[sectionIdx];
+        if (!inner) return "";
+        var v = inner[colorIdx];
+        return (v === undefined || v === null) ? "" : v;
+    }
+
+    Components.DialogPalette {
+        id: paletteDialog
+        onAccepted: {
+            if (selectedColor !== "transparent") {
+                if (ulauncherModelProxy.editSectionIndex >= 0 && ulauncherModelProxy.editColorIndex >= 0 && controller) {
+                    controller.ulauncherModel.setPaletteColor(ulauncherModelProxy.editSectionIndex, ulauncherModelProxy.editColorIndex, selectedColor.toString())
+                }
+            }
         }
     }
 
-   // --- Main Layout ---
+    Dialog {
+        id: confirmApplyDialog
+        title: qsTr("Confirm Apply")
+        modal: true
+        visible: false
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
+            Label { 
+                text: qsTr("This will apply the selected colors to the current theme.\n(Changes are written to ~/.config/ulauncher/)\n\nContinue?")
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: 400
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                Button {
+                    text: qsTr("Cancel")
+                    onClicked: confirmApplyDialog.close()
+                }
+                Button {
+                    text: qsTr("Apply")
+                    onClicked: {
+                        confirmApplyDialog.close()
+                        if (controller) controller.applyUlauncherConfig()
+                    }
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: newThemeDialog
+        title: qsTr("Create New Theme")
+        modal: true
+        visible: false
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
+            Label {
+                text: qsTr("Provide a name for your new theme:")
+                wrapMode: Text.WordWrap
+                Layout.maximumWidth: 400
+            }
+            TextField {
+                id: dialogThemeNameInput
+                Layout.fillWidth: true
+                placeholderText: qsTr("Theme Name")
+                text: controller ? controller.ulauncherNewThemeName : ""
+                onTextChanged: if(controller) controller.ulauncherNewThemeName = text
+                onAccepted: {
+                    if (controller && controller.ulauncherNewThemeName.trim().length > 0) {
+                        newThemeDialog.close()
+                        controller.applyUlauncherConfig()
+                    }
+                }
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                Button {
+                    text: qsTr("Cancel")
+                    onClicked: newThemeDialog.close()
+                }
+                Button {
+                    text: qsTr("Create and Apply")
+                    enabled: controller && controller.ulauncherNewThemeName.trim().length > 0
+                    highlighted: true
+                    onClicked: {
+                        newThemeDialog.close()
+                        if (controller) controller.applyUlauncherConfig()
+                    }
+                }
+            }
+        }
+        onOpened: dialogThemeNameInput.forceActiveFocus()
+    }
 
     RowLayout {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
-        // --- Left Pane: Controls ---
+        // --- Left Pane ---
         Rectangle {
-            id: leftPaneUlauncher
             color: Kirigami.Theme.backgroundColor
             Layout.preferredWidth: 250
             Layout.fillHeight: true
-       
+
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.smallSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                Label { text: qsTr("Settings"); font.bold: true; Layout.fillWidth: true }
+                MenuSeparator { Layout.fillWidth: true }
+
+                // Template Selection
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Select a theme"); Layout.fillWidth: true }
+                    ToolButton {
+                        icon.name: "edit-clear"
+                        ToolTip.text: qsTr("Reset to current theme")
+                        ToolTip.visible: hovered
+                        onClicked: { 
+                            if (controller) {
+                                controller.ulauncherClearSelection()
+                                controller.ulauncherModel.refresh()
+                            }
+                        }
+                    }
+                }
+
+                ComboBox {
+                    id: templateCombo
+                    Layout.fillWidth: true
+                    textRole: "fileName"
+                    
+                    model: {
+                        if (!controller || !controller.ulauncherModel || !controller.ulauncherTemplateModel) return [];
+                        
+                        var list = [];
+                        // Distinguish between the "editing" path and the "actually applied" path.
+                        // We use actualConfigPath to mark the (Current) flag.
+                        var actualPath = controller.ulauncherModel.actualConfigPath;
+                        var tm = controller.ulauncherTemplateModel;
+                        var foundCurrent = false;
+
+                        for (var i = 0; i < tm.rowCount(); i++) {
+                            var it = tm.get(i);
+                            var isCurrent = (actualPath && it.filePath === actualPath);
+                            var name = it.fileName;
+                            if (it.isTemplate) name += " (" + qsTr("Template") + ")";
+                            if (isCurrent) {
+                                name += " (" + qsTr("Current") + ")";
+                                foundCurrent = true;
+                            }
+                            list.push({ 
+                                fileName: name, 
+                                filePath: it.filePath, 
+                                isTemplate: it.isTemplate,
+                                isCurrent: isCurrent
+                            });
+                        }
+
+                        if (!foundCurrent && actualPath) {
+                            var parts = actualPath.split("/");
+                            var cfgName = parts[parts.length-1] || qsTr("Current Theme");
+                            list.unshift({ 
+                                fileName: cfgName + " (" + qsTr("Current") + ")", 
+                                filePath: actualPath, 
+                                isTemplate: false,
+                                isCurrent: true
+                            });
+                        }
+                        return list;
+                    }
+
+                    // Only sync currentIndex when the model is first loaded or when actualConfigPath significantly changes.
+                    // To avoid jumping back when selecting, we can use a Connection or simply check if the current selection
+                    // already matches the intent.
+                    Component.onCompleted: {
+                        if (controller) {
+                            controller.ulauncherModel.refresh();
+                        }
+                    }
+                    
+                    Connections {
+                        target: controller.ulauncherModel
+                        function onActualConfigPathChanged() {
+                            // When the applied theme changes, we force update the selection to it
+                            for (var i = 0; i < templateCombo.model.length; i++) {
+                                if (templateCombo.model[i].isCurrent) {
+                                    templateCombo.currentIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    enabled: (controller && !controller.ulauncherIsFileMode)
+                    opacity: enabled ? 1.0 : 0.5
+
+                    onActivated: (index) => {
+                         if (!controller) return;
+                         controller.ulauncherIsFileMode = false;
+                         controller.clearSelectedFile();
+                         
+                         var entry = (model && model.length > index) ? model[index] : null;
+                         if (!entry) return;
+
+                         // Map back to template index if it exists in the model
+                         var tm = controller.ulauncherTemplateModel;
+                         var foundIdx = -1;
+                         for (var i = 0; i < tm.rowCount(); i++) {
+                             if (tm.get(i).filePath === entry.filePath) {
+                                 foundIdx = i;
+                                 break;
+                             }
+                         }
+                         controller.ulauncherTemplateIndex = foundIdx;
+                         controller.ulauncherModel.refresh(entry.filePath);
+                    }
+
+                }
 
                 Label {
-                    text: qsTr("Settings")
-                    font.bold: true
-                    Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-                }
-
-                MenuSeparator { Layout.fillWidth: true }
-                // Label
-                // Template Selection Header
-                RowLayout{
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-                    Label {
-                        id: selectTemplateLabel
-                        Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter                        
-                        text: qsTr("Select a template")
+                    text: qsTr("New Theme Name")
+                    visible: {
+                        if (!controller || !controller.ulauncherTemplateModel || templateCombo.currentIndex <= 0) return false;
+                        var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
+                        return !!(info && info.isTemplate);
                     }
-                    ToolButton {
-                        id: clearSelectionButton
-                        icon.name: "edit-clear"
-                        Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-                        ToolTip.text: qsTr("Clear selection")
-                        ToolTip.visible: hovered
-                        onClicked: {
-                            // Logic to clear template selection
-                        }
-                    }              
                 }
-                // Templates, provided template or current config
-                // ComboBox for selecting templates provided
-                // Current config option
+                TextField {
+                    id: newThemeNameInput
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Enter name for the new theme...")
+                    visible: {
+                        if (!controller || !controller.ulauncherTemplateModel || templateCombo.currentIndex <= 0) return false;
+                        var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
+                        return !!(info && info.isTemplate);
+                    }
+                    text: controller ? controller.ulauncherNewThemeName : ""
+                    onTextChanged: if(controller) controller.ulauncherNewThemeName = text
+                }
 
                 MenuSeparator { Layout.fillWidth: true }
-                // color settings, will be adapted to the ulauncher model
-                // labels (paletteNameColors) + pickers for colors from palettes (paletteValuesColors), Repeater?
 
-                Item { Layout.fillHeight: true }
+                // Palette Section
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true 
+                    clip: true
 
-                // Action Buttons
+                    ColumnLayout {
+                        width: parent.width
+                        spacing: Kirigami.Units.largeSpacing
+
+                        // Iterate over Palette Sections (e.g. "manifest", "theme")
+                        Repeater {
+                            model: ulauncherModelProxy.paletteNames
+                            delegate: ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+                                
+                                readonly property int sectionIndex: index
+
+                                // Section Header
+                                Label { 
+                                    text: (modelData === "theme") ? qsTr("Theme Colors") : 
+                                          (modelData === "manifest") ? qsTr("Manifest Colors") : modelData
+                                    font.bold: true 
+                                    Layout.fillWidth: true
+                                }
+                                MenuSeparator { Layout.fillWidth: true }
+
+                                // Colors in this section
+                                Repeater {
+                                    id: innerRepeater
+                                    model: (ulauncherModelProxy.paletteValues && ulauncherModelProxy.paletteValues.length > sectionIndex) 
+                                           ? ulauncherModelProxy.paletteValues[sectionIndex] : []
+                                    delegate: RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        Label {
+                                            text: ulauncherPage.safePaletteKey(ulauncherModelProxy, sectionIndex, index)
+                                            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideMiddle
+                                        }
+
+                                        Rectangle {
+                                            id: colorPreview
+                                            width: Kirigami.Units.gridUnit * 1.5
+                                            height: Kirigami.Units.gridUnit * 1.5
+                                            radius: Kirigami.Units.smallSpacing
+                                            // Use controller to normalize CSS colors (e.g. rgba) to QML-friendy hex
+                                            color: controller ? controller.normalizeColor(modelData) : (modelData || "transparent")
+                                            border.width: 1
+                                            border.color: Kirigami.Theme.disabledTextColor
+                                            
+                                            ToolTip.text: controller ? (controller.formatColorWithAlpha(colorPreview.color)) : ""
+                                            ToolTip.visible: mouseArea.containsMouse
+                                            
+                                            MouseArea {
+                                                id: mouseArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                     if (!controller) return;
+                                                     var c = controller.openColorDialog(modelData || "transparent")
+                                                     if (c) {
+                                                         controller.ulauncherModel.setPaletteColor(sectionIndex, index, c)
+                                                     }
+                                                }
+                                            }
+                                        }
+
+                                        Button {
+                                            icon.name: "color-picker"
+                                            ToolTip.text: qsTr("Pick from palette")
+                                            ToolTip.visible: hovered
+                                            onClicked: {
+                                                ulauncherModelProxy.editSectionIndex = sectionIndex
+                                                ulauncherModelProxy.editColorIndex = index
+                                                paletteDialog.selectedColor = "transparent"
+                                                paletteDialog.open()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Label {
+                            visible: (!ulauncherModelProxy.paletteNames || ulauncherModelProxy.paletteNames.length === 0)
+                            text: qsTr("No colors found")
+                            font.italic: true
+                            Layout.alignment: Qt.AlignHCenter
+                        }
+                    }
+                }
+
+                MenuSeparator { Layout.fillWidth: true }
+
                 RowLayout {
                     Layout.fillWidth: true
                     Button {
-                        id: applyColorsButton
-                        text: qsTr("Apply colors")
+                        text: qsTr("Apply Config")
                         Layout.fillWidth: true
-                        ToolTip.text: qsTr("Apply the colors to ulauncher config")
-                        ToolTip.visible: hovered
-                        enabled: true //later based on controller state
-                        
                         onClicked: {
-                            // Logic to apply colors to ulauncher config
+                            if (!controller) return;
+                            var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
+                            if (info && info.isTemplate) {
+                                newThemeDialog.open();
+                            } else {
+                                confirmApplyDialog.open();
+                            }
                         }
                     }
                     Button {
-                        id: restoreBackupButton
-                        text: qsTr("Restore backup")
+                        text: qsTr("Restore Settings")
                         Layout.fillWidth: true
-                        enabled: true //later based on controller state
-                        ToolTip.text: qsTr("Restore the ulauncher config from the last backup")//(controller && controller.hasUlauncherBackup) ? qsTr("Restore the ulauncher config from the last backup") : qsTr("No backup available to restore")
-                        ToolTip.visible: hovered
-                        
-                        onClicked: {
-                            // Logic to restore ulauncher config from backup
+                        enabled: controller && controller.hasUlauncherBackup
+                        onClicked: if (controller) {
+                            controller.restoreUlauncherBackup()
                         }
                     }
                 }
             }
         }
-        // --- Right Pane: Previews ---
+
+        // --- Right Pane: Preview ---
         Rectangle {
-            id: rightPaneUlauncher
             color: "transparent"
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -123,39 +417,65 @@ Kirigami.Page{
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.largeSpacing
+                spacing: Kirigami.Units.smallSpacing
+
+                Label { text: qsTr("Current Theme:"); font.bold: true }
                 
-                // Top: Current Config Preview
-                ColumnLayout {
-                    id: previewSectionTop
+                // Current Theme Preview rendering
+                Rectangle {
+                    id: currentPreviewRect
+                    color: "transparent" //"#00FF00"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    //Layout.preferredHeight: 6
-
-                    Label { text: qsTr("Current (config):"); font.bold: true }
-                    // Preview current config
-                
-                }
-                // Bottom: Selection & Preview
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    spacing: Kirigami.Units.smallSpacing
-                    //Layout.preferredHeight: 4
-
+                    Layout.alignment: Qt.AlignHCenter
+                    clip: true
+                    
+                    WebEngineView {
+                        id: currentView
+                        anchors.fill: parent
+                        backgroundColor: "transparent"
                         
-                    Label {
-                        id: selectedTemplateLabel
-                        visible: text !== qsTr("Template:")
-                        font.bold: true
+                        property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.currentConfigPreviewHtml : ""
+                        onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                        Component.onCompleted: loadHtml(contentHtml, "file:///")
+
+                        // Disable interactions to make it feel like a preview
+                        settings.javascriptEnabled: false
+                        settings.scrollAnimatorEnabled: false
+                        settings.localContentCanAccessFileUrls: true
+                        settings.allowRunningInsecureContent: true
                     }
-                    // Preview with selected template applied
-                    Label {
-                        id: withColorsAppliedLabel
-                        visible: text !== qsTr("Template with colors:")
-                        font.bold: true
-                    }                    
-                    // Preview with selected template and colors applied            
+                }
+
+                Label {
+                    text: qsTr("Live Preview:")
+                    font.bold: true
+                    wrapMode: Text.WrapAnywhere
+                    Layout.fillWidth: true
+                }
+
+                // Live Preview rendering
+                Rectangle {
+                    id: livePreviewRect
+                    color: "transparent" //"#00FF00"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.alignment: Qt.AlignHCenter
+                    clip: true
+                    
+                    WebEngineView {
+                        id: liveView
+                        anchors.fill: parent
+                        backgroundColor: "transparent"
+                        
+                        property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.previewHtml : ""
+                        onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                        Component.onCompleted: loadHtml(contentHtml, "file:///")
+
+                        settings.javascriptEnabled: false
+                        settings.localContentCanAccessFileUrls: true
+                        settings.allowRunningInsecureContent: true
+                    }
                 }
             }
         }
