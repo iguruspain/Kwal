@@ -27,6 +27,30 @@ Kirigami.Page {
         
         property int editSectionIndex: -1
         property int editColorIndex: -1
+        
+        // Manual Previews Controls - Edit these values directly!
+        property real baseScale: 0.95 // Multiplier for the responsive fit (e.g. 0.95 for a small margin)
+        property int previewWidth: 1000
+        property int previewHeight: 500 // Must match content height to avoid clipping
+        
+        // This makes the preview resize automatically with the window!
+        // We use Math.min to ensure it fits both width and height.
+        property real previewScale: {
+            if (!livePreviewRect.width || !livePreviewRect.height) return baseScale;
+            var sw = (livePreviewRect.width / previewWidth);
+            var sh = (livePreviewRect.height / previewHeight);
+            return Math.min(sw, sh) * baseScale;
+        }
+        
+        onPreviewScaleChanged: if (model) model.previewScale = previewScale
+        onPreviewWidthChanged: if (model) model.previewWidth = 1000 // Render wider window
+        
+        onModelChanged: {
+            if (model) {
+                model.previewScale = previewScale
+                model.previewWidth = 1000
+            }
+        }
     }
 
     readonly property var controller: (typeof pyController !== "undefined") ? pyController : null

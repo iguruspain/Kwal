@@ -15,6 +15,7 @@ from PySide6.QtCore import (
     Property,
     Qt,
     QThread,
+    QTimer,
     Signal,
     Slot,
 )
@@ -873,6 +874,8 @@ class UlauncherModel(QObject):
     paletteNamesChanged = Signal()
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
+    previewScaleChanged = Signal()
+    previewWidthChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -895,6 +898,14 @@ class UlauncherModel(QObject):
         self._original_palette_values: list[list[str]] = []
         self._preview_html: str = ""
         self._current_config_preview_html: str = ""
+        self._preview_scale: float = 0.4
+        self._preview_width: int = 650
+
+        # Debounce timer to avoid lag during resizing/editing
+        self._render_timer = QTimer()
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(50) # 50ms delay
+        self._render_timer.timeout.connect(self._refresh_previews)
 
     def _get_config_path(self) -> str:
         return self._current_theme_path
@@ -945,7 +956,9 @@ class UlauncherModel(QObject):
                     try:
                         from ..utils import ulauncher_preview2
                         live = self._get_live_colors()
-                        self._preview_html = ulauncher_preview2.generate_preview_html(self._current_theme_path, live, scale=0.4)
+                        self._preview_html = ulauncher_preview2.generate_preview_html(
+                            self._current_theme_path, live, scale=self._preview_scale, window_width=self._preview_width
+                        )
                     except Exception:
                         pass
                     
@@ -1034,6 +1047,61 @@ class UlauncherModel(QObject):
                     return False
         return True
 
+    def _get_preview_scale(self) -> float:
+        return self._preview_scale
+
+    def _set_preview_scale(self, val: float) -> None:
+        if self._preview_scale != val:
+            self._preview_scale = float(val)
+            self._render_timer.start() # Trigger non-blocking re-render
+            self.previewScaleChanged.emit()
+
+    def _get_preview_width(self) -> int:
+        return self._preview_width
+
+    def _set_preview_width(self, val: int) -> None:
+        if self._preview_width != val:
+            self._preview_width = int(val)
+            self._render_timer.start() # Trigger non-blocking re-render
+            self.previewWidthChanged.emit()
+
+    def _get_preview_html(self) -> str:
+        return self._preview_html
+
+    def _get_current_config_preview_html(self) -> str:
+        return self._current_config_preview_html
+
+    def _refresh_previews(self) -> None:
+        """Internal helper to regenerate HTML for all preview properties."""
+        try:
+            from ..utils import ulauncher_preview2
+            live = self._get_live_colors()
+            
+            # Resolve paths
+            actual_current_path = self._resolve_current_theme_path()
+            target_path = self._current_theme_path or actual_current_path
+            
+            if not target_path:
+                return
+
+            # 1. Update Live Preview (Always)
+            new_live_html = ulauncher_preview2.generate_preview_html(
+                target_path, live, scale=self._preview_scale, window_width=self._preview_width
+            )
+            self._preview_html = new_live_html
+
+            # 2. Update Current Config Preview
+            # We update it ONLY if we are currently looking at the actual system theme,
+            # OR if it's already populated (to maintain sync during resizing).
+            if target_path == actual_current_path or self._current_config_preview_html:
+                 self._current_config_preview_html = ulauncher_preview2.generate_preview_html(
+                     actual_current_path, {}, scale=self._preview_scale, window_width=self._preview_width
+                 )
+
+            self.paletteValuesChanged.emit() # Trigger QML update
+        except Exception:
+            logger.exception("Failed refreshing previews")
+
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     actualConfigPath = Property(str, _resolve_current_theme_path, notify=actualConfigPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
@@ -1042,8 +1110,10 @@ class UlauncherModel(QObject):
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
     isModified = Property(bool, _get_is_modified, notify=paletteValuesChanged)
     allColorsFilled = Property(bool, _get_all_colors_filled, notify=paletteValuesChanged)
-    previewHtml = Property(str, lambda self: self._preview_html, notify=paletteValuesChanged)
-    currentConfigPreviewHtml = Property(str, lambda self: self._current_config_preview_html, notify=configPathChanged)
+    previewHtml = Property(str, _get_preview_html, notify=paletteValuesChanged)
+    currentConfigPreviewHtml = Property(str, _get_current_config_preview_html, notify=paletteValuesChanged)
+    previewScale = Property(float, _get_preview_scale, _set_preview_scale, notify=previewScaleChanged)
+    previewWidth = Property(int, _get_preview_width, _set_preview_width, notify=previewWidthChanged)
 
 
     @Slot(result="QVariantMap")
@@ -1102,19 +1172,10 @@ class UlauncherModel(QObject):
             self._palette_values = values
             self._original_palette_values = [list(x) for x in values] # Deep copy
 
-            # Generate Preview
-            try:
-                from ..utils import ulauncher_preview2
-                live = self._get_live_colors()
-                self._preview_html = ulauncher_preview2.generate_preview_html(target_path, live, scale=0.4)
-                
-                # If path is None, it means we refreshed against current settings.json
-                if path is None:
-                    self._current_config_preview_html = self._preview_html
-                
-            except Exception:
-                logger.exception("Failed generating ulauncher preview")
-                self._preview_html = ""
+            # Generate Preview - use timer for initial load too if it's the first time
+            # or if we are refreshing against a new path.
+            # This avoids blocking the UI when first opening the tab.
+            self._render_timer.start()
             
             self.paletteNamesChanged.emit()
             self.paletteKeysChanged.emit()
