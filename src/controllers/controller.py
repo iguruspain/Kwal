@@ -642,6 +642,28 @@ class Controller(QObject):
         except Exception:
             self._logger.exception("Failed refreshing fastfetch templates for %s", folder)
 
+    @Slot()
+    def refreshFastfetchConfigImage(self) -> None:
+        """Re-detect the current fastfetch config image from disk.
+        
+        Forces re-read and emits change signal with a cache-buster to ensure
+        QML Image reloads even if the file path is the same but content changed.
+        """
+        try:
+            import time
+            detected = self._detect_current_fastfetch_image()
+            if detected:
+                # Append cache-buster to force QML Image reload
+                url = f"file://{detected}?t={int(time.time() * 1000)}"
+                self._fastfetch_config_image = url
+                self.fastfetchConfigImageChanged.emit()
+            else:
+                if self._fastfetch_config_image != "":
+                    self._fastfetch_config_image = ""
+                    self.fastfetchConfigImageChanged.emit()
+        except Exception:
+            self._logger.exception("Failed refreshing fastfetch config image")
+
     @Slot(result="QVariantMap")
     def getFastfetchInfo(self) -> dict[str, str]:
         """Return info for QML."""

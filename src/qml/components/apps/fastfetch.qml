@@ -42,6 +42,13 @@ Kirigami.Page {
         }
     }
 
+    // Refresh config image when tab becomes visible (to catch external changes)
+    onVisibleChanged: {
+        if (visible && controller) {
+            controller.refreshFastfetchConfigImage();
+        }
+    }
+
     // --- Dialogs ---
 
     // resultDialog moved to main.qml for global access
@@ -142,7 +149,7 @@ Kirigami.Page {
                         // Binding to controller
                         currentIndex: controller ? controller.fastfetchTemplateIndex : -1
                         onCurrentIndexChanged: {
-                            if (controller && moving && currentIndex !== controller.fastfetchTemplateIndex) {
+                            if (controller && currentIndex !== controller.fastfetchTemplateIndex) {
                                 controller.fastfetchTemplateIndex = currentIndex;
                             }
                         }
@@ -404,24 +411,24 @@ Kirigami.Page {
                         
                         Label {
                             id: selectedTemplateLabel
-                            visible: text !== qsTr("Template:")
+                            visible: selectedTemplateName !== ""
                             font.bold: true
+                            text: selectedTemplateName !== "" ? qsTr("Template: %1").arg(selectedTemplateName) : ""
                             
-                            // Logic to compute names and side-effect update controller
-                            text: {
-                                if (!controller) return qsTr("Template:");
-                                
-                                let name = "";
+                            // Computed property for current template name
+                            readonly property string selectedTemplateName: {
+                                if (!controller) return "";
                                 if (controller.fastfetchIsFileMode) {
-                                    name = controller.selectedFile ? controller.selectedFile.split("/").pop() : "";
-                                } else {
-                                    // Using templateSelector.currentText directly works, but cleaner to use model+index
-                                    // However, currentText is convenient.
-                                    name = templateSelector.currentIndex !== -1 ? templateSelector.currentText : "";
+                                    return controller.selectedFile ? controller.selectedFile.split("/").pop() : "";
                                 }
-                                
-                                if (name !== "") {
-                                    var dst = name.replace(/\.[^/.]+$/, "") + "-tinted.png"; // safer replace extension
+                                return controller.fastfetchTemplateIndex !== -1 ? templateSelector.currentText : "";
+                            }
+                            
+                            // Update destination name and tinted name when template changes
+                            onSelectedTemplateNameChanged: {
+                                if (!controller) return;
+                                if (selectedTemplateName !== "") {
+                                    var dst = selectedTemplateName.replace(/\.[^/.]+$/, "") + "-tinted.png";
                                     fastfetchPage.sTintedName = dst;
                                     if (controller.fastfetchDestName !== dst) {
                                         controller.fastfetchDestName = dst;
@@ -430,8 +437,6 @@ Kirigami.Page {
                                     fastfetchPage.sTintedName = "";
                                     controller.fastfetchDestName = "";
                                 }
-                                
-                                return name !== "" ? qsTr("Template: %1").arg(name) : qsTr("Template:");
                             }
                         }
                         

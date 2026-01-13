@@ -1,6 +1,7 @@
 import logging
 import re
 import getpass
+import sys
 from typing import Any, Mapping
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class StarshipRenderer:
             "branch": "main",
             "all_status": "●",
             "ahead_behind": "",
-            "version": "v3.12",
+            "version": f"v{sys.version_info.major}.{sys.version_info.minor}",
             "ssh_symbol": " ",
             "symbol": "❯ ",
         }

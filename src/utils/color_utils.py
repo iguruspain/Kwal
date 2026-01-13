@@ -192,7 +192,7 @@ def _extract_pywal16(path: Path) -> PaletteData:
 def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     try:
         from materialyoucolor.quantize import QuantizeCelebi
-        from materialyoucolor.score.score import Score
+        from materialyoucolor.score.score import Score, ScoreOptions
         from materialyoucolor.hct import Hct
         from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot
         from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
@@ -219,10 +219,19 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     is_dark = kwargs.get("dark_mode", True)
     contrast = float(kwargs.get("contrast", 0.0))
     override_seed_hex = kwargs.get("seed_color", None)
+    colorfulness = float(kwargs.get("colorfulness", 1.0))
+    brightness = float(kwargs.get("brightness", 0.8))
     
-    # Always extract dominant colors from image so we don't lose the "Accents" list
-    # when a manual seed is selected.
-    ranked = []
+    # Extract dominant colors from image with ScoreOptions for better results
+    # desired=7 to get more diverse colors like kde-material-you-colors
+    score_options = ScoreOptions(
+        desired=7,
+        fallback_color_argb=0xFF4285F4,
+        filter=True,
+        dislike_filter=True,
+    )
+    
+    ranked: list[int] = []
     try:
         with Image.open(path) as img:
             img = img.convert("RGBA")
@@ -232,7 +241,7 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
         
         with suppress_stdout():
             stats = QuantizeCelebi(pixel_list, 128)
-            ranked = Score.score(stats)
+            ranked = Score.score(stats, score_options)
     except Exception:
         logger.exception("Failed to quantize image for accents")
 
@@ -242,41 +251,120 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
             seed_int = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
         except ValueError:
              logger.warning("Invalid seed color %s, falling back to auto", override_seed_hex)
-             seed_int = ranked[0] if ranked else 0xff4285F4
+             seed_int = ranked[0] if ranked else 0xFF4285F4
     else:
-        seed_int = ranked[0] if ranked else 0xff4285F4
+        seed_int = ranked[0] if ranked else 0xFF4285F4
 
     hct_seed = Hct.from_int(seed_int)
     adjusted_hct = Hct.from_hct(
         hct_seed.hue,
-        hct_seed.chroma * float(kwargs.get("colorfulness", 1.0)),
-        hct_seed.tone * float(kwargs.get("brightness", 0.8))
+        hct_seed.chroma * colorfulness,
+        hct_seed.tone * brightness
     )
 
     scheme = scheme_class(adjusted_hct, is_dark, contrast)
+    n = scheme.neutral_palette
     
-    def hex_f(i: int | list) -> str:
+    def hex_f(i: int | list[int]) -> str:
         if isinstance(i, list):
             return f"#{i[0]:02x}{i[1]:02x}{i[2]:02x}"
         return f"#{i & 0xFFFFFF:06x}"
-
-    p, s, t, n = scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette, scheme.neutral_palette
     
+    def adjust_color_hct(argb: int, chroma_mult: float, tone_mult: float, target_tone: int) -> str:
+        """Adjust a color's chroma and tone using HCT color space."""
+        hct = Hct.from_int(argb)
+        # Apply colorfulness multiplier to chroma
+        new_chroma = max(0, min(120, hct.chroma * chroma_mult))
+        # Blend the tone towards the target based on brightness multiplier
+        # tone_mult < 1 = darker, tone_mult > 1 = lighter
+        new_tone = max(0, min(100, hct.tone * tone_mult))
+        # Create new HCT with adjusted values
+        adjusted = Hct.from_hct(hct.hue, new_chroma, new_tone)
+        return hex_f(adjusted.to_int())
+    
+    def get_luminance(hex_color: str) -> float:
+        """Calculate relative luminance of a color for sorting."""
+        rgb = ImageColor.getrgb(hex_color)
+        # sRGB to linear RGB
+        def to_linear(c: int) -> float:
+            v = c / 255.0
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        r, g, b = to_linear(rgb[0]), to_linear(rgb[1]), to_linear(rgb[2])
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    # Background and foreground from neutral palette
+    bg_tone = 10 if is_dark else 95
+    fg_tone = 95 if is_dark else 10
+    bg_color = hex_f(n.tone(bg_tone))
+    fg_color = hex_f(n.tone(fg_tone))
+    
+    # Build palette using dominant colors from image
+    # This creates a richer, more varied palette than just primary/secondary/tertiary
+    palette_colors: list[str] = []
+    
+    # Tones for normal colors (color1-6) and bright variants (color9-14)
+    normal_tone_mult = 0.85 if is_dark else 1.1
+    bright_tone_mult = 1.15 if is_dark else 0.75
+    
+    # Use up to 6 ranked colors for main palette slots
+    num_ranked = len(ranked)
+    for i in range(6):
+        if i < num_ranked:
+            # Use actual ranked color with adjustments
+            palette_colors.append(adjust_color_hct(ranked[i], colorfulness, normal_tone_mult, 50))
+        else:
+            # Fallback: cycle through primary, secondary, tertiary palettes
+            palettes = [scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette]
+            pal = palettes[i % 3]
+            tone = 40 + (i // 3) * 10 if is_dark else 60 - (i // 3) * 10
+            palette_colors.append(hex_f(pal.tone(tone)))
+    
+    # Sort palette colors by luminance for visual consistency
+    palette_colors.sort(key=get_luminance, reverse=not is_dark)
+    
+    # Build bright variants of the palette colors
+    bright_colors: list[str] = []
+    for i in range(6):
+        if i < num_ranked:
+            bright_colors.append(adjust_color_hct(ranked[i], colorfulness, bright_tone_mult, 70))
+        else:
+            palettes = [scheme.primary_palette, scheme.secondary_palette, scheme.tertiary_palette]
+            pal = palettes[i % 3]
+            tone = 70 + (i // 3) * 10 if is_dark else 30 - (i // 3) * 5
+            bright_colors.append(hex_f(pal.tone(max(10, min(90, tone)))))
+    
+    bright_colors.sort(key=get_luminance, reverse=not is_dark)
+    
+    # Final 16-color palette structure:
+    # color0: background
+    # color1-6: main palette colors (from ranked image colors)
+    # color7: foreground
+    # color8: background variant (slightly lighter/darker)
+    # color9-14: bright variants of main colors
+    # color15: foreground variant
     c = [
-        hex_f(n.tone(10 if is_dark else 95)), hex_f(p.tone(40 if is_dark else 60)),
-        hex_f(s.tone(40 if is_dark else 60)), hex_f(t.tone(40 if is_dark else 60)),
-        hex_f(p.tone(50 if is_dark else 50)), hex_f(s.tone(50 if is_dark else 50)),
-        hex_f(t.tone(50 if is_dark else 50)), hex_f(n.tone(80 if is_dark else 20)),
-        hex_f(n.tone(30 if is_dark else 85)), hex_f(p.tone(70 if is_dark else 30)),
-        hex_f(s.tone(70 if is_dark else 30)), hex_f(t.tone(70 if is_dark else 30)),
-        hex_f(p.tone(80 if is_dark else 40)), hex_f(s.tone(80 if is_dark else 40)),
-        hex_f(t.tone(80 if is_dark else 40)), hex_f(n.tone(95 if is_dark else 10)),
+        bg_color,                              # color0: background
+        palette_colors[0],                     # color1: main color 1
+        palette_colors[1],                     # color2: main color 2
+        palette_colors[2],                     # color3: main color 3
+        palette_colors[3],                     # color4: main color 4
+        palette_colors[4],                     # color5: main color 5
+        palette_colors[5],                     # color6: main color 6
+        fg_color,                              # color7: foreground
+        hex_f(n.tone(30 if is_dark else 85)),  # color8: background variant
+        bright_colors[0],                      # color9: bright color 1
+        bright_colors[1],                      # color10: bright color 2
+        bright_colors[2],                      # color11: bright color 3
+        bright_colors[3],                      # color12: bright color 4
+        bright_colors[4],                      # color13: bright color 5
+        bright_colors[5],                      # color14: bright color 6
+        hex_f(n.tone(90 if is_dark else 15)),  # color15: foreground variant
     ]
 
+    # Accents remain unchanged - top 8 ranked colors for UI accent selection
     if ranked:
         accents = [hex_f(color) for color in ranked[:8]]
     else:
-        # Fallback if image quantization failed
         accents = [hex_f(seed_int)]
 
     return PaletteData(
