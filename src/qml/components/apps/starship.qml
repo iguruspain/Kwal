@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import QtWebEngine
 import ".." as Components
 
 Kirigami.Page{
@@ -28,6 +29,28 @@ Kirigami.Page{
         property bool paletteExpanded: true
         // Editing context for palette dialog
         property int editIndex: -1
+
+        // Preview scaling controls
+        property real baseScale: 0.9
+        property int previewWidth: 800
+        property int previewHeight: 150
+        
+        property real previewScale: {
+            if (!previewCurrentConfig.width || !previewCurrentConfig.height) return baseScale;
+            var sw = (previewCurrentConfig.width / previewWidth);
+            var sh = (previewCurrentConfig.height / previewHeight);
+            return Math.min(sw, sh) * baseScale;
+        }
+        
+        onPreviewScaleChanged: if (model) model.previewScale = previewScale
+        onPreviewWidthChanged: if (model) model.previewWidth = previewWidth
+        
+        onModelChanged: {
+            if (model) {
+                model.previewScale = previewScale
+                model.previewWidth = previewWidth
+            }
+        }
 
         Component.onCompleted: {
             if (model && model.paletteNames && model.paletteNames.length > 0) paletteIndex = 0
@@ -443,22 +466,22 @@ Kirigami.Page{
                     // Preview rendering
                     Rectangle {
                         id: previewCurrentConfig
-                        Kirigami.Theme.colorSet: Kirigami.Theme.View
-                        color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
-                        border.width: 1
-                        //border.color: Kirigami.Theme.disabledTextColor // (typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
-                        radius: Kirigami.Units.smallSpacing
+                        color: "transparent"
                         Layout.fillWidth: true
-                        //Layout.preferredHeight: 50
                         Layout.fillHeight: true
-                        Text {
+                        Layout.minimumHeight: 120
+                        clip: true
+                        
+                        WebEngineView {
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.largeSpacing
-                            textFormat: Text.RichText
-                            elide: Text.ElideRight
-                            //font.pointSize: 9
-                            text: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
-                            wrapMode: Text.WordWrap
+                            backgroundColor: "transparent"
+                            
+                            property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
+                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                            Component.onCompleted: loadHtml(contentHtml, "file:///")
+                            
+                            settings.javascriptEnabled: false
+                            settings.localContentCanAccessFileUrls: true
                         }
                     }
                 
@@ -491,22 +514,22 @@ Kirigami.Page{
                     // Status preview
                     Rectangle {
                         id: previewStatus
-                        Kirigami.Theme.colorSet: Kirigami.Theme.View
-                        color: (typeof Kirigami.Theme.backgroundColor !== 'undefined') ? Kirigami.Theme.backgroundColor : "transparent"
-                        border.width: 1
-                        //border.color: Kirigami.Theme.disabledTextColor //(typeof Kirigami.Theme.primaryColor !== 'undefined') ? Kirigami.Theme.primaryColor : "transparent"
-                        radius: Kirigami.Units.smallSpacing
+                        color: "transparent"
                         Layout.fillWidth: true
-                        //Layout.preferredHeight: 50
                         Layout.fillHeight: true
-                        Text {
+                        Layout.minimumHeight: 120
+                        clip: true
+                        
+                        WebEngineView {
                             anchors.fill: parent
-                            anchors.margins: Kirigami.Units.largeSpacing
-                            textFormat: Text.RichText
-                            elide: Text.ElideRight
-                            //font.pointSize: 9
-                            text: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
-                            wrapMode: Text.WordWrap
+                            backgroundColor: "transparent"
+                            
+                            property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
+                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                            Component.onCompleted: loadHtml(contentHtml, "file:///")
+                            
+                            settings.javascriptEnabled: false
+                            settings.localContentCanAccessFileUrls: true
                         }
                     }
                 }

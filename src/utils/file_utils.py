@@ -286,65 +286,42 @@ def read_starship_config(path: str | Path | None = None) -> tuple[str, str]:
         if not isinstance(config_data, dict):
             return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
 
+        def clean_val(v: object) -> Any:
+            """Recursively clean TOML values for JSON serialization."""
+            if isinstance(v, dict):
+                return {str(ki): clean_val(vi) for ki, vi in v.items()}
+            if isinstance(v, list):
+                return [clean_val(vi) for vi in v]
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                return v
+            try:
+                # tomlkit items often have unwrap() or can be stringified
+                if hasattr(v, "unwrap"):
+                    unwrapped: Any = v.unwrap()
+                    if isinstance(unwrapped, (dict, list, str, int, float, bool)) or unwrapped is None:
+                        return clean_val(unwrapped)
+                return str(v)
+            except Exception:
+                return None
+
         # Build simplified output: include config_path, palettes, top-level format/palette and a small preview mapping
         out: dict[str, Any] = {"config_path": display_path, "palettes": {}, "preview": {}, "format": None, "palette": None}
 
-        palettes = config_data.get("palettes")
-        if isinstance(palettes, dict):
-            for pname, pval in palettes.items():
-                # include only dict-like palettes (e.g. 'colors')
-                if isinstance(pval, dict):
-                    cleaned: dict[str, Any] = {}
-                    for k, v in pval.items():
-                        if isinstance(v, (str, int, float, bool)) or v is None:
-                            cleaned[k] = v
-                        else:
-                            try:
-                                cleaned[k] = str(v)
-                            except Exception:
-                                cleaned[k] = None
-                    out["palettes"][pname] = cleaned
-
-            # Collect all top-level keys that might be modules (everything except palettes)
-            # We flatten this into the root of the output so StarshipRenderer can find them easily.
-            # We still clean values to ensure JSON serializability.
-            
-            ignored_keys = {"palettes"} # handled above
-            
-            for key, val in config_data.items():
-                if key in ignored_keys:
-                    continue
-                    
-                # If it's a table/dict (module config)
-                if isinstance(val, dict):
-                    cleaned_mod: dict[str, Any] = {}
-                    for k, v in val.items():
-                        try:
-                            # Basic types or stringify
-                            if isinstance(v, (str, int, float, bool)) or v is None:
-                                cleaned_mod[k] = v
-                            else:
-                                cleaned_mod[k] = str(v)
-                        except Exception:
-                             pass
-                    out[key] = cleaned_mod
-                    
-                # If it's a simple value (like 'format' or 'palette' string)
-                elif isinstance(val, (str, int, float, bool)) or val is None:
-                    out[key] = val
-                else:
-                    # Fallback stringify
-                    try:
-                        out[key] = str(val)
-                    except Exception:
-                        pass
+        # Use the recursive cleaner for everything
+        for key, val in config_data.items():
+            out[key] = clean_val(val)
 
         try:
             json_str = json.dumps(out, ensure_ascii=False, indent=2)
         except Exception:
+            # Fallback to a very minimal structure if everything fails
             json_str = json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2)
 
         return json_str, display_path
+
+    except Exception:
+        logger.exception("Failed to read %s", cfg_path)
+        return json.dumps({"config_path": display_path, "palettes": {}}, ensure_ascii=False, indent=2), display_path
 
     except Exception:
         logger.exception("Failed to read %s", cfg_path)

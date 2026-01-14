@@ -21,6 +21,8 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QImage
 
+from ..utils import starship_preview_gemini
+
 # Logger
 logger = logging.getLogger(__name__)
 
@@ -534,6 +536,8 @@ class StarshipModel(QObject):
     paletteKeysChanged = Signal()
     previewChanged = Signal()
     currentConfigPreviewChanged = Signal()
+    previewScaleChanged = Signal()
+    previewWidthChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -551,6 +555,8 @@ class StarshipModel(QObject):
         self._preview_html: str = ""
         self._current_config_preview_html: str = ""
         self._full_config_data: dict[str, Any] = {}
+        self._preview_scale: float = 1.0
+        self._preview_width: int = 800
 
     def _get_config_path(self) -> str:
         return self._config_path
@@ -585,6 +591,26 @@ class StarshipModel(QObject):
     def _get_current_config_preview_html(self) -> str:
         return str(self._current_config_preview_html)
 
+    def _get_preview_scale(self) -> float:
+        return self._preview_scale
+
+    def _set_preview_scale(self, val: float) -> None:
+        if self._preview_scale != val:
+            self._preview_scale = float(val)
+            self._regenerate_preview()
+            self.reloadCurrentConfigPreview()
+            self.previewScaleChanged.emit()
+
+    def _get_preview_width(self) -> int:
+        return self._preview_width
+
+    def _set_preview_width(self, val: int) -> None:
+        if self._preview_width != val:
+            self._preview_width = int(val)
+            self._regenerate_preview()
+            self.reloadCurrentConfigPreview()
+            self.previewWidthChanged.emit()
+
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
     paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
@@ -592,12 +618,14 @@ class StarshipModel(QObject):
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
     previewHtml = Property(str, _get_preview_html, notify=previewChanged)
     currentConfigPreviewHtml = Property(str, _get_current_config_preview_html, notify=currentConfigPreviewChanged)
+    previewScale = Property(float, _get_preview_scale, _set_preview_scale, notify=previewScaleChanged)
+    previewWidth = Property(int, _get_preview_width, _set_preview_width, notify=previewWidthChanged)
 
     @Slot()
     def reloadCurrentConfigPreview(self) -> None:
         """Reads the actual config file from disk and updates currentConfigPreviewHtml."""
         try:
-            from ..utils import file_utils, starship_preview
+            from ..utils import file_utils
             import json
             
             # Read from the configured active path (usually ~/.config/starship.toml)
@@ -609,7 +637,7 @@ class StarshipModel(QObject):
 
             json_str, _ = file_utils.read_starship_config(self._config_path)
             data = json.loads(json_str)
-            html = starship_preview.generate_preview_html(data)
+            html = starship_preview_gemini.generate_preview_html(data, None, self._preview_scale, self._preview_width)
             
             if self._current_config_preview_html != html:
                 self._current_config_preview_html = html
@@ -638,7 +666,7 @@ class StarshipModel(QObject):
     def _regenerate_preview(self, palette_index: int | None = None) -> None:
         """Build a minimal data structure from current palette arrays and regenerate preview HTML."""
         try:
-            from ..utils import starship_preview
+            from ..utils import starship_preview_gemini
 
             # Start with full config data to preserve format, modules, etc.
             out = self._full_config_data.copy() if self._full_config_data else {}
@@ -659,7 +687,7 @@ class StarshipModel(QObject):
                 out["palettes"][name] = mapping
             
             # Generate preview using our internal generator
-            self._preview_html = starship_preview.generate_preview_html(out, palette_index)
+            self._preview_html = starship_preview_gemini.generate_preview_html(out, palette_index, self._preview_scale, self._preview_width)
             self.previewChanged.emit()
         except Exception:
             logger.exception("Failed regenerating preview")
