@@ -13,12 +13,13 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional, cast, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from ..models.models import PaletteData
 from PIL import Image, ImageColor
 from PySide6.QtGui import QColor
 
-from ..models.models import PaletteData
 from .file_utils import check_binary
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,7 @@ def _extract_pywal16(path: Path, **kwargs) -> PaletteData:
     
     # Try with 'wal' backend first
     try:
+        from ..models.models import PaletteData
         data = pywal_colors.get(
             str(path), 
             light=light_mode,
@@ -240,6 +242,7 @@ def _extract_material_you_kwal(path: Path, **kwargs) -> PaletteData:
     Preserves image color variety by using ranked colors directly,
     with scheme-specific adjustments for colorfulness.
     """
+    from ..models.models import PaletteData
     try:
         from materialyoucolor.quantize import QuantizeCelebi
         from materialyoucolor.score.score import Score, ScoreOptions
@@ -496,6 +499,7 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     Standard Material You implementation following Google's specification.
     Uses only primary/secondary/tertiary palettes from a single seed color.
     """
+    from ..models.models import PaletteData
     try:
         from materialyoucolor.quantize import QuantizeCelebi
         from materialyoucolor.score.score import Score, ScoreOptions
@@ -673,6 +677,7 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     )
 
 def _extract_imagemagick(path: Path) -> PaletteData:
+    from ..models.models import PaletteData
     im_exe = shutil.which("magick") or shutil.which("convert")
     if not im_exe:
         raise OSError("ImageMagick not found")

@@ -4,11 +4,18 @@ import sys
 import logging
 from datetime import datetime
 import tomlkit
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
+from .color_utils import parse_css_color, format_css_color
 
 logger = logging.getLogger(__name__)
 
 class StarshipRenderer:
+    STANDARD_COLORS = {
+        "black": "#000000", "red": "#cc241d", "green": "#98971a", "yellow": "#d79921",
+        "blue": "#458588", "purple": "#b16286", "cyan": "#689d6a", "white": "#a89984",
+        "orange": "#fe8019", "gray": "#928374", "grey": "#928374"
+    }
+
     def __init__(self, toml_content: str, palette_index: int | None = None, scale: float = 1.0, width: int = 800):
         # Accept either a parsed dict (from models) or a TOML string
         if isinstance(toml_content, dict):
@@ -20,6 +27,8 @@ class StarshipRenderer:
                 self.valid = False
             else:
                 try:
+                    # Usamos tomlkit para preservar comentarios e integridad si fuera necesario,
+                    # aunque aquí solo leemos para la preview.
                     self.doc = tomlkit.parse(toml_content)
                     self.valid = True
                 except Exception as e:
@@ -31,6 +40,7 @@ class StarshipRenderer:
         self.scale = scale
         self.width = width
         self.palette_index = palette_index
+        self._active_palette = self._get_active_palette()
         
         self.runtime_context = {
             "os": "Arch",
@@ -42,6 +52,36 @@ class StarshipRenderer:
             "git_status": "",
         }
         self.whitelist_modules = {"os", "username", "directory", "python", "time", "git_branch", "git_status", "character"}
+
+    def _get_active_palette(self) -> Dict[str, Any]:
+        """Resolves the current palette to use based on index or document setting."""
+        if not self.valid:
+            return {}
+        palettes = self.doc.get("palettes", {})
+        p_name = self.doc.get("palette")
+        
+        if self.palette_index is not None:
+            names = list(palettes.keys())
+            if 0 <= self.palette_index < len(names):
+                p_name = names[self.palette_index]
+        
+        active = palettes.get(p_name, {}) if p_name else {}
+        return cast(Dict[str, Any], active)
+
+    def _resolve_color(self, color_key: str) -> str:
+        if not self.valid or not color_key:
+            return "inherit"
+
+        clean_key = str(color_key).replace("fg:", "").replace("bg:", "").strip().lower()
+        
+        # 1. Prioridad: Paleta activa del TOML > Colores ANSI estándar > Valor literal
+        val = self._active_palette.get(clean_key)
+        if val is None:
+            # Fallback a colores ANSI predefinidos (estilo Gruvbox por defecto para el preview)
+            val = self.STANDARD_COLORS.get(clean_key, clean_key)
+        
+        # 2. Formateo mediante utilidades globales (maneja hex, rgb, rgba y nombres)
+        return format_css_color(str(val).strip())
 
     def clean_final_content(self, text: str) -> str:
         """Limpia el contenido de artefactos de formato de Starship."""
@@ -248,27 +288,6 @@ class StarshipRenderer:
                 'final_content': self.clean_final_content(post)
             })
 
-    def _resolve_color(self, color_key: str) -> str:
-        if not self.valid or not color_key: return "inherit"
-        palettes = self.doc.get("palettes", {})
-        names = list(palettes.keys())
-        p_name = self.doc.get("palette")
-        
-        if self.palette_index is not None and 0 <= self.palette_index < len(names):
-            p_name = names[self.palette_index]
-        
-        palette = palettes.get(p_name, {}) if p_name else {}
-        clean_key = str(color_key).replace("fg:", "").replace("bg:", "").strip().lower()
-        
-        if clean_key in palette:
-            return str(palette[clean_key])
-            
-        standard_colors = {
-            "black": "#000000", "red": "#cc241d", "green": "#98971a", "yellow": "#d79921",
-            "blue": "#458588", "purple": "#b16286", "cyan": "#689d6a", "white": "#a89984",
-            "orange": "#fe8019", "gray": "#928374", "grey": "#928374"
-        }
-        return standard_colors.get(clean_key, clean_key)
 
     def render(self) -> str:
         if not self.valid:
