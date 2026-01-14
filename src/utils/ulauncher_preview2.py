@@ -46,6 +46,7 @@ class UlauncherRendererV2:
         self.manifest = manifest or {}
         self.css_content = css_content or ""
         self.layout = self.LAYOUT_DEFAULTS.copy()
+        self._resolving_stack: set[str] = set()  # Track recursion to prevent cycles
         
         if window_width is not None:
              self.layout["window_width"] = window_width
@@ -134,15 +135,24 @@ class UlauncherRendererV2:
 
     def _get_color(self, name: str, fallback: str) -> str:
         """Get color from live overrides, then CSS variables, then fallback. Handles alpha/darker."""
-        val = fallback
-        if name in self.live_colors:
-            raw = self.live_colors[name]
-            if raw and raw not in ["provisional_rgba_color", "provisional_hex_color", "transparent"]:
-                val = raw
-        elif name in self.variables:
-            val = self.variables[name]
-        
-        return self._resolve_value(val)
+        # Prevent infinite recursion
+        if name in self._resolving_stack:
+            logger.warning(f"Circular reference detected for color '{name}', using fallback")
+            return fallback
+            
+        self._resolving_stack.add(name)
+        try:
+            val = fallback
+            if name in self.live_colors:
+                raw = self.live_colors[name]
+                if raw and raw not in ["provisional_rgba_color", "provisional_hex_color", "transparent"]:
+                    val = raw
+            elif name in self.variables:
+                val = self.variables[name]
+            
+            return self._resolve_value(val)
+        finally:
+            self._resolving_stack.discard(name)
 
     def _hex_to_rgba(self, hex_color: str) -> tuple[int, int, int, int] | None:
         """Convert hex to (r, g, b, a)."""
@@ -174,12 +184,12 @@ class UlauncherRendererV2:
         
         val = val.strip()
         
-        # 1. Resolve @variable
+        # 1. Resolve @variable - use _get_color to respect live_colors overrides
         if val.startswith("@"):
             ref = val[1:]
-            if ref in self.variables:
-                return self._resolve_value(self.variables[ref])
-            return val
+            # Use _get_color instead of direct variable lookup to apply live_colors
+            fallback = self.variables.get(ref, val)
+            return self._get_color(ref, fallback)
 
         # 2. Handle alpha(color, opacity)
         alpha_match = re.match(r"alpha\s*\(([^,]+),\s*([^)]+)\)", val)

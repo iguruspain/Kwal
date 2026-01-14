@@ -407,7 +407,7 @@ Dialog {
                             }
 
                             Label {
-                                text: root.currentBackend === "material-you-kwal" ? qsTr("(Right click to set seed)") : ""
+                                text: root.currentBackend === "material-you-kwal" ? qsTr("(Right click gen new palette variation)") : ""
                                 font.pixelSize: parent.children[0].font.pixelSize * 0.8
                                 font.italic: true
                                 color: Kirigami.Theme.disabledTextColor
@@ -469,8 +469,8 @@ Dialog {
                                             // 1. Manual seed matches this accent, OR
                                             // 2. No manual seed and this is the auto seed (actualSeed from backend)
                                             visible: root.currentBackend === "material-you-kwal" && 
-                                                    (root.seed_color === modelData || 
-                                                     (root.seed_color === "" && root.actualSeed === modelData))
+                                                    (root.seed_color === modelData) //|| 
+                                                    //  (root.seed_color === "" && root.actualSeed === modelData))
 
                                             Rectangle {
                                                 anchors.fill: parent
@@ -536,7 +536,8 @@ Dialog {
                             Label {
                                 visible: root.currentBackend === "material-you-kwal"
                                 textFormat: Text.StyledText
-                                text: qsTr("Seed") + "<font color='" + Kirigami.Theme.positiveTextColor + "'>★</font>:"
+                                //text: qsTr("Seed") + "<font color='" + Kirigami.Theme.positiveTextColor + "'>★</font>:"
+                                text: qsTr("Seed:")
                                 Layout.leftMargin: Kirigami.Units.largeSpacing
                             }
                             Rectangle {
@@ -686,39 +687,39 @@ Dialog {
                                 }
                             }
 
-                            Label { 
-                                text: qsTr("Contrast:")
-                                visible: root.currentBackend === "material-you-kwal"
-                            }
-                            Slider {
-                                Layout.fillWidth: true
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 16
-                                from: -1.0
-                                to: 1.0
-                                value: root.contrastValue
-                                stepSize: 0.1
-                                visible: root.currentBackend === "material-you-kwal"
-                                onMoved: {
-                                    root.contrastValue = Math.round(value * 10) / 10
-                                    debounceRefresh()
-                                }
-                            }
-                            Label { 
-                                text: root.contrastValue.toFixed(1)
-                                visible: root.currentBackend === "material-you-kwal"
-                            }
-                            Button {
-                                icon.name: "edit-clear"
-                                flat: true
-                                opacity: (Math.abs(root.contrastValue - 0.0) > 0.01) ? 1.0 : 0.0
-                                enabled: (Math.abs(root.contrastValue - 0.0) > 0.01)
-                                visible: root.currentBackend === "material-you-kwal"
-                                ToolTip.text: qsTr("Reset to 0.0")
-                                onClicked: {
-                                    root.contrastValue = 0.0
-                                    triggerRefresh()
-                                }
-                            }
+                            // Label { 
+                            //     text: qsTr("Contrast:")
+                            //     visible: root.currentBackend === "material-you-kwal"
+                            // }
+                            // Slider {
+                            //     Layout.fillWidth: true
+                            //     Layout.preferredWidth: Kirigami.Units.gridUnit * 16
+                            //     from: -1.0
+                            //     to: 1.0
+                            //     value: root.contrastValue
+                            //     stepSize: 0.1
+                            //     visible: root.currentBackend === "material-you-kwal"
+                            //     onMoved: {
+                            //         root.contrastValue = Math.round(value * 10) / 10
+                            //         debounceRefresh()
+                            //     }
+                            // }
+                            // Label { 
+                            //     text: root.contrastValue.toFixed(1)
+                            //     visible: root.currentBackend === "material-you-kwal"
+                            // }
+                            // Button {
+                            //     icon.name: "edit-clear"
+                            //     flat: true
+                            //     opacity: (Math.abs(root.contrastValue - 0.0) > 0.01) ? 1.0 : 0.0
+                            //     enabled: (Math.abs(root.contrastValue - 0.0) > 0.01)
+                            //     visible: root.currentBackend === "material-you-kwal"
+                            //     ToolTip.text: qsTr("Reset to 0.0")
+                            //     onClicked: {
+                            //         root.contrastValue = 0.0
+                            //         triggerRefresh()
+                            //     }
+                            // }
                         }
                     }
                 }
