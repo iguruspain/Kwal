@@ -33,7 +33,7 @@ Kirigami.Page{
         // Preview scaling controls
         property real baseScale: 0.9
         property int previewWidth: 800
-        property int previewHeight: 150
+        property int previewHeight: 200
         
         property real previewScale: {
             if (!previewCurrentConfig.width || !previewCurrentConfig.height) return baseScale;
@@ -472,7 +472,7 @@ Kirigami.Page{
                         color: "transparent"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 120
+                        Layout.minimumHeight: 200
                         clip: true
                         
                         WebEngineView {
@@ -520,7 +520,7 @@ Kirigami.Page{
                         color: "transparent"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 120
+                        Layout.minimumHeight: 200
                         clip: true
                         
                         WebEngineView {

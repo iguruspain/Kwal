@@ -340,20 +340,40 @@ class StarshipRenderer:
         return self._wrap("".join(html_segments))
 
     def _wrap(self, inner_html: str) -> str:
+        shadow_blur = 40
+        shadow_y = 20
         return f"""
         <html>
         <head>
             <style>
-                body {{ background: transparent; margin: 0; padding: 10px; font-family: 'CaskaydiaCove Nerd Font', monospace; overflow: hidden; }}
-                .scaler {{ transform: scale({self.scale}); transform-origin: top left; display: inline-block; }}
+                body {{
+                    background: transparent;
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-start;
+                    width: 100vw;
+                    overflow: hidden;
+                    font-family: 'CaskaydiaCove Nerd Font', monospace;
+                }}
+                body::-webkit-scrollbar {{ display: none; }}
+                .scaler {{
+                    padding: {shadow_blur}px; 
+                    transform: scale({self.scale});
+                    transform-origin: top center;
+                    display: inline-block;
+                    }}
                 .terminal {{
                     display: inline-block;
+                    width: {self.width}px;
                     background: #181818;
                     border: 1px solid #303030;
                     border-radius: 8px;
                     padding: 15px 20px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    box-shadow: 0 {shadow_y}px {shadow_blur}px rgba(0,0,0,0.8);
                     white-space: nowrap;
+                    overflow: hidden;
                 }}
                 .prompt-line {{ display: flex; align-items: stretch; height: 32px; line-height: 32px; }}
                 span {{ display: flex; align-items: center; justify-content: center; height: 100%; }}
