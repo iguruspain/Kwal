@@ -165,10 +165,13 @@ Kirigami.Page {
             color: Kirigami.Theme.backgroundColor
             Layout.preferredWidth: 250
             Layout.fillHeight: true
+            radius: Kirigami.Units.largeSpacing
+            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.width: 1
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
+                anchors.margins: Kirigami.Units.largeSpacing
                 spacing: Kirigami.Units.smallSpacing
 
                 Label { text: qsTr("Settings"); font.bold: true; Layout.fillWidth: true }
@@ -440,7 +443,7 @@ Kirigami.Page {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
+                anchors.margins: Kirigami.Units.largeSpacing
                 spacing: Kirigami.Units.smallSpacing
 
                 Label { text: qsTr("Current Theme:"); font.bold: true }

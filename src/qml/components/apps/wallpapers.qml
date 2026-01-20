@@ -29,6 +29,9 @@ Kirigami.Page {
             // Collapsible logic
             Layout.preferredWidth: wallpaperPage.sidePaneOpen ? 250 : 0
             Layout.fillHeight: true
+            radius: Kirigami.Units.largeSpacing
+            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.width: 1
             
             visible: Layout.preferredWidth > 0
             opacity: wallpaperPage.sidePaneOpen ? 1 : 0
@@ -39,7 +42,7 @@ Kirigami.Page {
        
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
+                anchors.margins: Kirigami.Units.largeSpacing
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -87,7 +90,7 @@ Kirigami.Page {
                         Rectangle {
                             anchors.fill: parent
                             color: "transparent"
-                            border.color: isHovered ? Kirigami.Theme.focusColor : (isSelected ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.1))
+                            border.color: isHovered ? Kirigami.Theme.focusColor : (isSelected ? Kirigami.Theme.highlightColor : Kirigami.Theme.alternateBackgroundColor)
                             border.width: isSelected ? 3 : 1
                             radius: Kirigami.Units.smallSpacing
                             visible: card.isSelected || card.isHovered
@@ -156,7 +159,7 @@ Kirigami.Page {
                 }
             }
         }
-        // --- Right Pane: Previews ---
+        // --- Right Pane: Thumbnails ---
         Rectangle {
             id: rightPaneWallpapers
             color: "transparent"

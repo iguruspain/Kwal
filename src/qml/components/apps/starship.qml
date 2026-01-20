@@ -156,11 +156,14 @@ Kirigami.Page{
             color: Kirigami.Theme.backgroundColor
             Layout.preferredWidth: 250
             Layout.fillHeight: true
+            radius: Kirigami.Units.largeSpacing
+            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.width: 1
 
             ColumnLayout {
                 id: leftColumn
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
+                anchors.margins: Kirigami.Units.largeSpacing
                 spacing: Kirigami.Units.smallSpacing
 
                 Label {
@@ -446,7 +449,7 @@ Kirigami.Page{
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
+                anchors.margins: Kirigami.Units.largeSpacing
                 spacing: Kirigami.Units.largeSpacing
                 
                 // Top: Current Config Preview

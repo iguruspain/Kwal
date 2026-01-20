@@ -94,3 +94,6 @@ backups/
 
 #TODO files
 *.todo
+
+#Setup env for development
+setup_dev_env.sh
