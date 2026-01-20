@@ -307,23 +307,27 @@ Kirigami.Page{
 
                 MenuSeparator { Layout.fillWidth: true }
 
-                ScrollView {
+                ScrollView{
                     id: paletteScroll
                     Layout.fillWidth: true
-                    Layout.fillHeight: true 
+                    Layout.fillHeight: true
                     clip: true
 
                     ColumnLayout {
+                        Layout.fillWidth: true
                         width: paletteScroll.availableWidth
+                        spacing: Kirigami.Units.largeSpacing
 
                         RowLayout {
+                            id: paletteHeader
                             Layout.fillWidth: true
                             Label {
-                                text: qsTr("Palette: " + (starshipModelProxy.paletteIndex >= 0 ? starshipModelProxy.paletteNames[starshipModelProxy.paletteIndex] : ""))
+                                text: (starshipModelProxy.paletteIndex >= 0 ? starshipModelProxy.paletteNames[starshipModelProxy.paletteIndex] : "")
                                 font.bold: true
                             }
                             Item { Layout.fillWidth: true }
                             ToolButton {
+                                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                 icon.name: starshipModelProxy.paletteExpanded ? "arrow-down" : "arrow-right"
                                 onClicked: starshipModelProxy.paletteExpanded = !starshipModelProxy.paletteExpanded
                                 ToolTip.text: starshipModelProxy.paletteExpanded ? qsTr("Collapse palettes") : qsTr("Expand palettes")
@@ -332,13 +336,12 @@ Kirigami.Page{
                             }
                         }
                         MenuSeparator { Layout.fillWidth: true }
-
                         ColumnLayout {
                             id: paletteContent
+                            width: parent.width
                             visible: starshipModelProxy.paletteExpanded
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
-
+                            spacing: Kirigami.Units.largeSpacing
+                            
                             Repeater {
                                 id: paletteColorRepeater
                                 model: (starshipModelProxy.paletteIndex >= 0) ? starshipModelProxy.paletteValues[starshipModelProxy.paletteIndex] : []
@@ -350,28 +353,20 @@ Kirigami.Page{
                                         id: colorNameLabel
                                         text: safePaletteKey(starshipModelProxy, index)
                                         Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-                                        // Layout.maximumWidth: 120
+                                        Layout.fillWidth: true
                                         elide: Text.ElideRight
                                     }
-
-                                    Item { Layout.fillWidth: true }
 
                                     Rectangle {
                                         id: colorValuePreview
                                         width: Kirigami.Units.gridUnit * 1.5
                                         height: Kirigami.Units.gridUnit * 1.5
                                         radius: Kirigami.Units.smallSpacing
-                                        color: modelData || "transparent"
+                                        color: controller ? controller.normalizeColor(modelData) : (modelData || "transparent")
                                         border.width: 1
                                         border.color: Kirigami.Theme.disabledTextColor
-                                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                         
-                                        ToolTip.text: {
-                                            if (!controller) return qsTr("Pick color")
-                                            var t = controller.formatColorWithAlpha(colorValuePreview.color)
-                                            return t && t !== "" ? t : qsTr("Pick color")
-                                        }
-                                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                                        ToolTip.text: controller ? (controller.formatColorWithAlpha(colorValuePreview.color)) : ""
                                         ToolTip.visible: colorPreviewMouse.containsMouse
 
                                         MouseArea {
@@ -393,8 +388,7 @@ Kirigami.Page{
                                     Button {
                                         id: paletteColorButton
                                         icon.name: "color-picker"
-                                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                                        ToolTip.text: qsTr("Open color palette")
+                                        ToolTip.text: qsTr("Pick from palette")
                                         ToolTip.visible: hovered
                                         onClicked: {
                                             starshipModelProxy.editIndex = index
@@ -405,8 +399,9 @@ Kirigami.Page{
                                     }
                                 }
                             }
+
                         }
-                    }
+                    }             
                 }
 
                 MenuSeparator { Layout.fillWidth: true }
