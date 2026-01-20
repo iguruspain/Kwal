@@ -93,7 +93,7 @@ Kirigami.Page {
         Rectangle {
             id: leftPaneFastfetch
             color: Kirigami.Theme.backgroundColor
-            Layout.preferredWidth: 250
+            Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
             border.color: Kirigami.Theme.alternateBackgroundColor
@@ -282,7 +282,7 @@ Kirigami.Page {
                         id: paletteColorButton
                         icon.name: "color-picker"
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        ToolTip.text: qsTr("Open color palette")
+                        ToolTip.text: qsTr("Pick from palette")
                         ToolTip.visible: hovered
                         onClicked: {
                             // Identify current image being previewed
@@ -306,7 +306,7 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     Button {
                         id: applyTintedButton
-                        text: qsTr("Apply tinted")
+                        text: qsTr("Apply Tinted")
                         Layout.fillWidth: true
                         ToolTip.text: qsTr("Apply the tinted image to fastfetch config")
                         ToolTip.visible: hovered
@@ -334,7 +334,7 @@ Kirigami.Page {
                     }
                     Button {
                         id: restoreBackupButton
-                        text: qsTr("Restore backup")
+                        text: qsTr("Restore Backup")
                         Layout.fillWidth: true
                         enabled: controller && controller.hasFastfetchBackup
                         ToolTip.text: (controller && controller.hasFastfetchBackup) ? qsTr("Restore the fastfetch config from the last backup") : qsTr("No backup available to restore")

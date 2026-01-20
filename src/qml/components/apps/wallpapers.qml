@@ -21,13 +21,13 @@ Kirigami.Page {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
-        // --- Left Pane: Controls ---
+        // Left Pane
         Rectangle {
             id: leftPaneWallpapers
             color: Kirigami.Theme.backgroundColor
             
             // Collapsible logic
-            Layout.preferredWidth: wallpaperPage.sidePaneOpen ? 250 : 0
+            Layout.preferredWidth: wallpaperPage.sidePaneOpen ? 300 : 0
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
             border.color: Kirigami.Theme.alternateBackgroundColor
@@ -133,6 +133,7 @@ Kirigami.Page {
                                         }
                                         color: Kirigami.Theme.disabledTextColor
                                         font.pixelSize: Kirigami.Units.smallSpacing * 3
+                                        elide: Text.ElideLeft
                                     }
                                 }
 
@@ -152,14 +153,14 @@ Kirigami.Page {
                                     ToolTip.text: qsTr("Remove this folder")
                                     ToolTip.visible: hovered
                                     ToolTip.delay: Kirigami.Units.toolTipDelay
-                                }
+                                } 
                             }
                         }
                     }
                 }
             }
         }
-        // --- Right Pane: Thumbnails ---
+        // Right Pane
         Rectangle {
             id: rightPaneWallpapers
             color: "transparent"
@@ -184,7 +185,7 @@ Kirigami.Page {
                 // Header Info
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                    //Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                     
                     ToolButton {
                         icon.name: "view-list-details" 

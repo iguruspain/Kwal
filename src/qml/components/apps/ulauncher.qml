@@ -163,7 +163,7 @@ Kirigami.Page {
         // --- Left Pane ---
         Rectangle {
             color: Kirigami.Theme.backgroundColor
-            Layout.preferredWidth: 250
+            Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
             border.color: Kirigami.Theme.alternateBackgroundColor
@@ -311,12 +311,14 @@ Kirigami.Page {
 
                 // Palette Section
                 ScrollView {
+                    id: paletteScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true 
                     clip: true
 
                     ColumnLayout {
-                        width: parent.width
+                        Layout.fillWidth: true
+                        width: paletteScroll.availableWidth
                         spacing: Kirigami.Units.largeSpacing
 
                         // Iterate over Palette Sections (e.g. "manifest", "theme")
@@ -350,7 +352,7 @@ Kirigami.Page {
                                             text: ulauncherPage.safePaletteKey(ulauncherModelProxy, sectionIndex, index)
                                             Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                                             Layout.fillWidth: true
-                                            elide: Text.ElideMiddle
+                                            elide: Text.ElideRight
                                         }
 
                                         Rectangle {

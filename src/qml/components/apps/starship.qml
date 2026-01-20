@@ -154,7 +154,7 @@ Kirigami.Page{
         Rectangle {
             id: leftPaneStarship
             color: Kirigami.Theme.backgroundColor
-            Layout.preferredWidth: 250
+            Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
             border.color: Kirigami.Theme.alternateBackgroundColor
