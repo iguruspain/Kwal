@@ -12,7 +12,7 @@ Kirigami.Page{
     background: Rectangle {
         color: "transparent"
     }
-    // Proxy to Python Starship model exposed by Controller (pyController.starshipModel)
+    // Proxy to Python Starship model exposed by Controller (controller.starshipModel)
     Item {
         id: starshipModelProxy
         // Underlying Python QObject
@@ -71,7 +71,7 @@ Kirigami.Page{
     }
 
     // Controller helper like in fastfetch.qml
-    readonly property var controller: (typeof pyController !== "undefined") ? pyController : null
+
 
     // Utility: return a safe palette key string or empty string to avoid assigning undefined to QString
     function safePaletteKey(proxy, idx) {

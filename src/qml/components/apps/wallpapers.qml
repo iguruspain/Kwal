@@ -60,7 +60,7 @@ Kirigami.Page {
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 2
                         ToolTip.text: qsTr("Add a wallpapers folder")
                         ToolTip.visible: hovered
-                        onClicked: {pyController.openFolderDialog()}               
+                        onClicked: {controller.openFolderDialog()}               
                     }            
                 }
                     
@@ -83,7 +83,7 @@ Kirigami.Page {
 
                         Layout.fillWidth: true
                         // Visually indicate selection by comparing the folder path with controller.selectedFolder
-                        property bool isSelected: path === pyController.selectedFolder
+                        property bool isSelected: path === controller.selectedFolder
                         property bool isHovered: mouseArea.containsMouse
 
                         // Selection border
@@ -103,7 +103,7 @@ Kirigami.Page {
                                 id: mouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: pyController.selectFolder(index)
+                                onClicked: controller.selectFolder(index)
                                 cursorShape: Qt.PointingHandCursor
                             }
                             
@@ -126,7 +126,7 @@ Kirigami.Page {
                                         // wrapMode: Text.WordWrap
                                         text: {
                                             if (name !== "Local") {
-                                                return path.replace(pyController.homePath, "~\/")
+                                                return path.replace(controller.homePath, "~\/")
                                             } else {
                                                 return path
                                             }
@@ -147,7 +147,7 @@ Kirigami.Page {
                                     enabled: name !== "Local"
                                     onClicked: {
                                         if (!enabled) return
-                                        pyController.removeFolder(index)
+                                        controller.removeFolder(index)
                                     }
                                     hoverEnabled: true
                                     ToolTip.text: qsTr("Remove this folder")
@@ -171,9 +171,9 @@ Kirigami.Page {
             property bool drawerOpen: false
 
             Connections {
-                target: pyController
+                target: controller
                 function onSelectedWallpaperChanged() {
-                    rightPaneWallpapers.drawerOpen = (pyController.selectedWallpaper !== "")
+                    rightPaneWallpapers.drawerOpen = (controller.selectedWallpaper !== "")
                 }
             }
 
@@ -201,16 +201,16 @@ Kirigami.Page {
                     
                     ColumnLayout {
                         spacing: 0
-                        visible: pyController.selectedWallpaper !== ""
+                        visible: controller.selectedWallpaper !== ""
                         Label {
                             Layout.alignment: Qt.AlignHCenter
-                            text: pyController.selectedWallpaper ? pyController.selectedWallpaper.split("/").pop() : ""
+                            text: controller.selectedWallpaper ? controller.selectedWallpaper.split("/").pop() : ""
                             font.bold: true
                             elide: Text.ElideMiddle
                         }
                         Label {
                             Layout.alignment: Qt.AlignHCenter
-                            text: pyController.selectedWallpaperResolution
+                            text: controller.selectedWallpaperResolution
                             color: Kirigami.Theme.disabledTextColor
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                         }
@@ -248,7 +248,7 @@ Kirigami.Page {
                             required property string fileName
                             required property string thumbPath
 
-                            property bool isSelected: filePath === pyController.selectedWallpaper
+                            property bool isSelected: filePath === controller.selectedWallpaper
                             property bool isHovered: hoverHandler.hovered
 
                             Rectangle {
@@ -273,7 +273,7 @@ Kirigami.Page {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        pyController.selectWallpaper(filePath)
+                                        controller.selectWallpaper(filePath)
                                         rightPaneWallpapers.drawerOpen = true
                                     }
                                 }
@@ -304,7 +304,7 @@ Kirigami.Page {
                 width: Math.min(parent.width * 0.8, actionsRow.implicitWidth + Kirigami.Units.largeSpacing * 2)
                 height: actionsRow.implicitHeight + Kirigami.Units.largeSpacing
                 
-                property bool isOpen: rightPaneWallpapers.drawerOpen && pyController.selectedWallpaper !== "" && pyController.selectedWallpaper.length > 0
+                property bool isOpen: rightPaneWallpapers.drawerOpen && controller.selectedWallpaper !== "" && controller.selectedWallpaper.length > 0
                 
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing : parent.height
@@ -332,7 +332,7 @@ Kirigami.Page {
                         palette.buttonText: Kirigami.Theme.positiveTextColor
                         
                         onClicked: {
-                            pyController.setAsWallpaper(pyController.selectedWallpaper)
+                            controller.setAsWallpaper(controller.selectedWallpaper)
                             rightPaneWallpapers.drawerOpen = false
                         }
                     }

@@ -18,7 +18,7 @@ Kirigami.ApplicationWindow {
     // Depends on the compositing state:
     // - Enabled: Semi-transparent (80%) for modern look.
     // - Disabled: Solid Alternate Background Color for readability fallback.
-    readonly property color overlayBackgroundColor: pyController.compositingEnabled 
+    readonly property color overlayBackgroundColor: controller.compositingEnabled 
         ? Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
         : Kirigami.Theme.backgroundColor
     
@@ -39,8 +39,8 @@ Kirigami.ApplicationWindow {
                 Kirigami.Action {
                     text: qsTr("Transparency Effects")
                     checkable: true
-                    checked: pyController.compositingEnabled
-                    onToggled: pyController.toggleCompositing()
+                    checked: controller.compositingEnabled
+                    onToggled: controller.toggleCompositing()
                     icon.name: "blur-on" 
                 }
             },
@@ -63,7 +63,7 @@ Kirigami.ApplicationWindow {
         
         // The title updates dynamically based on the selected tab
         title: {
-            const item = pyController.settingsAppModel.get(tabBar.currentIndex);
+            const item = controller.settingsAppModel.get(tabBar.currentIndex);
             return item ? item.title : "Settings";
         }
 
@@ -87,7 +87,7 @@ Kirigami.ApplicationWindow {
                     background: Rectangle { color: "transparent" }
 
                     Repeater {
-                        model: pyController.settingsAppModel
+                        model: controller.settingsAppModel
                         delegate: TabButton {
                             required property string title
                             text: title
@@ -111,7 +111,7 @@ Kirigami.ApplicationWindow {
 
             // Use a Repeater to preserve page state
             Repeater {
-                model: pyController.settingsAppModel
+                model: controller.settingsAppModel
                 delegate: Loader {
                     required property string qmlpage
                     required property int index
@@ -130,12 +130,12 @@ Kirigami.ApplicationWindow {
     Dialog {
         id: templatesDialog
         title: qsTr("Install templates")
-        visible: !pyController.templatesInstalled()
+        visible: !controller.templatesInstalled()
         modal: true
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
             // call the controller slot to install templates
-            pyController.installTemplates()
+            controller.installTemplates()
             templatesDialog.visible = false
         }
         onRejected: {
@@ -148,7 +148,7 @@ Kirigami.ApplicationWindow {
     }
     // Connect passive notifications from Python Controller
     Connections {
-        target: pyController
+        target: controller
         function onNotification(message, type) {
             if (type === "error" && message !== "") {
                 root.showPassiveNotification(message, "short")
@@ -159,20 +159,20 @@ Kirigami.ApplicationWindow {
     // Generic Result Dialog (Global)
     Dialog {
         id: resultDialog
-        visible: pyController.resultDialogVisible
+        visible: controller.resultDialogVisible
         modal: true
         title: qsTr("Notification") 
         standardButtons: Dialog.Ok
-        onAccepted: pyController.resultDialogVisible = false
-        onRejected: pyController.resultDialogVisible = false
+        onAccepted: controller.resultDialogVisible = false
+        onRejected: controller.resultDialogVisible = false
         
         // Ensure close from X button also updates controller state
         onVisibleChanged: {
-            if (!visible) pyController.resultDialogVisible = false
+            if (!visible) controller.resultDialogVisible = false
         }
 
         contentItem: Label {
-            text: pyController.resultDialogText
+            text: controller.resultDialogText
             wrapMode: Text.WordWrap
             topPadding: Kirigami.Units.smallSpacing
             bottomPadding: Kirigami.Units.smallSpacing

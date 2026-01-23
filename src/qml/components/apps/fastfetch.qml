@@ -15,8 +15,8 @@ Kirigami.Page {
     property string sTintedName: ""
 
     // Controller Helper
-    // Safe access to pyController in case it's not injected yet (though it should be)
-    readonly property var controller: (typeof pyController !== "undefined") ? pyController : null
+    // Safe access to controller in case it's not injected yet (though it should be)
+
 
     background: Rectangle {
         color: "transparent"

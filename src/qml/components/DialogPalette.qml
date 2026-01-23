@@ -9,7 +9,7 @@ Dialog {
     standardButtons: Dialog.Ok | Dialog.Cancel
     
     // Properties
-    property string appSelectedWallpaper: (pyController && pyController.selectedWallpaper) ? pyController.selectedWallpaper : ""
+    property string appSelectedWallpaper: (controller && controller.selectedWallpaper) ? controller.selectedWallpaper : ""
     
     // Internal state
     property string sourceImage: "" 
@@ -29,7 +29,7 @@ Dialog {
     property string seed_color: ""
     
     // Watch for backend updates to seed
-    property string actualSeed: (pyController.currentPaletteData && pyController.currentPaletteData.seed) ? pyController.currentPaletteData.seed : ""
+    property string actualSeed: (controller.currentPaletteData && controller.currentPaletteData.seed) ? controller.currentPaletteData.seed : ""
     onActualSeedChanged: {
         // If we have an actual seed returned, and no manual override is active (or it matches),
         // we can update our local state or just use this for visualization
@@ -54,7 +54,7 @@ Dialog {
         if (sourceMode === 0) {
             // App Wallpaper Mode is default
              if (appSelectedWallpaper === "") {
-                sys = pyController.getCurrentSystemWallpaper()
+                sys = controller.getCurrentSystemWallpaper()
                 if (sys !== "") {
                     root.sourceMode = 1
                     root.sourceImage = sys
@@ -63,7 +63,7 @@ Dialog {
         } else {
             // System Wallpaper Mode
             if (sourceImage === "") {
-                sys = pyController.getCurrentSystemWallpaper()
+                sys = controller.getCurrentSystemWallpaper()
                 if (sys !== "") {
                     root.sourceImage = sys
                 }
@@ -96,7 +96,7 @@ Dialog {
                 "dark_mode": root.darkMode
              }
         }
-        pyController.generatePalette(path, currentBackend, params)
+        controller.generatePalette(path, currentBackend, params)
     }
 
     function resetParameters() {
@@ -138,17 +138,17 @@ Dialog {
     }
 
     Connections {
-        target: pyController
+        target: controller
         function onPaletteGenerationError(msg) {
             applicationWindow().showPassiveNotification("Error: " + msg)
         }
     }
 
     Connections {
-        target: pyController
+        target: controller
         function onCurrentPaletteDataChanged() {
-            var colors = (pyController.currentPaletteData && pyController.currentPaletteData.colors) ? pyController.currentPaletteData.colors : []
-            var accents = (pyController.currentPaletteData && pyController.currentPaletteData.accents) ? pyController.currentPaletteData.accents : []
+            var colors = (controller.currentPaletteData && controller.currentPaletteData.colors) ? controller.currentPaletteData.colors : []
+            var accents = (controller.currentPaletteData && controller.currentPaletteData.accents) ? controller.currentPaletteData.accents : []
             var len = colors.length
             var a_len = accents.length
             // If current selection refers to a palette index that no longer exists, clear selection
@@ -216,7 +216,7 @@ Dialog {
                             
                             if (currentIndex === 1) {
                                 // Fetch system wallpaper immediately when switching to this mode
-                                var sys = pyController.getCurrentSystemWallpaper()
+                                var sys = controller.getCurrentSystemWallpaper()
                                 if (sys !== "") root.sourceImage = sys
                             }
                         }
@@ -298,7 +298,7 @@ Dialog {
                             root.selectedIndex = -1
                             root.selectedSet = ""
                             root.resetParameters()
-                            if (pyController && pyController.clearPalette) pyController.clearPalette()
+                            if (controller && controller.clearPalette) controller.clearPalette()
                         }
                     }
 
@@ -319,7 +319,7 @@ Dialog {
                             }
                             if (!path && root.sourceMode === 1 && root.sourceImage === "") {
                                 // Try to fetch system
-                                var sys = pyController.getCurrentSystemWallpaper()
+                                var sys = controller.getCurrentSystemWallpaper()
                                 if (sys) {
                                     root.sourceImage = sys
                                     path = sys
@@ -364,7 +364,7 @@ Dialog {
                             clip: true
 
                             Repeater {
-                                model: (pyController.currentPaletteData && pyController.currentPaletteData.colors) ? pyController.currentPaletteData.colors : []
+                                model: (controller.currentPaletteData && controller.currentPaletteData.colors) ? controller.currentPaletteData.colors : []
                                 delegate: Item {
                                     width: Kirigami.Units.gridUnit * 1.5
                                     height: Kirigami.Units.gridUnit * 1.5
@@ -423,7 +423,7 @@ Dialog {
                             clip: true
 
                             Repeater {
-                                model: (pyController.currentPaletteData && pyController.currentPaletteData.accents) ? pyController.currentPaletteData.accents : []
+                                model: (controller.currentPaletteData && controller.currentPaletteData.accents) ? controller.currentPaletteData.accents : []
                                 delegate: Item {
                                     width: Kirigami.Units.gridUnit * 1.5
                                     height: Kirigami.Units.gridUnit * 1.5

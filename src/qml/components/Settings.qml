@@ -14,7 +14,7 @@ Kirigami.Page {
     
     // El título cambia dinámicamente según la pestaña seleccionada
     title: {
-        const item = pyController.settingsAppModel.get(tabBar.currentIndex);
+        const item = controller.settingsAppModel.get(tabBar.currentIndex);
         return item ? item.title : "Settings";
     }
 
@@ -38,7 +38,7 @@ Kirigami.Page {
                 background: Rectangle { color: "transparent" }
 
                 Repeater {
-                    model: pyController.settingsAppModel
+                    model: controller.settingsAppModel
                     delegate: TabButton {
                         required property string title
                         text: title
@@ -62,7 +62,7 @@ Kirigami.Page {
 
         // Implementación con Repeater para mantener el estado de las páginas
         Repeater {
-            model: pyController.settingsAppModel
+            model: controller.settingsAppModel
             delegate: Loader {
                 required property string qmlpage
                 required property int index

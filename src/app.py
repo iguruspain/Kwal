@@ -90,7 +90,7 @@ def main():
 
     # Create controller and expose to QML
     controller = Controller()
-    engine.rootContext().setContextProperty("pyController", controller)
+    engine.rootContext().setContextProperty("controller", controller)
     engine.rootContext().setContextProperty("wallpaperFolderModel", controller.wallpaperModel())
     engine.rootContext().setContextProperty("imageModel", controller.imageModel())
     # Expose Fastfetch template model directly to QML as a context property

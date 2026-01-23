@@ -53,7 +53,7 @@ Kirigami.Page {
         }
     }
 
-    readonly property var controller: (typeof pyController !== "undefined") ? pyController : null
+
 
     function safePaletteKey(proxy, sectionIdx, colorIdx) {
         if (!proxy || !proxy.paletteKeys) return "";
