@@ -97,3 +97,8 @@ backups/
 
 #Setup env for development
 setup_dev_env.sh
+
+# 
+.agent/*
+.agent/rules/*
+.agent/settings.yaml
