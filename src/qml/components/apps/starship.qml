@@ -470,16 +470,26 @@ Kirigami.Page{
                         Layout.minimumHeight: 200
                         clip: true
                         
-                        WebEngineView {
+                        Loader {
+                            id: currentConfigLoader
                             anchors.fill: parent
-                            backgroundColor: "transparent"
-                            
-                            property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
-                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
-                            Component.onCompleted: loadHtml(contentHtml, "file:///")
-                            
-                            settings.javascriptEnabled: false
-                            settings.localContentCanAccessFileUrls: true
+                            // Only load when page is visible
+                            active: starshipPage.visible
+                            sourceComponent: WebEngineView {
+                                anchors.fill: parent
+                                backgroundColor: "transparent"
+                                
+                                property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.currentConfigPreviewHtml : ""
+                                onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                                Component.onCompleted: loadHtml(contentHtml, "file:///")
+                                
+                                settings.javascriptEnabled: false
+                                settings.localContentCanAccessFileUrls: true
+                            }
+                        }
+                        BusyIndicator {
+                            anchors.centerIn: parent
+                            running: currentConfigLoader.status === Loader.Loading
                         }
                     }
                 
@@ -518,16 +528,26 @@ Kirigami.Page{
                         Layout.minimumHeight: 200
                         clip: true
                         
-                        WebEngineView {
+                        Loader {
+                            id: statusPreviewLoader
                             anchors.fill: parent
-                            backgroundColor: "transparent"
-                            
-                            property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
-                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
-                            Component.onCompleted: loadHtml(contentHtml, "file:///")
-                            
-                            settings.javascriptEnabled: false
-                            settings.localContentCanAccessFileUrls: true
+                            // Only load when page is visible
+                            active: starshipPage.visible
+                            sourceComponent: WebEngineView {
+                                anchors.fill: parent
+                                backgroundColor: "transparent"
+                                
+                                property string contentHtml: (controller && controller.starshipModel) ? controller.starshipModel.previewHtml : ""
+                                onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                                Component.onCompleted: loadHtml(contentHtml, "file:///")
+                                
+                                settings.javascriptEnabled: false
+                                settings.localContentCanAccessFileUrls: true
+                            }
+                        }
+                        BusyIndicator {
+                            anchors.centerIn: parent
+                            running: statusPreviewLoader.status === Loader.Loading
                         }
                     }
                 }

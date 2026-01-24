@@ -316,7 +316,7 @@ Kirigami.Page {
 
                 radius: Kirigami.Units.largeSpacing
                 color: root.overlayBackgroundColor
-                border.color: Kirigami.Theme.textColor
+                border.color: Kirigami.Theme.disabledTextColor
                 border.width: 1
 
                 RowLayout {

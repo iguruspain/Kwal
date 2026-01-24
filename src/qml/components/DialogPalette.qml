@@ -265,7 +265,7 @@ Dialog {
                                 x: 0 // Como alineamos a la izquierda, x siempre es 0
                                 
                                 color: "transparent"
-                                border.color: Kirigami.Theme.highlightColor
+                                border.color: Kirigami.Theme.disabledTextColor
                                 border.width: 1
                                 visible: parent.status === Image.Ready
                             }
@@ -277,6 +277,10 @@ Dialog {
                             }
                         }
                     }
+                }
+
+                Kirigami.Separator {
+                    Layout.fillWidth: true
                 }
 
                 // Extraction Controls
@@ -339,6 +343,11 @@ Dialog {
                     Item { Layout.fillWidth: true } // Spacer
                 }
 
+                Kirigami.Separator {
+                    Layout.fillWidth: true
+                    visible: root.generationActive
+                }
+
                 RowLayout {
                     id: generationGroup
                     Layout.fillWidth: true
@@ -373,8 +382,8 @@ Dialog {
                                         anchors.fill: parent
                                         anchors.margins: Kirigami.Units.smallSpacing / 2
                                         color: modelData
-                                        border.width: (root.selectedSet === "palette" && root.selectedIndex === index) ? 2 : 0
-                                        border.color: Kirigami.Theme.highlightColor
+                                        border.width: (root.selectedSet === "palette" && root.selectedIndex === index) ? 2 : 1
+                                        border.color: (root.selectedSet === "palette" && root.selectedIndex === index) ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                                         radius: 3
 
                                         MouseArea {
@@ -432,8 +441,8 @@ Dialog {
                                         anchors.fill: parent
                                         anchors.margins: Kirigami.Units.smallSpacing / 2
                                         color: modelData
-                                        border.width: (root.selectedSet === "accent" && root.selectedIndex === index) ? 2 : 0
-                                        border.color: Kirigami.Theme.highlightColor
+                                        border.width: (root.selectedSet === "accent" && root.selectedIndex === index) ? 2 : 1
+                                        border.color: (root.selectedSet === "accent" && root.selectedIndex === index) ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                                         radius: 3
                                         
                                         MouseArea {
@@ -491,6 +500,12 @@ Dialog {
                         }
                         Item { Layout.fillHeight: true }
                     }
+
+                    Kirigami.Separator {
+                        Layout.fillHeight: true
+                        visible: root.currentBackend === "material-you-kwal" || root.currentBackend === "material-you" || root.currentBackend === "pywal16"
+                    }
+
                     // Aux Controls (for Material You and pywal16)
                     ColumnLayout {
                         id: auxControls
@@ -546,7 +561,7 @@ Dialog {
                                 height: width
                                 radius: 3
                                 color: (root.seed_color !== "") ? root.seed_color : root.actualSeed
-                                border.color: Kirigami.Theme.highlightColor
+                                border.color: Kirigami.Theme.disabledTextColor
                                 border.width: 1
                                 
                                 ToolTip.visible: seedMouse.containsMouse

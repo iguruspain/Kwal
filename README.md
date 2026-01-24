@@ -1,66 +1,84 @@
+# 🎨 Kwal — KDE Wallpaper & Style Manager
 
-# Kwal — Python Application
+**Kwal** is a modern utility for KDE Plasma designed to unify your desktop aesthetics. It manages your wallpapers and automatically tints your favorite tools (Fastfetch, Starship, Ulauncher) using palettes extracted from your background or custom colors.
 
-Kwal is a small Python application that includes QML components and a
-minimal structure to start development.
+Built with **Python**, **PySide6**, and **Kirigami**, Kwal offers a native and fluid experience integrated with the KDE ecosystem.
 
-Status: work in progress.
+---
 
-Requirements
-------------
+## ✨ Main Features
 
-- Python 3.10+
+- **🖼️ Wallpaper Management**: Change your KDE Plasma wallpaper directly from the app.
+- **🌈 Palette Generation**: Automatic color extraction using modern algorithms (Material You, Color Thief).
+- **🚀 App Tinting**:
+  - **Fastfetch**: Customize your fetch logo and colors.
+  - **Starship**: Apply color themes to your terminal prompt.
+  - **Ulauncher**: Generate matching themes for your application launcher.
+- **📂 Template System**: Customize how colors are applied to each tool.
+- **✨ KDE Integration**: Native Kirigami style with support for blur effects and dark mode.
 
-Quick installation
-------------------
+---
 
-1. Create and activate a virtual environment (recommended):
+## 🚀 Installation
 
+Kwal is installed as a native user application without requiring root permissions.
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/iguruspain/kwal.git
+   cd kwal
+   ```
+
+2. **Run the installer**:
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+
+The installer will create a virtual environment, install dependencies, and add **Kwal** to your KDE application menu.
+
+---
+
+## 🛠️ Requirements
+
+- **Operating System**: Linux (Optimized for KDE Plasma).
+- **Python**: 3.10 or higher.
+- **System Dependencies**: `python3-pip`, `python3-venv`, `qdbus`.
+- **Optional**: Fastfetch, Starship, or Ulauncher installed to use tinting features.
+
+---
+
+## 📖 Usage
+
+Once installed, you can find **Kwal** in your application launcher (KRunner, Kickoff, etc.).
+
+When launching the application for the first time, it will automatically install the necessary templates to your configuration directory: `~/.config/kwal/templates`. You can edit these files to customize the tinting results.
+
+### Terminal Commands
+If you prefer using the terminal (within the virtual environment):
+- `kwal`: Launches the graphical interface.
+- `kwal --install-templates`: Forces the re-installation of original templates.
+
+---
+
+## 🗑️ Uninstallation
+
+To completely remove the application and its shortcuts from your system:
 ```bash
-python -m venv --system-site-packages .venv
-source .venv/bin/activate
+chmod +x uninstall.sh
+./uninstall.sh
 ```
 
-2. Install dependencies (if a `requirements.txt` is provided):
+---
 
-```bash
-pip install -r requirements.txt
-```
+## 👨‍💻 Development
 
-3. Install app (dev):
-```bash
-pip install -e.
-```
+If you wish to contribute or test changes:
+1. Create a virtual environment: `python -m venv .venv`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Install in editable mode: `pip install -e .`
+4. Run with: `python src/app.py`
 
-Running the application
------------------------
+---
 
-```bash
-python src/app.py
-```
-
-Notes
------
-
-- The project includes QML files under `src/qml/` and may require system
-  packages to run QML-based UIs (Qt, PySide6, Kirigami runtime, etc.).
-- Add a `requirements.txt` if you want to pin Python dependencies.
-
-Contributing
-------------
-
-Please open issues or pull requests with improvements or fixes.
-
-This application uses Kirigami for the UI and Python for business logic.
-
-Project layout
---------------
-
-- `src/`: Main source code
-  - `app.py`: Application entry point
-  - `qml/`: QML files for the user interface
-    - `main.qml`: Main window layout
-  - `controllers/`: Controllers bridging Python and QML
-  - `models/`: Data models and business logic
-- `resources/`: Assets such as images, icons, and templates
-- `README.md`: This file
+*Developed with ❤️ for the KDE community.*

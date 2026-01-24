@@ -299,26 +299,7 @@ Kirigami.Page {
 
                 }
 
-                Label {
-                    text: qsTr("New Theme Name")
-                    visible: {
-                        if (!controller || !controller.ulauncherTemplateModel || templateCombo.currentIndex <= 0) return false;
-                        var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
-                        return !!(info && info.isTemplate);
-                    }
-                }
-                TextField {
-                    id: newThemeNameInput
-                    Layout.fillWidth: true
-                    placeholderText: qsTr("Enter name for the new theme...")
-                    visible: {
-                        if (!controller || !controller.ulauncherTemplateModel || templateCombo.currentIndex <= 0) return false;
-                        var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
-                        return !!(info && info.isTemplate);
-                    }
-                    text: controller ? controller.ulauncherNewThemeName : ""
-                    onTextChanged: if(controller) controller.ulauncherNewThemeName = text
-                }
+
 
                 MenuSeparator { Layout.fillWidth: true }
 
@@ -507,20 +488,30 @@ Kirigami.Page {
                     Layout.alignment: Qt.AlignHCenter
                     clip: true
                     
-                    WebEngineView {
-                        id: currentView
+                    Loader {
+                        id: currentViewLoader
                         anchors.fill: parent
-                        backgroundColor: "transparent"
-                        
-                        property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.currentConfigPreviewHtml : ""
-                        onContentHtmlChanged: loadHtml(contentHtml, "file:///")
-                        Component.onCompleted: loadHtml(contentHtml, "file:///")
+                        // Only load when page is visible
+                        active: ulauncherPage.visible
+                        sourceComponent: WebEngineView {
+                            id: currentView
+                            anchors.fill: parent
+                            backgroundColor: "transparent"
+                            
+                            property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.currentConfigPreviewHtml : ""
+                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                            Component.onCompleted: loadHtml(contentHtml, "file:///")
 
-                        // Disable interactions to make it feel like a preview
-                        settings.javascriptEnabled: false
-                        settings.scrollAnimatorEnabled: false
-                        settings.localContentCanAccessFileUrls: true
-                        settings.allowRunningInsecureContent: true
+                            // Disable interactions to make it feel like a preview
+                            settings.javascriptEnabled: false
+                            settings.scrollAnimatorEnabled: false
+                            settings.localContentCanAccessFileUrls: true
+                            settings.allowRunningInsecureContent: true
+                        }
+                    }
+                    BusyIndicator {
+                        anchors.centerIn: parent
+                        running: currentViewLoader.status === Loader.Loading
                     }
                 }
 
@@ -540,18 +531,28 @@ Kirigami.Page {
                     Layout.alignment: Qt.AlignHCenter
                     clip: true
                     
-                    WebEngineView {
-                        id: liveView
+                    Loader {
+                        id: liveViewLoader
                         anchors.fill: parent
-                        backgroundColor: "transparent"
-                        
-                        property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.previewHtml : ""
-                        onContentHtmlChanged: loadHtml(contentHtml, "file:///")
-                        Component.onCompleted: loadHtml(contentHtml, "file:///")
+                        // Only load when page is visible
+                        active: ulauncherPage.visible
+                        sourceComponent: WebEngineView {
+                            id: liveView
+                            anchors.fill: parent
+                            backgroundColor: "transparent"
+                            
+                            property string contentHtml: (controller && controller.ulauncherModel) ? controller.ulauncherModel.previewHtml : ""
+                            onContentHtmlChanged: loadHtml(contentHtml, "file:///")
+                            Component.onCompleted: loadHtml(contentHtml, "file:///")
 
-                        settings.javascriptEnabled: false
-                        settings.localContentCanAccessFileUrls: true
-                        settings.allowRunningInsecureContent: true
+                            settings.javascriptEnabled: false
+                            settings.localContentCanAccessFileUrls: true
+                            settings.allowRunningInsecureContent: true
+                        }
+                    }
+                    BusyIndicator {
+                        anchors.centerIn: parent
+                        running: liveViewLoader.status === Loader.Loading
                     }
                 }
             }

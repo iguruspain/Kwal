@@ -1,0 +1,40 @@
+# Maintainer: Your Name <your-email@example.com>
+pkgname=kwal-git
+pkgver=0.1
+pkgrel=1
+pkgdesc="Kwal — modern wallpaper manager for KDE Plasma (Kirigami + Python)"
+arch=('any')
+url="https://github.com/iguruspain/kwal"
+license=('GPL3')
+groups=('kde-apps')
+depends=(
+    'python-pyside6'
+    'python-pillow'
+    'python-tomlkit'
+    'python-cssutils'
+    'python-json5'
+    'python-materialyoucolor'
+    'python-pywal16'
+    'python-modern-colorthief'
+    'qt6-webengine'
+    'kirigami'
+)
+makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+provides=('kwal')
+conflicts=('kwal')
+source=("git+https://github.com/iguruspain/kwal.git")
+sha256sums=('SKIP')
+
+build() {
+    cd "${srcdir}/kwal"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "${srcdir}/kwal"
+    python -m installer --destdir="${pkgdir}" dist/*.whl
+
+    # Desktop entry and icons are usually handled by setuptools data-files/package-data
+    # but some AUR maintainers prefer manual installation to ensure system paths.
+    # The pyproject.toml already handles share/applications and share/icons.
+}

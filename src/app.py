@@ -39,15 +39,41 @@ def main():
     """
     args = _parse_args()
 
-    if getattr(args, "install_templates", False):
-        try:
-            from .utils.template_installer import install_templates_to_user
-
-            install_templates_to_user()
-            return 0
-        except Exception as exc:  # pragma: no cover - IO/system errors
-            print(f"Failed to install templates: {exc}")
+    # Auto-install templates if missing (First Run) or explicitly requested
+    force_install = getattr(args, "install_templates", False)
+    should_exit = False
+    
+    try:
+        from .utils.template_installer import install_templates_to_user
+        from pathlib import Path
+        
+        config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        tpl_dir = config_home / "kwal" / "templates"
+        
+        # Check if we need to install:
+        # 1. Explicit request (--install-templates) -> Force overwrite
+        # 2. Templates dir missing or empty -> Safe install (no overwrite)
+        
+        if force_install:
+             print("Installing templates (forced)...")
+             install_templates_to_user(force=True)
+             should_exit = True
+        elif not tpl_dir.exists() or not any(tpl_dir.iterdir()):
+             # Silent auto-install
+             install_templates_to_user(force=False)
+             
+    except Exception as exc:
+        # Don't crash the app for this on auto-run, just warn
+        msg = f"Failed to check/install templates: {exc}"
+        if force_install:
+            print(msg)
             return 1
+        else:
+            # We can't use logger yet as it's not configured
+            print(f"Warning: {msg}", file=sys.stderr)
+
+    if should_exit:
+        return 0
 
     # Determine log level: CLI arg > env var > INFO
     level_name = args.log_level or os.environ.get("LOG_LEVEL") or "INFO"
@@ -58,6 +84,12 @@ def main():
     logging.basicConfig(level=level)
     logger = logging.getLogger(__name__)
     logger.debug("Log level set to %s", logging.getLevelName(level))
+
+    # Disable GPU for QtWebEngine to avoid "GBM not supported" warnings and freezing
+    # on systems where hardware acceleration fails.
+    if not os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS"):
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu"
+
 
     # Needed to get proper KDE style outside of Plasma
     if not os.environ.get("QT_QPA_PLATFORM"):
