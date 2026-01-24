@@ -99,6 +99,7 @@ backups/
 setup_dev_env.sh
 
 # 
+.agent
 .agent/*
 .agent/rules/*
 .agent/settings.yaml
