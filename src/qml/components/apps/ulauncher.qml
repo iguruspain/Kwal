@@ -132,7 +132,7 @@ Kirigami.Page {
                 onAccepted: {
                     if (controller && controller.ulauncherNewThemeName.trim().length > 0) {
                         newThemeDialog.close()
-                        controller.applyUlauncherConfig()
+                        controller.ulauncherCreateNewTheme()
                     }
                 }
             }
@@ -143,12 +143,12 @@ Kirigami.Page {
                     onClicked: newThemeDialog.close()
                 }
                 Button {
-                    text: qsTr("Create and Apply")
+                    text: qsTr("Create")
                     enabled: controller && controller.ulauncherNewThemeName.trim().length > 0
                     highlighted: true
                     onClicked: {
                         newThemeDialog.close()
-                        if (controller) controller.applyUlauncherConfig()
+                        if (controller) controller.ulauncherCreateNewTheme()
                     }
                 }
             }
@@ -201,6 +201,9 @@ Kirigami.Page {
                     
                     model: {
                         if (!controller || !controller.ulauncherModel || !controller.ulauncherTemplateModel) return [];
+                        
+                        // Dependency on generation counter to force refresh
+                        var _gen = controller.ulauncherTemplatesGeneration;
                         
                         var list = [];
                         // Distinguish between the "editing" path and the "actually applied" path.
@@ -260,6 +263,16 @@ Kirigami.Page {
                             }
                         }
                     }
+                    
+                    Connections {
+                        target: controller
+                        function onUlauncherTemplateIndexChanged() {
+                            if (controller.ulauncherTemplateIndex >= 0 && controller.ulauncherTemplateIndex < templateCombo.count) {
+                                templateCombo.currentIndex = controller.ulauncherTemplateIndex
+                            }
+                        }
+                    }
+
                     enabled: (controller && !controller.ulauncherIsFileMode)
                     opacity: enabled ? 1.0 : 0.5
 
@@ -412,26 +425,61 @@ Kirigami.Page {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Button {
-                        text: qsTr("Apply Config")
-                        Layout.fillWidth: true
-                        onClicked: {
-                            if (!controller) return;
-                            var info = controller.ulauncherTemplateModel.get(controller.ulauncherTemplateIndex);
-                            if (info && info.isTemplate) {
-                                newThemeDialog.open();
-                            } else {
-                                confirmApplyDialog.open();
-                            }
-                        }
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.largeSpacing
+
+                    ToolButton {
+                        icon.name: "document-new"
+                        ToolTip.text: qsTr("Create New Theme")
+                        ToolTip.visible: hovered
+                        onClicked: newThemeDialog.open()
                     }
-                    Button {
-                        text: qsTr("Restore Settings")
-                        Layout.fillWidth: true
-                        enabled: controller && controller.hasUlauncherBackup
-                        onClicked: if (controller) {
-                            controller.restoreUlauncherBackup()
+
+                    ToolButton {
+                        icon.name: "document-save"
+                        ToolTip.text: qsTr("Save Theme")
+                        ToolTip.visible: hovered
+                        enabled: {
+                            if (templateCombo.currentIndex < 0 || !templateCombo.model) return false;
+                            var item = templateCombo.model[templateCombo.currentIndex];
+                            // Can save if it is not a template (even if it is current)
+                            return item && !item.isTemplate;
                         }
+                        onClicked: if(controller) controller.ulauncherSaveTheme()
+                    }
+
+                    ToolButton {
+                        icon.name: "edit-delete"
+                        ToolTip.text: qsTr("Delete Theme")
+                        ToolTip.visible: hovered
+                        enabled: {
+                            if (templateCombo.currentIndex < 0 || !templateCombo.model) return false;
+                            var item = templateCombo.model[templateCombo.currentIndex];
+                            // Cannot delete template AND cannot delete active theme
+                            return item && !item.isTemplate && !item.isCurrent;
+                        }
+                        onClicked: if(controller) controller.ulauncherDeleteTheme()
+                    }
+
+                    ToolButton {
+                        icon.name: "dialog-ok-apply" 
+                        ToolTip.text: qsTr("Apply to Ulauncher")
+                        ToolTip.visible: hovered
+                        enabled: {
+                            if (templateCombo.currentIndex < 0 || !templateCombo.model) return false;
+                            var item = templateCombo.model[templateCombo.currentIndex];
+                            // Cannot apply if it is a template or already current
+                            return item && !item.isTemplate && !item.isCurrent;
+                        }
+                        onClicked: if(controller) controller.ulauncherApplyTheme()
+                    }
+
+                    ToolButton {
+                        icon.name: "document-revert"
+                        ToolTip.text: qsTr("Restore Backups")
+                        ToolTip.visible: hovered
+                        enabled: controller && controller.hasUlauncherBackup
+                        onClicked: if(controller) controller.restoreUlauncherBackup()
                     }
                 }
             }
