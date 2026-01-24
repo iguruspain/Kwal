@@ -81,6 +81,9 @@ qmlcache/
 .continue/
 .continue/rules
 .continue/*
+.agent/
+.agent/rules
+.agent/*
 
 # Run
 run.py
@@ -98,8 +101,6 @@ backups/
 #Setup env for development
 setup_dev_env.sh
 
-# 
-.agent
-.agent/*
-.agent/rules/*
-.agent/settings.yaml
+
+
+
