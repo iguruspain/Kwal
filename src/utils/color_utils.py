@@ -283,7 +283,7 @@ def _extract_material_you_kwal(path: Path, **kwargs) -> PaletteData:
         desired=7,
         fallback_color_argb=0xFF4285F4,
         filter=True,
-        dislike_filter=True,
+        #dislike_filter=True,
     )
     
     ranked: list[int] = []
@@ -538,7 +538,7 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
         desired=7,
         fallback_color_argb=0xFF4285F4,
         filter=True,
-        dislike_filter=True,
+        #dislike_filter=True,
     )
     
     ranked: list[int] = []
