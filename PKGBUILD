@@ -8,18 +8,26 @@ url="https://github.com/iguruspain/kwal"
 license=('GPL3')
 groups=('kde-apps')
 depends=(
-    'python-pyside6'
-    'python-pillow'
-    'python-tomlkit'
-    'python-cssutils'
-    'python-json5'
-    'python-materialyoucolor'
-    'python-pywal16'
-    'python-modern-colorthief'
+    # System / Qt / KDE
+    'python>=3.10'
+    'pyside6'
     'qt6-webengine'
     'kirigami'
+    # Python-only libraries (from pip / AUR)
+    'python-json5'
+    'python-materialyoucolor'
+    'python-modern-colorthief'
+    'python-pillow'
+    'python-pywal16'
+    'python-tomlkit'
 )
 makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+optdepends=(
+    'imagemagick: Advanced image tinting and palette extraction'
+    'fastfetch: Terminal fetch tool (tinting target)'
+    'starship: Terminal prompt (tinting target)'
+    'ulauncher: Application launcher (tinting target)'
+)
 provides=('kwal')
 conflicts=('kwal')
 source=("git+https://github.com/iguruspain/kwal.git")
@@ -33,8 +41,4 @@ build() {
 package() {
     cd "${srcdir}/kwal"
     python -m installer --destdir="${pkgdir}" dist/*.whl
-
-    # Desktop entry and icons are usually handled by setuptools data-files/package-data
-    # but some AUR maintainers prefer manual installation to ensure system paths.
-    # The pyproject.toml already handles share/applications and share/icons.
 }

@@ -1,8 +1,9 @@
+# Python-only dependencies (installed via pip)
+# System dependencies (PySide6, Qt6 WebEngine, Kirigami) must be installed
+# via your distribution's package manager. See README.md for details.
 json5
-tomlkit
-cssutils
 materialyoucolor
-pywal16
-Pillow
-PySide6
 modern_colorthief
+Pillow
+pywal16
+tomlkit

@@ -1,8 +1,4 @@
 import re
-import argparse
-import sys
-import getpass
-from datetime import datetime
 import tomlkit
 from typing import List, Dict, Any
 
@@ -226,29 +222,3 @@ def parse_and_render(toml_content: str, context: Dict[str, Any], whitelist: set)
         
     return results
 
-def main():
-    whitelist_modules = {"os", "username", "directory", "python", "time", "git_branch", "git_status", "character"}
-    runtime_context = {
-        "os": "Arch",
-        "username": getpass.getuser(),
-        "directory": "~/dev/scripts",
-        "python": f"v{sys.version_info.major}.{sys.version_info.minor}",
-        "time": datetime.now().strftime("%R"),
-        "git_branch": "main",
-        "git_status": "",
-    }
-
-    # Cambia la ruta según tu entorno
-    #path = "/home/iguruspain/VSCode/Kwal/src/resources/templates/starship/gruvbox-rainbow.toml"
-    #path = "/home/iguruspain/VSCode/Kwal/src/resources/templates/starship/iguruspain.toml"
-    path = "/home/iguruspain/.config/starship.toml"
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = f.read()
-        for el in parse_and_render(data, runtime_context, whitelist_modules):
-            print(el)
-    except FileNotFoundError:
-        print(f"Error: Archivo no encontrado.")
-
-if __name__ == "__main__":
-    main()

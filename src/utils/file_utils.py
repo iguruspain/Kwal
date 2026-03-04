@@ -12,11 +12,6 @@ from pathlib import Path
 from typing import Any
 
 import json5
-import cssutils
-import re
-
-# Suppress cssutils logging noise
-logging.getLogger('cssutils').setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 

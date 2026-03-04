@@ -7,6 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "kwal"
 
 version = "0.1"
+requires-python = ">=3.10"
 authors = [
     {name = "iguruspain", email = "iguruspain@example.com"}
 ]
@@ -24,15 +25,16 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 
+# Python-only dependencies (installed via pip).
+# System dependencies (PySide6, Qt6 WebEngine, Kirigami) must be installed
+# via the distribution's package manager. See README.md for details.
 dependencies = [
     "json5",
-    "tomlkit",
-    "cssutils",
     "materialyoucolor",
-    "pywal16",
-    "Pillow",
-    "PySide6",
     "modern_colorthief",
+    "Pillow",
+    "pywal16",
+    "tomlkit",
 ]
 
 [project.scripts]
