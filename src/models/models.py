@@ -401,6 +401,22 @@ class SettingsAppModel(QAbstractListModel):
             }
         return {}
 
+    def resetApps(self, apps: list[SettingsApp]) -> None:
+        """Replace the app list using incremental row operations.
+
+        Avoids beginResetModel/endResetModel which triggers a null-item
+        access bug in the KDE Desktop style TabBar implementation.
+        """
+        old_count = len(self._apps)
+        if old_count > 0:
+            self.beginRemoveRows(QModelIndex(), 0, old_count - 1)
+            self._apps = []
+            self.endRemoveRows()
+        if apps:
+            self.beginInsertRows(QModelIndex(), 0, len(apps) - 1)
+            self._apps = apps
+            self.endInsertRows()
+
     @Slot(int, int, int)
     def move(self, source: int, destination: int, count: int = 1) -> None:
         if source == destination:

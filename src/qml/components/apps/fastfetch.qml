@@ -300,16 +300,20 @@ Kirigami.Page {
                 }
 
                 Item { Layout.fillHeight: true }
+                MenuSeparator { Layout.fillWidth: true }
 
                 // Action Buttons
                 RowLayout {
                     Layout.fillWidth: true
-                    Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.largeSpacing
+
+                    ToolButton {
                         id: applyTintedButton
-                        text: qsTr("Apply Tinted")
-                        Layout.fillWidth: true
+                        icon.name: "dialog-ok-apply"
                         ToolTip.text: qsTr("Apply the tinted image to fastfetch config")
                         ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
                         enabled: controller && controller.fastfetchDestName && controller.fastfetchDestName !== ""
                         
                         onClicked: {
@@ -332,13 +336,13 @@ Kirigami.Page {
                             }
                         }
                     }
-                    Button {
+                    ToolButton {
                         id: restoreBackupButton
-                        text: qsTr("Restore Backup")
-                        Layout.fillWidth: true
-                        enabled: controller && controller.hasFastfetchBackup
+                        icon.name: "document-revert"
                         ToolTip.text: (controller && controller.hasFastfetchBackup) ? qsTr("Restore the fastfetch config from the last backup") : qsTr("No backup available to restore")
                         ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                        enabled: controller && controller.hasFastfetchBackup
                         
                         onClicked: {
                             if (!controller) return;

@@ -408,23 +408,25 @@ Kirigami.Page{
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Button {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: Kirigami.Units.largeSpacing
+                    
+                    ToolButton {
                         id: applyButton
-                        text: qsTr("Apply Config")
-                        Layout.fillWidth: true
-                        onClicked: { 
-                            if (controller) confirmApplyDialog.open()
-                        }
+                        icon.name: "dialog-ok-apply"
                         ToolTip.text: qsTr("Apply selected configuration to your Starship config (starship.toml)")
                         ToolTip.visible: hovered
                         ToolTip.delay: Kirigami.Units.toolTipDelay
+                        onClicked: { 
+                            if (controller) confirmApplyDialog.open()
+                        }
                     }
-                    Button {
-                        text: qsTr("Restore Backup")
-                        Layout.fillWidth: true
-                        enabled: controller && controller.hasStarshipBackup
-                        ToolTip.text: (enabled) ? qsTr("Restore starship config from backup") : qsTr("No backup available")
+                    ToolButton {
+                        icon.name: "document-revert"
+                        ToolTip.text: enabled ? qsTr("Restore starship config from backup") : qsTr("No backup available")
                         ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                        enabled: controller && controller.hasStarshipBackup
                         onClicked: {
                              if (controller) {
                                 controller.restoreStarshipBackup();

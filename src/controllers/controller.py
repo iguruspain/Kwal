@@ -97,6 +97,8 @@ class Controller(QObject):
     starshipBackupExistsChanged = Signal()
     # Signal for compositing
     compositingEnabledChanged = Signal()
+    # Signal for simulate all apps dev toggle
+    simulateAllAppsChanged = Signal()
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
@@ -136,6 +138,9 @@ class Controller(QObject):
 
         # Compositing state (True by default for modern desktops)
         self._compositing_enabled: bool = True
+
+        # Dev toggle: simulate all apps installed
+        self._simulate_all_apps: bool = False
 
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
@@ -177,13 +182,13 @@ class Controller(QObject):
             self._logger.debug("Initial fastfetch template refresh failed or empty")
 
         # Settings App Model
-        apps = [
-            SettingsApp(app_name="wallpapers", section="Apps", qml_page="apps/wallpapers.qml"), # experimental
-            SettingsApp(app_name="fastfetch", section="Apps", qml_page="apps/fastfetch.qml"),
-            SettingsApp(app_name="starship", section="Apps", qml_page="apps/starship.qml"),
-            SettingsApp(app_name="ulauncher", section="Apps", qml_page="apps/ulauncher.qml"),
+        # Full list of optional apps (used for simulate mode and filtering)
+        self._optional_apps: list[tuple[str, SettingsApp]] = [
+            ("fastfetch", SettingsApp(app_name="fastfetch", section="Apps", qml_page="apps/fastfetch.qml")),
+            ("starship", SettingsApp(app_name="starship", section="Apps", qml_page="apps/starship.qml")),
+            ("ulauncher", SettingsApp(app_name="ulauncher", section="Apps", qml_page="apps/ulauncher.qml")),
         ]
-        self._settings_app_model = SettingsAppModel(apps)
+        self._settings_app_model = SettingsAppModel(self._build_app_list())
 
         # Starship model
         try:
@@ -400,6 +405,38 @@ class Controller(QObject):
     @Slot()
     def toggleCompositing(self) -> None:
         self.compositingEnabled = not self._compositing_enabled
+
+    # --- Simulate All Apps (Dev Toggle) ---
+
+    @Property(bool, notify=simulateAllAppsChanged)
+    def simulateAllApps(self) -> bool:
+        return self._simulate_all_apps
+
+    @simulateAllApps.setter
+    def simulateAllApps(self, value: bool) -> None:
+        if self._simulate_all_apps != value:
+            self._simulate_all_apps = value
+            self.simulateAllAppsChanged.emit()
+            self._settings_app_model.resetApps(self._build_app_list())
+            self._logger.info("Simulate all apps: %s", value)
+
+    @Slot()
+    def toggleSimulateAllApps(self) -> None:
+        self.simulateAllApps = not self._simulate_all_apps
+
+    def _build_app_list(self) -> list[SettingsApp]:
+        """Build the list of app tabs based on installed apps or simulate mode."""
+        # Wallpapers tab is always available (not an external app)
+        apps: list[SettingsApp] = [
+            SettingsApp(app_name="wallpapers", section="Apps", qml_page="apps/wallpapers.qml"),
+        ]
+        for binary_name, setting in self._optional_apps:
+            if self._simulate_all_apps or shutil.which(binary_name):
+                apps.append(setting)
+                self._logger.info("Detected '%s' installed, enabling tab", binary_name)
+            else:
+                self._logger.info("'%s' not found in PATH, tab hidden", binary_name)
+        return apps
 
     # --- Draft Properties ---
 

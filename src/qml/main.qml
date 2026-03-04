@@ -43,6 +43,13 @@ Kirigami.ApplicationWindow {
                     onToggled: controller.toggleCompositing()
                     icon.name: "blur-on" 
                 }
+                Kirigami.Action {
+                    text: qsTr("Simulate All Apps")
+                    checkable: true
+                    checked: controller.simulateAllApps
+                    onToggled: controller.toggleSimulateAllApps()
+                    icon.name: "applications-development"
+                }
             },
             Kirigami.Action {
                 text: qsTr("Quit")
