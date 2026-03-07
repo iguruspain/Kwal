@@ -24,7 +24,8 @@ Kirigami.Page {
         // Left Pane
         Rectangle {
             id: leftPaneWallpapers
-            color: Kirigami.Theme.backgroundColor
+            //color: Kirigami.Theme.backgroundColor
+            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
             
             // Collapsible logic
             Layout.preferredWidth: wallpaperPage.sidePaneOpen ? 300 : 0

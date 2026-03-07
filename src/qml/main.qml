@@ -10,8 +10,8 @@ import org.kde.kirigami as Kirigami
 Kirigami.ApplicationWindow {
     id: root
     visible: true
-    width: 820
-    height: 620
+    width: 800
+    height: 560
     title: "Kwal"
     
     // Global Safe Overlay Color
@@ -26,86 +26,86 @@ Kirigami.ApplicationWindow {
     color: "transparent"
 
 
-    // Global Drawer for Application Settings
-    globalDrawer: Kirigami.GlobalDrawer {
-        isMenu: true
-        modal: true
-        
-        actions: [
-            Kirigami.Action {
-                text: qsTr("Application Settings")
-                icon.name: "configure"
-                // Group actions under a header
-                Kirigami.Action {
-                    text: qsTr("Transparency Effects")
-                    checkable: true
-                    checked: controller.compositingEnabled
-                    onToggled: controller.toggleCompositing()
-                    icon.name: "blur-on" 
-                }
-                Kirigami.Action {
-                    text: qsTr("Simulate All Apps")
-                    checkable: true
-                    checked: controller.simulateAllApps
-                    onToggled: controller.toggleSimulateAllApps()
-                    icon.name: "applications-development"
-                }
-            },
-            Kirigami.Action {
-                text: qsTr("Quit")
-                icon.name: "application-exit"
-                shortcut: StandardKey.Quit
-                onTriggered: Qt.quit()
-            }
-        ]
+    // Keyboard shortcut for quitting the application
+    Shortcut {
+        sequence: StandardKey.Quit
+        onActivated: Qt.quit()
     }
 
     pageStack.initialPage: settingsAltRoot
     Kirigami.Page {
         id: settingsAltRoot
+        // Shared index between custom header TabBar and SwipeView
+        property int currentTabIndex: 0
+
+        // Suppress Kirigami's native opaque toolbar so the custom header inherits transparency
+        globalToolBarStyle: Kirigami.ApplicationHeaderStyle.None
+
         background: Rectangle {
             // Inherit global safe overlay color logic
             color: root.overlayBackgroundColor
         }
-        
-        // The title updates dynamically based on the selected tab
-        title: {
-            const item = controller.settingsAppModel.get(tabBar.currentIndex);
-            return item ? item.title : "Settings";
-        }
 
-        header: Pane {
-            // Use a Pane to give a consistent background to the header
-            background: Rectangle { color: "transparent" }
-            topPadding: Kirigami.Units.smallSpacing
-            bottomPadding: 0
+        title: "Kwal"
 
-            contentItem: RowLayout {
-                width: parent.width
+        // Custom header that inherits the same semi-transparent overlay color
+        header: ToolBar {
+            background: Rectangle {
+                color: "transparent"//root.overlayBackgroundColor
+            }
 
-                // Left spacer
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
+
+                // Hamburger menu button — opens the inline application menu
+                ToolButton {
+                    id: menuButton
+                    icon.name: "open-menu-symbolic"
+                    onClicked: appMenu.open()
+
+                    Menu {
+                        id: appMenu
+                        y: menuButton.height
+
+                        MenuItem {
+                            text: qsTr("Transparency Effects")
+                            checkable: true
+                            checked: controller.compositingEnabled
+                            onTriggered: controller.toggleCompositing()
+                        }
+                        MenuItem {
+                            text: qsTr("Simulate All Apps")
+                            checkable: true
+                            checked: controller.simulateAllApps
+                            onTriggered: controller.toggleSimulateAllApps()
+                        }
+                        MenuSeparator {}
+                        MenuItem {
+                            text: qsTr("Quit")
+                            icon.name: "application-exit"
+                            onTriggered: Qt.quit()
+                        }
+                    }
+                }
+
                 Item { Layout.fillWidth: true }
 
                 TabBar {
-                    id: tabBar
-                    currentIndex: swipeView.currentIndex
-                    
-                    // Remove the TabBar default background for a cleaner look
-                    background: Rectangle { color: "transparent" }
+                    currentIndex: settingsAltRoot.currentTabIndex
+                    //background: Rectangle { color: "transparent" }
+                    onCurrentIndexChanged: settingsAltRoot.currentTabIndex = currentIndex
 
                     Repeater {
                         model: controller.settingsAppModel
                         delegate: TabButton {
                             required property string title
                             text: title
-                            
-                            // Optional: adjust button widths
                             implicitWidth: Math.max(100, Kirigami.Units.gridUnit * 5)
                         }
                     }
                 }
 
-                // Right spacer
                 Item { Layout.fillWidth: true }
             }
         }
@@ -113,8 +113,9 @@ Kirigami.ApplicationWindow {
         SwipeView {
             id: swipeView
             anchors.fill: parent
-            currentIndex: tabBar.currentIndex
+            currentIndex: settingsAltRoot.currentTabIndex
             clip: true
+            onCurrentIndexChanged: settingsAltRoot.currentTabIndex = currentIndex
 
             // Use a Repeater to preserve page state
             Repeater {

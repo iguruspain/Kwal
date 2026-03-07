@@ -162,7 +162,8 @@ Kirigami.Page {
 
         // --- Left Pane ---
         Rectangle {
-            color: Kirigami.Theme.backgroundColor
+            //color: Kirigami.Theme.backgroundColor
+            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
             Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing

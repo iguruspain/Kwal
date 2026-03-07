@@ -14,7 +14,7 @@ Dialog {
     // Internal state
     property string sourceImage: "" 
     property color selectedColor: "transparent"
-    property string currentBackend: "material-you-kwal" // "pywal16", "material-you-kwal", "material-you", "imagemagick"
+    property string currentBackend: "material-you" // "pywal16", "material-you-kwal", "material-you", "imagemagick"
     property int sourceMode: 0 // 0: App (Wallpapers Tab), 1: Custom/System
     property bool generationActive: false
     // Single selection across both grids: index + set name ("palette" or "accent")
@@ -42,7 +42,7 @@ Dialog {
     }
     
     // Dimensions
-    width: Kirigami.Units.gridUnit * 32
+    width: Kirigami.Units.gridUnit * 40
     
     // Remove manual implicitHeight here, let contentItem drive it, but use constraints
     // implicitHeight: Math.min(...)
@@ -178,7 +178,7 @@ Dialog {
         Item {
             id: contentContainer
             // The constraint for the width is the scrollview's width (which matches dialog width)
-            width: contentScroll.availableWidth 
+            width: contentScroll.availableWidth
             
             // The height is determined by the content + margins
             implicitHeight: mainLayout.implicitHeight + (Kirigami.Units.largeSpacing * 2)
@@ -189,8 +189,10 @@ Dialog {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.margins: Kirigami.Units.largeSpacing
-                
+                anchors.topMargin: Kirigami.Units.largeSpacing
+                anchors.leftMargin: Kirigami.Units.largeSpacing * 2
+                anchors.rightMargin: Kirigami.Units.largeSpacing * 2
+
                 spacing: Kirigami.Units.largeSpacing
 
                 // Wallpaper Selection Row
@@ -237,14 +239,12 @@ Dialog {
                         
                         Image {
                             id: wallpaperPreview
-                            // 1. Ocupamos todo el contenedor para tener el área de dibujo
                             anchors.fill: parent
                             
-                            // 2. Alineamos el dibujo internamente a la izquierda
-                            horizontalAlignment: Image.AlignLeft
-                            verticalAlignment: Image.AlignTop
+                            horizontalAlignment: Image.AlignHCenter
+                            verticalAlignment: Image.AlignVCenter
                             
-                            // 3. Mantenemos proporción sin estirar
+                            // Mantenemos proporción sin estirar
                             fillMode: Image.PreserveAspectFit
                             
                             source: {
@@ -255,14 +255,13 @@ Dialog {
                             asynchronous: true
                             cache: false
 
-                            // El Borde
+                            // Border follows the painted (visible) area of the image
                             Rectangle {
                                 id: imageBorder
-                                // 4. Usamos las propiedades 'painted' para que el borde
-                                // se ajuste automáticamente a los píxeles visibles.
                                 width: parent.paintedWidth
                                 height: parent.paintedHeight
-                                x: 0 // Como alineamos a la izquierda, x siempre es 0
+                                x: (parent.width - parent.paintedWidth) / 2
+                                y: (parent.height - parent.paintedHeight) / 2
                                 
                                 color: "transparent"
                                 border.color: Kirigami.Theme.disabledTextColor
@@ -271,7 +270,7 @@ Dialog {
                             }
 
                             Label {
-                                anchors.centerIn: parent // Mejor centrado en el contenedor
+                                anchors.centerIn: parent
                                 text: qsTr("No Image selected")
                                 visible: parent.status !== Image.Ready
                             }
@@ -292,7 +291,7 @@ Dialog {
                     ComboBox {
                         id: extractMethodCombo
                         model: ["pywal16", "material-you-kwal", "material-you", "imagemagick"]
-                        currentIndex: 1
+                        currentIndex: model.indexOf(root.currentBackend)
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 8
                         onActivated: {
                             // Switch backend and reset any generated data
