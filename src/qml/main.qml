@@ -54,62 +54,72 @@ Kirigami.ApplicationWindow {
                 color: "transparent"//root.overlayBackgroundColor
             }
 
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
                 spacing: 0
 
-                // Hamburger menu button — opens the inline application menu
-                ToolButton {
-                    id: menuButton
-                    icon.name: "open-menu-symbolic"
-                    onClicked: appMenu.open()
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    spacing: 0
 
-                    Menu {
-                        id: appMenu
-                        y: menuButton.height
+                    // Hamburger menu button — opens the inline application menu
+                    ToolButton {
+                        id: menuButton
+                        icon.name: "open-menu-symbolic"
+                        onClicked: appMenu.open()
 
-                        MenuItem {
-                            text: qsTr("Transparency Effects")
-                            checkable: true
-                            checked: controller.compositingEnabled
-                            onTriggered: controller.toggleCompositing()
-                        }
-                        MenuItem {
-                            text: qsTr("Simulate All Apps")
-                            checkable: true
-                            checked: controller.simulateAllApps
-                            onTriggered: controller.toggleSimulateAllApps()
-                        }
-                        MenuSeparator {}
-                        MenuItem {
-                            text: qsTr("Quit")
-                            icon.name: "application-exit"
-                            onTriggered: Qt.quit()
-                        }
-                    }
-                }
+                        Menu {
+                            id: appMenu
+                            y: menuButton.height
 
-                Item { Layout.fillWidth: true }
-
-                TabBar {
-                    currentIndex: settingsAltRoot.currentTabIndex
-                    //background: Rectangle { color: "transparent" }
-                    onCurrentIndexChanged: settingsAltRoot.currentTabIndex = currentIndex
-
-                    Repeater {
-                        model: controller.settingsAppModel
-                        delegate: TabButton {
-                            required property string title
-                            text: title
-                            implicitWidth: Math.max(100, Kirigami.Units.gridUnit * 5)
+                            MenuItem {
+                                text: qsTr("Transparency Effects")
+                                checkable: true
+                                checked: controller.compositingEnabled
+                                onTriggered: controller.toggleCompositing()
+                            }
+                            MenuItem {
+                                text: qsTr("Simulate All Apps")
+                                checkable: true
+                                checked: controller.simulateAllApps
+                                onTriggered: controller.toggleSimulateAllApps()
+                            }
+                            MenuSeparator {}
+                            MenuItem {
+                                text: qsTr("Quit")
+                                icon.name: "application-exit"
+                                onTriggered: Qt.quit()
+                            }
                         }
                     }
+
+                    Item { Layout.fillWidth: true }
+
+                    TabBar {
+                        currentIndex: settingsAltRoot.currentTabIndex
+                        onCurrentIndexChanged: settingsAltRoot.currentTabIndex = currentIndex
+
+                        Repeater {
+                            model: controller.settingsAppModel
+                            delegate: TabButton {
+                                required property string title
+                                text: title
+                                implicitWidth: Math.max(100, Kirigami.Units.gridUnit * 5)
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
                 }
 
-                Item { Layout.fillWidth: true }
+                MenuSeparator {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Kirigami.Units.smallSpacing
+                    Layout.bottomMargin: Kirigami.Units.smallSpacing
+                }
             }
         }
-
         SwipeView {
             id: swipeView
             anchors.fill: parent
