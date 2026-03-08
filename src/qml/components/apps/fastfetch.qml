@@ -97,7 +97,7 @@ Kirigami.Page {
             Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
-            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.color: Kirigami.Theme.highlightColor
             border.width: 1
        
             ColumnLayout {
@@ -222,7 +222,7 @@ Kirigami.Page {
                     }
                 }
 
-                MenuSeparator { Layout.fillWidth: true }
+                Kirigami.Separator {Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor}
 
                 // Color Picker
                 RowLayout {

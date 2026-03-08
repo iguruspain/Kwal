@@ -158,7 +158,7 @@ Kirigami.Page{
             Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
-            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.color: Kirigami.Theme.highlightColor
             border.width: 1
 
             ColumnLayout {
@@ -322,11 +322,6 @@ Kirigami.Page{
                         RowLayout {
                             id: paletteHeader
                             Layout.fillWidth: true
-                            Label {
-                                text: (starshipModelProxy.paletteIndex >= 0 ? starshipModelProxy.paletteNames[starshipModelProxy.paletteIndex] : "")
-                                font.bold: true
-                            }
-                            Item { Layout.fillWidth: true }
                             ToolButton {
                                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                                 icon.name: starshipModelProxy.paletteExpanded ? "arrow-down" : "arrow-right"
@@ -335,8 +330,13 @@ Kirigami.Page{
                                 ToolTip.visible: hovered
                                 ToolTip.delay: Kirigami.Units.toolTipDelay
                             }
+                            Label {
+                                text: (starshipModelProxy.paletteIndex >= 0 ? starshipModelProxy.paletteNames[starshipModelProxy.paletteIndex] : "No palette")
+                                font.bold: true
+                            }
+                            Item { Layout.fillWidth: true }
                         }
-                        MenuSeparator { Layout.fillWidth: true }
+                        Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.disabledTextColor, 0.4)}
                         ColumnLayout {
                             id: paletteContent
                             width: parent.width

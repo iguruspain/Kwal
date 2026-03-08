@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import threading
@@ -99,6 +100,8 @@ class Controller(QObject):
     compositingEnabledChanged = Signal()
     # Signal for simulate all apps dev toggle
     simulateAllAppsChanged = Signal()
+    # Wallpaper custom command signal
+    customCommandWallpaperChanged = Signal()
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
@@ -125,6 +128,7 @@ class Controller(QObject):
         self._result_dialog_visible: bool = False
         self._result_dialog_text: str = ""
         self._templates_installed: bool = False
+        self._custom_command_wallpaper: str = ""
         
         # Draft State (Persist across tabs)
         self._fastfetch_draft_color: str = "transparent"
@@ -159,6 +163,7 @@ class Controller(QObject):
         loaded_folders = config.get("folders", [])
         last_selected = cast(str, config.get("selected_folder", ""))
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
+        self._custom_command_wallpaper = cast(str, config.get("custom_command_wallpaper", ""))
 
         # Initialize Models
         folders: list[Folder] = []
@@ -265,6 +270,8 @@ class Controller(QObject):
         }
         if self._last_set_wallpaper:
             data["last_set_wallpaper"] = self._last_set_wallpaper
+        if self._custom_command_wallpaper:
+            data["custom_command_wallpaper"] = self._custom_command_wallpaper
             
         try:
             with open(self._config_path_file, "w", encoding="utf-8") as fh:
@@ -389,6 +396,23 @@ class Controller(QObject):
         return bak.exists() and bak.is_file()
 
     hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
+
+    def _get_custom_command_wallpaper(self) -> str:
+        return self._custom_command_wallpaper
+
+    def _set_custom_command_wallpaper(self, cmd: str) -> None:
+        val = cmd or ""
+        if self._custom_command_wallpaper != val:
+            self._custom_command_wallpaper = val
+            self._save_config()
+            self.customCommandWallpaperChanged.emit()
+
+    customCommandWallpaper = Property(
+        str,
+        _get_custom_command_wallpaper,
+        _set_custom_command_wallpaper,
+        notify=customCommandWallpaperChanged,
+    )
 
     # --- Compositing Control ---
 
@@ -807,6 +831,23 @@ class Controller(QObject):
             self.notification.emit("qdbus executable not found (required for KDE Plasma)", "error")
             
         self._save_config()
+
+    @Slot(str)
+    def runCMD(self, command: str) -> None:
+        """Execute a user-provided shell command in the background (fire & forget)."""
+        cmd = (command or "").strip()
+        if not cmd:
+            return
+        try:
+            args = [os.path.expanduser(a) for a in shlex.split(cmd)]
+            subprocess.Popen(args, start_new_session=True)
+            self._logger.info("Launched custom command: %s", args)
+        except ValueError:
+            self._logger.error("Invalid command syntax: %r", cmd)
+            self.notification.emit(f"Invalid command: {cmd}", "error")
+        except Exception:
+            self._logger.exception("Failed to launch custom command: %r", cmd)
+            self.notification.emit(f"Failed to run command: {cmd}", "error")
 
     @Slot(result=str)
     def getCurrentSystemWallpaper(self) -> str:

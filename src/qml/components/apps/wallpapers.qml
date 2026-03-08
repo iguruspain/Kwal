@@ -31,7 +31,7 @@ Kirigami.Page {
             Layout.preferredWidth: wallpaperPage.sidePaneOpen ? 300 : 0
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
-            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.color: Kirigami.Theme.highlightColor
             border.width: 1
             
             visible: Layout.preferredWidth > 0
@@ -65,9 +65,8 @@ Kirigami.Page {
                     }            
                 }
                     
-                Kirigami.Separator {
-                    Layout.fillWidth: true
-                }
+                MenuSeparator { Layout.fillWidth: true }
+
                 Kirigami.CardsListView {
                     id: wallpaperCards
                     Layout.fillWidth: true
@@ -119,9 +118,7 @@ Kirigami.Page {
                                         level: 2
                                         text: name
                                     }
-                                    Kirigami.Separator {
-                                        Layout.fillWidth: true
-                                    }
+                                    Kirigami.Separator {Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor}
                                     Label {
                                         Layout.fillWidth: true
                                         // wrapMode: Text.WordWrap
@@ -203,14 +200,19 @@ Kirigami.Page {
                     ColumnLayout {
                         spacing: 0
                         visible: controller.selectedWallpaper !== ""
+                        Layout.fillWidth: true          // ← acota el ancho
+                        Layout.maximumWidth: 600        // ← opcional: límite razonable
+                    
                         Label {
-                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillWidth: true      // ← necesario para que elide funcione
+                            horizontalAlignment: Text.AlignHCenter
                             text: controller.selectedWallpaper ? controller.selectedWallpaper.split("/").pop() : ""
                             font.bold: true
                             elide: Text.ElideMiddle
                         }
                         Label {
-                            Layout.alignment: Qt.AlignHCenter
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
                             text: controller.selectedWallpaperResolution
                             color: Kirigami.Theme.disabledTextColor
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -218,8 +220,12 @@ Kirigami.Page {
                     }
                     
                     Item { Layout.fillWidth: true }
+                    
                 }
-
+                Item { Layout.fillHeight: true }
+                //Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.textColor, 0.4)}
+                MenuSeparator { Layout.fillWidth: true }
+                Item { Layout.fillHeight: true }
                 // Grid View
                 ScrollView {
                     id: scrollView
@@ -302,50 +308,86 @@ Kirigami.Page {
                 // Use y position for sliding animation instead of anchors.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 
-                width: Math.min(parent.width * 0.8, actionsRow.implicitWidth + Kirigami.Units.largeSpacing * 2)
-                height: actionsRow.implicitHeight + Kirigami.Units.largeSpacing
+                //width: parent.width * 0.8
+                width: Math.min(parent.width * 0.8, drawerContent.implicitWidth + Kirigami.Units.largeSpacing * 4)
+                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
                 
                 property bool isOpen: rightPaneWallpapers.drawerOpen && controller.selectedWallpaper !== "" && controller.selectedWallpaper.length > 0
-                
+                property bool commandVisible: false
+
                 // Slide up from bottom
-                y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing : parent.height
+                y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
                 opacity: isOpen ? 1.0 : 0.0
                 visible: y < parent.height
 
                 Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
+                Behavior on height { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
                 Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
 
                 radius: Kirigami.Units.largeSpacing
-                color: root.overlayBackgroundColor
-                border.color: Kirigami.Theme.disabledTextColor
+                //color: root.overlayBackgroundColor
+                color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.95)
+                border.color: Kirigami.Theme.highlightColor
                 border.width: 1
 
-                RowLayout {
-                    id: actionsRow
-                    anchors.centerIn: parent
+                ColumnLayout {
+                    id: drawerContent
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.largeSpacing
                     spacing: Kirigami.Units.largeSpacing
-                    
-                    ToolButton {
-                        text: qsTr("Set as Wallpaper")
-                        icon.name: "dialog-ok-apply"
-                        // Positive color styling
-                        icon.color: Kirigami.Theme.positiveTextColor
-                        palette.buttonText: Kirigami.Theme.positiveTextColor
-                        
-                        onClicked: {
-                            controller.setAsWallpaper(controller.selectedWallpaper)
-                            rightPaneWallpapers.drawerOpen = false
+                    RowLayout {
+                        id: actionsRow
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        spacing: Kirigami.Units.largeSpacing
+                        //Layout.preferredWidth: 400
+
+                        ToolButton {
+                            checkable: true
+                            Layout.alignment: Qt.AlignLeft
+                            checked: bottomDrawer.commandVisible
+                            icon.name: bottomDrawer.commandVisible ? "arrow-down" : "arrow-right"
+                            onToggled: bottomDrawer.commandVisible = checked
+                            ToolTip.text: bottomDrawer.commandVisible ? qsTr("Hide custom command input") : qsTr("Show custom command input")
+                            ToolTip.visible: hovered
+                            ToolTip.delay: Kirigami.Units.toolTipDelay
+                        }
+                        Item { Layout.fillWidth: true }
+
+                        ToolButton {
+                            text: qsTr("Set as Wallpaper")
+                            icon.name: "dialog-ok-apply"
+                            icon.color: Kirigami.Theme.positiveTextColor
+                            palette.buttonText: Kirigami.Theme.positiveTextColor
+
+                            onClicked: {
+                                controller.setAsWallpaper(controller.selectedWallpaper)
+                                controller.runCMD(controller.customCommandWallpaper)
+                                rightPaneWallpapers.drawerOpen = false
+                            }
+                        }
+                        ToolButton {
+                            text: qsTr("Close")
+                            icon.name: "dialog-close"
+                            icon.color: Kirigami.Theme.negativeTextColor
+                            palette.buttonText: Kirigami.Theme.negativeTextColor
+
+                            onClicked: {
+                                rightPaneWallpapers.drawerOpen = false
+                            }
                         }
                     }
-                    ToolButton {
-                        text: qsTr("Close")
-                        icon.name: "dialog-close"
-                        // Negative color styling
-                        icon.color: Kirigami.Theme.negativeTextColor
-                        palette.buttonText: Kirigami.Theme.negativeTextColor
-                        
-                        onClicked: {
-                            rightPaneWallpapers.drawerOpen = false
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 400
+                        spacing: Kirigami.Units.smallSpacing
+                        visible: bottomDrawer.commandVisible
+                        TextField {
+                            id: commandInput
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("Enter custom command")
+                            text: controller.customCommandWallpaper
+                            onTextChanged: controller.customCommandWallpaper = text
                         }
                     }
                 }

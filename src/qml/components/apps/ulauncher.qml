@@ -167,7 +167,7 @@ Kirigami.Page {
             Layout.preferredWidth: 300
             Layout.fillHeight: true
             radius: Kirigami.Units.largeSpacing
-            border.color: Kirigami.Theme.alternateBackgroundColor
+            border.color: Kirigami.Theme.highlightColor
             border.width: 1
 
             ColumnLayout {
@@ -300,8 +300,6 @@ Kirigami.Page {
 
                 }
 
-
-
                 MenuSeparator { Layout.fillWidth: true }
 
                 // Palette Section
@@ -332,7 +330,7 @@ Kirigami.Page {
                                     font.bold: true 
                                     Layout.fillWidth: true
                                 }
-                                MenuSeparator { Layout.fillWidth: true }
+                                Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.disabledTextColor, 0.4)}
 
                                 // Colors in this section
                                 Repeater {
