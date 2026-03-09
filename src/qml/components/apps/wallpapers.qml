@@ -276,6 +276,28 @@ Kirigami.Page {
                                     smooth: true
                                 }
 
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    anchors.margins: Kirigami.Units.smallSpacing * 2
+                                    radius: Kirigami.Units.cornerRadius
+                                    visible: controller.showExtensionBadge
+                                    color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
+                                    width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
+                                    height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
+                                    border.color: Kirigami.Theme.highlightColor
+                                    border.width: 0.5
+
+                                    Label {
+                                        id: extLabel
+                                        anchors.centerIn: parent
+                                        text: fileName.split(".").pop().toUpperCase()
+                                        color: Kirigami.Theme.textColor
+                                        font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
+                                        font.bold: true
+                                    }
+                                }
+
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor

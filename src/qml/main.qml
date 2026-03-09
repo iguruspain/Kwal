@@ -11,7 +11,7 @@ Kirigami.ApplicationWindow {
     id: root
     visible: true
     width: 800
-    height: 560
+    height: 590
     title: "Kwal"
     
     // Global Safe Overlay Color
@@ -84,6 +84,12 @@ Kirigami.ApplicationWindow {
                                 checkable: true
                                 checked: controller.simulateAllApps
                                 onTriggered: controller.toggleSimulateAllApps()
+                            }
+                            MenuItem {
+                                text: qsTr("Show Extension Badge")
+                                checkable: true
+                                checked: controller.showExtensionBadge
+                                onTriggered: controller.toggleExtensionBadge()
                             }
                             MenuSeparator {}
                             MenuItem {

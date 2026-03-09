@@ -100,6 +100,8 @@ class Controller(QObject):
     compositingEnabledChanged = Signal()
     # Signal for simulate all apps dev toggle
     simulateAllAppsChanged = Signal()
+    # Signal for wallpaper extension badge visibility
+    showExtensionBadgeChanged = Signal()
     # Wallpaper custom command signal
     customCommandWallpaperChanged = Signal()
 
@@ -145,6 +147,9 @@ class Controller(QObject):
 
         # Dev toggle: simulate all apps installed
         self._simulate_all_apps: bool = False
+
+        # UI preference: show file extension badge on wallpaper thumbnails
+        self._show_extension_badge: bool = True
 
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
@@ -447,6 +452,22 @@ class Controller(QObject):
     @Slot()
     def toggleSimulateAllApps(self) -> None:
         self.simulateAllApps = not self._simulate_all_apps
+
+    # --- Wallpaper Extension Badge ---
+
+    @Property(bool, notify=showExtensionBadgeChanged)
+    def showExtensionBadge(self) -> bool:
+        return self._show_extension_badge
+
+    @showExtensionBadge.setter
+    def showExtensionBadge(self, value: bool) -> None:
+        if self._show_extension_badge != value:
+            self._show_extension_badge = value
+            self.showExtensionBadgeChanged.emit()
+
+    @Slot()
+    def toggleExtensionBadge(self) -> None:
+        self.showExtensionBadge = not self._show_extension_badge
 
     def _build_app_list(self) -> list[SettingsApp]:
         """Build the list of app tabs based on installed apps or simulate mode."""
