@@ -11,7 +11,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
-from .controllers.controller import Controller
+from .controllers.controller import Controller, SvgImageProvider
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -128,6 +128,11 @@ def main():
     # Expose Fastfetch template model directly to QML as a context property
     engine.rootContext().setContextProperty("fastfetchTemplateModel", controller.fastfetchTemplateModel())
 
+    # Register SVG image provider so QML Image items can render SVGs via
+    # source: "image://svgprovider" + absolutePath
+    svg_provider = SvgImageProvider()
+    engine.addImageProvider("svgprovider", svg_provider)
+
     # Route Qt/QML messages into Python logging and respect application log level.
     def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
         # Map Qt message types to Python logging levels
@@ -163,6 +168,7 @@ def main():
     # Ensure tint worker is stopped and fastfetch tinted cache is cleaned up on exit
     try:
         from .utils.color_utils import clear_fastfetch_tinted_cache
+        from .utils.svg_utils import clear_svg_preview_cache
         # stop worker and clear cache when application is about to quit
         def _on_quit() -> None:
             try:
@@ -170,9 +176,17 @@ def main():
             except Exception:
                 logger.exception("Error stopping tint worker during shutdown")
             try:
+                controller.stopSvgWorker()
+            except Exception:
+                logger.exception("Error stopping SVG worker during shutdown")
+            try:
                 clear_fastfetch_tinted_cache()
             except Exception:
                 logger.exception("Error clearing fastfetch tinted cache during shutdown")
+            try:
+                clear_svg_preview_cache()
+            except Exception:
+                logger.exception("Error clearing SVG preview cache during shutdown")
 
         app.aboutToQuit.connect(_on_quit)
     except Exception:
