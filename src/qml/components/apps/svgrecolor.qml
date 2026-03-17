@@ -28,7 +28,16 @@ Kirigami.Page {
         color: "transparent"
     }
 
-    // --- Main Layout ---
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function copyToClipboard(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            root.notifyClipboard(text)
+        }
+    }
     RowLayout {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
@@ -158,7 +167,12 @@ Kirigami.Page {
                                         hoverEnabled: true
                                         enabled: index < (controller ? controller.svgColorCount : 6)
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        onClicked: (mouse) => {
+                                            if (mouse.button === Qt.RightButton) {
+                                                clipboardHelper.copyToClipboard(modelData)
+                                                return
+                                            }
                                             if (!controller) return
                                             var result = controller.openColorDialog(parent.color)
                                             if (result !== "") {
@@ -214,7 +228,12 @@ Kirigami.Page {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: (mouse) => {
+                                        if (mouse.button === Qt.RightButton) {
+                                            clipboardHelper.copyToClipboard(controller.svgMonoColor)
+                                            return
+                                        }
                                         if (!controller) return
                                         var result = controller.openColorDialog(parent.color)
                                         if (result !== "") {

@@ -12,6 +12,18 @@ Kirigami.Page{
     background: Rectangle {
         color: "transparent"
     }
+
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function copyToClipboard(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            root.notifyClipboard(text)
+        }
+    }
+
     // Proxy to Python Starship model exposed by Controller (controller.starshipModel)
     Item {
         id: starshipModelProxy
@@ -375,7 +387,12 @@ Kirigami.Page{
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                            onClicked: (mouse) => {
+                                                if (mouse.button === Qt.RightButton) {
+                                                    clipboardHelper.copyToClipboard(modelData)
+                                                    return
+                                                }
                                                 if (!controller) return;
                                                 var currentColor = modelData || "transparent";
                                                 var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);

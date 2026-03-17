@@ -13,6 +13,17 @@ Kirigami.Page {
         color: "transparent"
     }
 
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function copyToClipboard(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            root.notifyClipboard(text)
+        }
+    }
+
     // Proxy to Python Ulauncher model
     Item {
         id: ulauncherModelProxy
@@ -366,12 +377,17 @@ Kirigami.Page {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                     if (!controller) return;
-                                                     var c = controller.openColorDialog(modelData || "transparent")
-                                                     if (c) {
-                                                         controller.ulauncherModel.setPaletteColor(sectionIndex, index, c)
-                                                     }
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                onClicked: (mouse) => {
+                                                    if (mouse.button === Qt.RightButton) {
+                                                        clipboardHelper.copyToClipboard(modelData)
+                                                        return
+                                                    }
+                                                    if (!controller) return;
+                                                    var c = controller.openColorDialog(modelData || "transparent")
+                                                    if (c) {
+                                                        controller.ulauncherModel.setPaletteColor(sectionIndex, index, c)
+                                                    }
                                                 }
                                             }
                                         }

@@ -366,6 +366,7 @@ Kirigami.Page {
                         clipboardHelper.text = text
                         clipboardHelper.selectAll()
                         clipboardHelper.copy()
+                        root.notifyClipboard(text)
                     }
                 }
 

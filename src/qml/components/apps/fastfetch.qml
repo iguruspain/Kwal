@@ -22,6 +22,17 @@ Kirigami.Page {
         color: "transparent"
     }
 
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function copyToClipboard(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            root.notifyClipboard(text)
+        }
+    }
+
     // Signals Handling
     Connections {
         target: controller
@@ -259,7 +270,12 @@ Kirigami.Page {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: (mouse) => {
+                                if (mouse.button === Qt.RightButton) {
+                                    clipboardHelper.copyToClipboard(controller ? controller.fastfetchDraftColor : colorPreview.color.toString())
+                                    return
+                                }
                                 if (!controller) return;
                                 var currentColor = controller.fastfetchDraftColor;
                                 var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);

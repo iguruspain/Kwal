@@ -21,6 +21,10 @@ Kirigami.ApplicationWindow {
     readonly property color overlayBackgroundColor: controller.compositingEnabled 
         ? Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
         : Kirigami.Theme.backgroundColor
+
+    function notifyClipboard(text) {
+        root.showPassiveNotification(qsTr("Copied: %1").arg(text), "short")
+    }
     
     // Enable transparency for the main window
     color: "transparent"

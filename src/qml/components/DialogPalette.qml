@@ -27,7 +27,18 @@ Dialog {
     property real brightnessValue: 0.8
     property real contrastValue: 0.0
     property string seed_color: ""
-    
+
+    TextEdit {
+        id: clipboardHelper
+        visible: false
+        function copyToClipboard(text) {
+            clipboardHelper.text = text
+            clipboardHelper.selectAll()
+            clipboardHelper.copy()
+            applicationWindow().notifyClipboard(text)
+        }
+    }
+
     // Watch for backend updates to seed
     property string actualSeed: (controller.currentPaletteData && controller.currentPaletteData.seed) ? controller.currentPaletteData.seed : ""
     onActualSeedChanged: {
@@ -390,7 +401,12 @@ Dialog {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                            onClicked: (mouse) => {
+                                                if (mouse.button === Qt.RightButton) {
+                                                    clipboardHelper.copyToClipboard(modelData)
+                                                    return
+                                                }
                                                 root.selectedIndex = index
                                                 root.selectedSet = "palette"
                                                 root.selectedColor = modelData
@@ -456,10 +472,14 @@ Dialog {
                                                     root.selectedSet = "accent"
                                                     root.selectedColor = modelData
                                                 }
-                                                else if (mouse.button === Qt.RightButton && root.currentBackend === "material-you-kwal") {
-                                                    // Right-click sets this color as seed (only for Kwal variant)
-                                                    root.seed_color = modelData
-                                                    triggerRefresh()
+                                                else if (mouse.button === Qt.RightButton) {
+                                                    if (root.currentBackend === "material-you-kwal") {
+                                                        // Right-click sets this color as seed (only for Kwal variant)
+                                                        root.seed_color = modelData
+                                                        triggerRefresh()
+                                                    } else {
+                                                        clipboardHelper.copyToClipboard(modelData)
+                                                    }
                                                 }
                                             }
                                         }
