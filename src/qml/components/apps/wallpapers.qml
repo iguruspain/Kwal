@@ -399,6 +399,39 @@ Kirigami.Page {
                             }
                         }
                     }
+                    Label {
+                        text: qsTr("Wallpaper Colors")
+                        visible: bottomDrawer.commandVisible
+                        font.bold: true
+                    }         
+                    RowLayout {
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignHCenter
+                        spacing: Kirigami.Units.smallSpacing
+                        visible: bottomDrawer.commandVisible
+                        
+                        Repeater {
+                            model: controller.wallpaperColors
+                            delegate: Rectangle {
+                                required property string modelData
+                                width: Kirigami.Units.gridUnit * 1.5
+                                height: Kirigami.Units.gridUnit * 1.5
+                                radius: Kirigami.Units.smallSpacing
+                                color: modelData
+                                border.color: Qt.alpha(Kirigami.Theme.textColor, 0.2)
+                                border.width: 1
+
+                                HoverHandler { id: colorHover }
+                                ToolTip.text: modelData.toUpperCase()
+                                ToolTip.visible: colorHover.hovered
+                                ToolTip.delay: Kirigami.Units.toolTipDelay
+                            }
+                        }
+                    }
+                    Label {
+                        text: qsTr("Custom Command")
+                        visible: bottomDrawer.commandVisible
+                        font.bold: true
+                    }                    
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.preferredWidth: 400

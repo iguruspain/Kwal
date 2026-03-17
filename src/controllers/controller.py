@@ -159,6 +159,10 @@ class Controller(QObject):
     # Global notification signal (message, type["error"|"success"|"info"])
     notification = Signal(str, str)
 
+    # Wallpaper color extraction
+    wallpaperColorsChanged = Signal()
+
+
     # SVG Recolor signals
     svgDirectoryChanged = Signal()
     svgGradientColorsChanged = Signal()
@@ -193,6 +197,7 @@ class Controller(QObject):
         self._result_dialog_text: str = ""
         self._templates_installed: bool = False
         self._custom_command_wallpaper: str = ""
+        self._wallpaper_colors: list[str] = []
         
         # Draft State (Persist across tabs)
         self._fastfetch_draft_color: str = "transparent"
@@ -216,6 +221,7 @@ class Controller(QObject):
         # Thread References
         self._tint_thread: Optional[threading.Thread] = None
         self._apply_thread: Optional[threading.Thread] = None
+        self._color_extraction_thread: Optional[threading.Thread] = None
         # Palette workers (to avoid premature destruction and track latest request)
         self._palette_workers: set[PaletteWorker] = set()
         self._latest_palette_request_id: int = 0
@@ -408,6 +414,11 @@ class Controller(QObject):
         return self._selected_wallpaper_resolution
 
     selectedWallpaperResolution = Property(str, _get_selected_wallpaper_resolution, notify=selectedWallpaperChanged)
+
+    def _get_wallpaper_colors(self) -> list[str]:
+        return self._wallpaper_colors
+
+    wallpaperColors = Property("QVariantList", _get_wallpaper_colors, notify=wallpaperColorsChanged)
 
     def _get_selected_file(self) -> str:
         return self._selected_file
@@ -880,14 +891,69 @@ class Controller(QObject):
                     img = QImage(path)
                     if not img.isNull():
                         self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
+                        self._start_color_extraction(path)
                     else:
                         self._selected_wallpaper_resolution = ""
+                        self._wallpaper_colors = []
+                        self.wallpaperColorsChanged.emit()
                 else:
                     self._selected_wallpaper_resolution = ""
+                    self._wallpaper_colors = []
+                    self.wallpaperColorsChanged.emit()
                     
                 self.selectedWallpaperChanged.emit()
         except Exception:
             self._logger.exception("Error selecting wallpaper %r", path)
+
+    # Signals for internal threading
+    _colorsExtracted = Signal(list)
+
+    def _start_color_extraction(self, image_path: str) -> None:
+        """Starts a background thread to extract top colors using Celebi quantization."""
+        # Connect signal once if not already connected
+        try:
+            self._colorsExtracted.disconnect(self._update_colors_main_thread)
+        except Exception:
+            pass
+        self._colorsExtracted.connect(self._update_colors_main_thread)
+
+        if self._color_extraction_thread and self._color_extraction_thread.is_alive():
+            pass
+            
+        self._color_extraction_thread = threading.Thread(
+            target=self._extract_colors_task,
+            args=(image_path,),
+            daemon=True
+        )
+        self._color_extraction_thread.start()
+
+    def _extract_colors_task(self, image_path: str) -> None:
+        """Background task to extract colors using materialyoucolor.
+        
+        Like matugen, it resizes the image to 128x128 for speed, 
+        then uses Celebi algorithm to quantize colors, and scores them.
+        """
+        try:
+            from ..utils.color_utils import extract_wallpaper_top_colors
+            
+            hex_colors = extract_wallpaper_top_colors(image_path, count=4)
+            self._logger.info(f"Extracted Celebi Colors: {hex_colors}")
+            
+            # Only update if the selection hasn't changed while we were processing
+            if self._selected_wallpaper == image_path:
+                self._colorsExtracted.emit(hex_colors)
+                
+        except Exception as e:
+            self._logger.error("Failed to extract wallpaper colors: %s", e)
+            self._colorsExtracted.emit([])
+            
+    @Slot(list)
+    def _update_colors_main_thread(self, colors: list) -> None:
+        """Safely updates the property on the main thread via Qt slot mechanism."""
+        self._logger.info(f"Updating UI with Colors: {colors}")
+        self._wallpaper_colors = colors
+        self.wallpaperColorsChanged.emit()
+
 
     @Slot(str)
     def setAsWallpaper(self, path: str) -> None:

@@ -36,7 +36,7 @@
         <rect x="70.313004" y="10.5" width="376.07501" height="417.5" rx="48" ry="48" fill="none" stroke="url(#bevel_grad)" stroke-width="16" opacity="0.4" id="rect6" style="stroke:url(#bevel_grad)"/>
     </g>
     <!--Letra K (Usa el color de fondo del tema para contraste)-->
-    <path id="central_k" d="m 145.528,122 h 65.813 v 83.5 L 305.36,122 h 75.215 L 258.35,236.813 380.575,372.5 H 305.36 L 211.341,278.563 V 372.5 h -65.813 z" fill="currentColor" opacity="0.6" class="ColorScheme-Background"/>
+    <path id="central_k" d="m 145.528,122 h 65.813 v 83.5 L 305.36,122 h 75.215 L 258.35,236.813 380.575,372.5 H 305.36 L 211.341,278.563 V 372.5 h -65.813 z" fill="currentColor" class="ColorScheme-Background"/>
     <!--Brillo sutil-->
     <ellipse cx="258" cy="68" rx="150" ry="20" fill="#ffffff" opacity="0.10" id="ellipse6"/>
 </svg>

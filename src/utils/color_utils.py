@@ -161,6 +161,48 @@ def extract_palette(image_path: str, backend: str, **kwargs) -> PaletteData:
         raise ValueError(f"Unknown backend: {backend}")
 
 
+def extract_wallpaper_top_colors(image_path: str, count: int = 4) -> list[str]:
+    """Extract top dominant colors using materialyoucolor's Celebi quantization.
+    
+    Similar to how matugen works: resizes to 128x128 for speed, 
+    quantizes colors, and scores them to find the `count` best colors.
+    Returns a list of hex color strings (e.g. ['#RRGGBB', ...]).
+    """
+    try:
+        from materialyoucolor.quantize import QuantizeCelebi
+        from materialyoucolor.score.score import Score, ScoreOptions
+        
+        path = Path(image_path).expanduser().resolve()
+        if not path.exists():
+            logger.error("extract_wallpaper_top_colors: image not found: %s", path)
+            return []
+
+        img = Image.open(str(path))
+        img.thumbnail((128, 128))
+        
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        pixels = list(img.getdata())
+        quantized = QuantizeCelebi(pixels, 128)
+        
+        options = ScoreOptions(desired=count)
+        ranked_colors = Score.score(quantized, options)
+        
+        hex_colors = []
+        for color in ranked_colors:
+            hex_colors.append(f"#{color & 0xFFFFFF:06x}")
+            
+        return hex_colors
+    except ImportError:
+        logger.error("materialyoucolor not installed. Cannot extract top colors.")
+        return []
+    except Exception as e:
+        logger.error("Failed to extract wallpaper colors: %s", e)
+        return []
+
+
+
 def _extract_pywal16(path: Path, **kwargs) -> PaletteData:
     """
     Extract palette using pywal backend with automatic fallback to alternative backend.
