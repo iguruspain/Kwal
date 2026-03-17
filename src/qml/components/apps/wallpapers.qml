@@ -352,6 +352,23 @@ Kirigami.Page {
                 border.color: Kirigami.Theme.highlightColor
                 border.width: 1
 
+                // Block mouse events from passing through to items behind the drawer
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.AllButtons
+                    onWheel: wheel => wheel.accepted = true
+                }
+
+                TextEdit {
+                    id: clipboardHelper
+                    visible: false
+                    function copyToClipboard(text) {
+                        clipboardHelper.text = text
+                        clipboardHelper.selectAll()
+                        clipboardHelper.copy()
+                    }
+                }
+
                 ColumnLayout {
                     id: drawerContent
                     anchors.fill: parent
@@ -400,11 +417,12 @@ Kirigami.Page {
                         }
                     }
                     Label {
-                        text: qsTr("Wallpaper Colors")
+                        text: qsTr("Scored Colors")
                         visible: bottomDrawer.commandVisible
                         font.bold: true
                     }         
                     RowLayout {
+                        id: colorRowWallpaper
                         Layout.alignment: Qt.AlignLeft | Qt.AlignHCenter
                         spacing: Kirigami.Units.smallSpacing
                         visible: bottomDrawer.commandVisible
@@ -421,6 +439,10 @@ Kirigami.Page {
                                 border.width: 1
 
                                 HoverHandler { id: colorHover }
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
+                                    onTapped: clipboardHelper.copyToClipboard(modelData)
+                                }
                                 ToolTip.text: modelData.toUpperCase()
                                 ToolTip.visible: colorHover.hovered
                                 ToolTip.delay: Kirigami.Units.toolTipDelay

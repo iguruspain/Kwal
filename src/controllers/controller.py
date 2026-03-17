@@ -222,6 +222,7 @@ class Controller(QObject):
         self._tint_thread: Optional[threading.Thread] = None
         self._apply_thread: Optional[threading.Thread] = None
         self._color_extraction_thread: Optional[threading.Thread] = None
+        self._colorsExtracted.connect(self._update_colors_main_thread)
         # Palette workers (to avoid premature destruction and track latest request)
         self._palette_workers: set[PaletteWorker] = set()
         self._latest_palette_request_id: int = 0
@@ -910,16 +911,6 @@ class Controller(QObject):
 
     def _start_color_extraction(self, image_path: str) -> None:
         """Starts a background thread to extract top colors using Celebi quantization."""
-        # Connect signal once if not already connected
-        try:
-            self._colorsExtracted.disconnect(self._update_colors_main_thread)
-        except Exception:
-            pass
-        self._colorsExtracted.connect(self._update_colors_main_thread)
-
-        if self._color_extraction_thread and self._color_extraction_thread.is_alive():
-            pass
-            
         self._color_extraction_thread = threading.Thread(
             target=self._extract_colors_task,
             args=(image_path,),
