@@ -161,39 +161,81 @@ def extract_palette(image_path: str, backend: str, **kwargs) -> PaletteData:
         raise ValueError(f"Unknown backend: {backend}")
 
 
-def extract_wallpaper_top_colors(image_path: str, count: int = 4) -> list[str]:
-    """Extract top dominant colors using materialyoucolor's Celebi quantization.
-    
-    Similar to how matugen works: resizes to 128x128 for speed, 
-    quantizes colors, and scores them to find the `count` best colors.
-    Returns a list of hex color strings (e.g. ['#RRGGBB', ...]).
-    """
-    try:
-        from materialyoucolor.quantize import QuantizeCelebi
-        from materialyoucolor.score.score import Score, ScoreOptions
-        
-        path = Path(image_path).expanduser().resolve()
-        if not path.exists():
-            logger.error("extract_wallpaper_top_colors: image not found: %s", path)
-            return []
+def _extract_colors_matugen(image_path: str, count: int) -> list[str]:
+    """Extract scored colors by running matugen in dry-run mode and parsing hex output.
 
-        img = Image.open(str(path))
-        img.thumbnail((128, 128))
-        
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-            
-        pixels = list(img.getdata())
-        quantized = QuantizeCelebi(pixels, 128)
-        
-        options = ScoreOptions(desired=count)
-        ranked_colors = Score.score(quantized, options)
-        
-        hex_colors = []
-        for color in ranked_colors:
-            hex_colors.append(f"#{color & 0xFFFFFF:06x}")
-            
-        return hex_colors
+    RUST_LOG=debug is required so matugen emits the ranked-color DEBUG lines
+    regardless of the environment from which the app was launched (e.g. KDE).
+    """
+    env = os.environ.copy()
+    env["RUST_LOG"] = "debug"
+    result = subprocess.run(
+        ["matugen", "image", image_path, "-d", "--dry-run", "--source-color-index", "0"],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    combined = result.stdout + result.stderr
+    found = re.findall(r"#[0-9a-fA-F]{6}", combined)
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for color in found:
+        lower = color.lower()
+        if lower not in seen:
+            seen.add(lower)
+            unique.append(lower)
+    return unique[:count]
+
+
+def _extract_colors_materialyoucolor(image_path: str, count: int) -> list[str]:
+    """Extract top dominant colors using materialyoucolor's Celebi quantization."""
+    from materialyoucolor.quantize import QuantizeCelebi
+    from materialyoucolor.score.score import Score, ScoreOptions
+
+    img = Image.open(image_path)
+    img.thumbnail((128, 128))
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    pixels = list(img.getdata())
+    quantized = QuantizeCelebi(pixels, 128)
+
+    options = ScoreOptions(desired=count)
+    ranked_colors = Score.score(quantized, options)
+
+    return [f"#{color & 0xFFFFFF:06x}" for color in ranked_colors]
+
+
+def extract_wallpaper_top_colors(image_path: str, count: int = 4) -> list[str]:
+    """Extract top scored colors from a wallpaper image.
+
+    Prefers matugen (if installed) for consistency with the system theme engine.
+    Falls back to materialyoucolor's Celebi quantization otherwise.
+    Returns a list of hex color strings (e.g. ['#rrggbb', ...]).
+    """
+    path = Path(image_path).expanduser().resolve()
+    if not path.exists() or not path.is_file():
+        logger.error("extract_wallpaper_top_colors: image not found: %s", path)
+        return []
+
+    if check_binary("matugen"):
+        try:
+            colors = _extract_colors_matugen(str(path), count)
+            if colors:
+                logger.info("Scored colors via matugen: %s", colors)
+                return colors
+            logger.warning("matugen returned no colors, falling back to materialyoucolor (Celebi)")
+        except Exception as e:
+            logger.warning("matugen extraction failed (%s), falling back to materialyoucolor (Celebi)", e)
+    else:
+        logger.debug("matugen not found — using materialyoucolor (Celebi) for color extraction")
+
+    try:
+        colors = _extract_colors_materialyoucolor(str(path), count)
+        logger.info("Scored colors via materialyoucolor (Celebi): %s", colors)
+        return colors
     except ImportError:
         logger.error("materialyoucolor not installed. Cannot extract top colors.")
         return []

@@ -928,7 +928,7 @@ class Controller(QObject):
             from ..utils.color_utils import extract_wallpaper_top_colors
             
             hex_colors = extract_wallpaper_top_colors(image_path, count=4)
-            self._logger.info(f"Extracted Celebi Colors: {hex_colors}")
+            self._logger.info(f"Extracted wallpaper colors: {hex_colors}")
             
             # Only update if the selection hasn't changed while we were processing
             if self._selected_wallpaper == image_path:
