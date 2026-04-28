@@ -84,6 +84,8 @@ qmlcache/
 .agent/
 .agent/rules
 .agent/*
+.kilo/
+.kilo/*
 
 # Run
 run.py
