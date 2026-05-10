@@ -9,6 +9,7 @@ import argparse
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QUrl
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtGui import QImageReader
 from PySide6.QtCore import qInstallMessageHandler, QtMsgType
 from PySide6.QtWebEngineQuick import QtWebEngineQuick
 from .controllers.controller import Controller, SvgImageProvider
@@ -105,6 +106,9 @@ def main():
 
     # Use QApplication because we use Qt Widgets (QFileDialog) in controller
     app = QApplication(sys.argv)
+    
+    # Disable QImageReader allocation limit to allow loading very high-res wallpapers
+    QImageReader.setAllocationLimit(0)
 
     # Set application metadata
     app.setApplicationName("kwal")
