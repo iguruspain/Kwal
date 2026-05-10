@@ -172,6 +172,7 @@ Kirigami.Page {
                 target: controller
                 function onSelectedWallpaperChanged() {
                     rightPaneWallpapers.drawerOpen = (controller.selectedWallpaper !== "")
+                    bottomDrawer.selectedScoreColorIndex = 0
                 }
             }
 
@@ -336,6 +337,7 @@ Kirigami.Page {
                 
                 property bool isOpen: rightPaneWallpapers.drawerOpen && controller.selectedWallpaper !== "" && controller.selectedWallpaper.length > 0
                 property bool commandVisible: false
+                property int selectedScoreColorIndex: 0
 
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
@@ -402,7 +404,8 @@ Kirigami.Page {
 
                             onClicked: {
                                 controller.setAsWallpaper(controller.selectedWallpaper)
-                                controller.runCMD(controller.customCommandWallpaper)
+                                let cmd = controller.customCommandWallpaper.replace(/%sc%/g, bottomDrawer.selectedScoreColorIndex.toString())
+                                controller.runCMD(cmd)
                                 rightPaneWallpapers.drawerOpen = false
                             }
                         }
@@ -432,14 +435,19 @@ Kirigami.Page {
                             model: controller.wallpaperColors
                             delegate: Rectangle {
                                 required property string modelData
+                                required property int index
                                 width: Kirigami.Units.gridUnit * 1.5
                                 height: Kirigami.Units.gridUnit * 1.5
                                 radius: Kirigami.Units.smallSpacing
                                 color: modelData
-                                border.color: Qt.alpha(Kirigami.Theme.textColor, 0.2)
-                                border.width: 1
+                                border.color: bottomDrawer.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.2)
+                                border.width: bottomDrawer.selectedScoreColorIndex === index ? 3 : 1
 
                                 HoverHandler { id: colorHover }
+                                TapHandler {
+                                    acceptedButtons: Qt.LeftButton
+                                    onTapped: bottomDrawer.selectedScoreColorIndex = index
+                                }
                                 TapHandler {
                                     acceptedButtons: Qt.RightButton
                                     onTapped: clipboardHelper.copyToClipboard(modelData)
@@ -451,9 +459,9 @@ Kirigami.Page {
                         }
                     }
                     Label {
-                        text: qsTr("Custom Command")
+                        text: qsTr("Use placeholder %sc% for selected color")
                         visible: bottomDrawer.commandVisible
-                        font.bold: true
+                        font.bold: false
                     }                    
                     RowLayout {
                         Layout.fillWidth: true
