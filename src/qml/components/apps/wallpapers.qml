@@ -412,7 +412,17 @@ Kirigami.Page {
                             onClicked: {
                                 controller.setAsWallpaper(controller.selectedWallpaper)
                                 let cmd = controller.customCommandWallpaper.replace(/%sc%/g, bottomDrawer.selectedScoreColorIndex.toString())
-                                controller.runCMD(cmd)
+                                cmd = cmd.replace(/%path%/g, controller.selectedWallpaper)
+                                if (cmd.trim() !== "") {
+                                    controller.runCMD(cmd)
+                                }
+
+                                let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, bottomDrawer.selectedScoreColorIndex.toString())
+                                cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper)
+                                if (cmd2.trim() !== "") {
+                                    controller.runCMD(cmd2)
+                                }
+
                                 rightPaneWallpapers.drawerOpen = false
                             }
                         }
@@ -466,7 +476,7 @@ Kirigami.Page {
                         }
                     }
                     Label {
-                        text: qsTr("Use placeholder %sc% for selected color")
+                        text: qsTr("Placeholders:\n %sc% for selected color\n %path% for image path")
                         visible: bottomDrawer.commandVisible
                         font.bold: false
                     }                    
@@ -481,6 +491,19 @@ Kirigami.Page {
                             placeholderText: qsTr("Enter custom command")
                             text: controller.customCommandWallpaper
                             onTextChanged: controller.customCommandWallpaper = text
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 400
+                        spacing: Kirigami.Units.smallSpacing
+                        visible: bottomDrawer.commandVisible
+                        TextField {
+                            id: commandInput2
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("Enter custom command 2")
+                            text: controller.customCommandWallpaper2
+                            onTextChanged: controller.customCommandWallpaper2 = text
                         }
                     }
                 }
