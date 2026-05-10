@@ -222,6 +222,13 @@ Kirigami.Page {
                     
                     Item { Layout.fillWidth: true }
                     
+                    Kirigami.SearchField {
+                        id: searchField
+                        Layout.preferredWidth: 200
+                        placeholderText: qsTr("Filter wallpapers...")
+                        onTextChanged: imageModel.filterText = text
+                    }
+                    
                 }
                 Item { Layout.fillHeight: true }
                 //Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.textColor, 0.4)}

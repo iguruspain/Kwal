@@ -246,14 +246,18 @@ class ImageModel(QAbstractListModel):
     ThumbnailRole = Qt.UserRole + 3
 
     loadingChanged = Signal()
+    filterTextChanged = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
+        self._all_files: list[Path] = []
+        self._all_thumbs: list[str] = []
         self._files: list[Path] = []
         self._thumbs: list[str] = []
         self._worker_thread: QThread | None = None
         self._worker: ThumbnailWorker | None = None
         self._loading: bool = False
+        self._filter_text: str = ""
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._files)
@@ -286,6 +290,34 @@ class ImageModel(QAbstractListModel):
 
     loading = Property(bool, _get_loading, notify=loadingChanged)
 
+    def _get_filter_text(self) -> str:
+        return self._filter_text
+
+    def _set_filter_text(self, text: str) -> None:
+        if self._filter_text != text:
+            self._filter_text = text
+            self._apply_filter()
+            self.filterTextChanged.emit()
+
+    filterText = Property(str, _get_filter_text, _set_filter_text, notify=filterTextChanged)
+
+    def _apply_filter(self) -> None:
+        self.beginResetModel()
+        if not self._filter_text:
+            self._files = list(self._all_files)
+            self._thumbs = list(self._all_thumbs)
+        else:
+            self._files = []
+            self._thumbs = []
+            term = self._filter_text.lower()
+            # Ensure lengths match in case of desync
+            length = min(len(self._all_files), len(self._all_thumbs))
+            for i in range(length):
+                if term in self._all_files[i].name.lower():
+                    self._files.append(self._all_files[i])
+                    self._thumbs.append(self._all_thumbs[i])
+        self.endResetModel()
+
     def _cleanup_worker(self) -> None:
         if self._worker:
             try:
@@ -308,6 +340,8 @@ class ImageModel(QAbstractListModel):
         self._cleanup_worker()
 
         self.beginResetModel()
+        self._all_files.clear()
+        self._all_thumbs.clear()
         self._files.clear()
         self._thumbs.clear()
         self.endResetModel()
@@ -339,11 +373,10 @@ class ImageModel(QAbstractListModel):
     @Slot(list, list)
     def _on_worker_done(self, files: list[str], thumbs: list[str]) -> None:
         try:
-            self.beginResetModel()
-            self._files = [Path(x) for x in files]
-            self._thumbs = thumbs
-            self.endResetModel()
-            logger.debug("ImageModel loaded %d files", len(self._files))
+            self._all_files = [Path(x) for x in files]
+            self._all_thumbs = thumbs
+            self._apply_filter()
+            logger.debug("ImageModel loaded %d files", len(self._all_files))
         finally:
             self._loading = False
             self.loadingChanged.emit()
