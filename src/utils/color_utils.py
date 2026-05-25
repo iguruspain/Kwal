@@ -160,33 +160,28 @@ def extract_palette(image_path: str, backend: str, **kwargs) -> PaletteData:
     else:
         raise ValueError(f"Unknown backend: {backend}")
 
-
 def _extract_colors_matugen(image_path: str, count: int) -> list[str]:
-    """Extract scored colors by running matugen in dry-run mode and parsing hex output.
-
-    RUST_LOG=debug is required so matugen emits the ranked-color DEBUG lines
-    regardless of the environment from which the app was launched (e.g. KDE).
-    """
-    env = os.environ.copy()
-    env["RUST_LOG"] = "debug"
+    """Extract source colors by running matugen with --show-source-colors."""
     result = subprocess.run(
-        ["matugen", "image", image_path, "-d", "--dry-run", "--source-color-index", "0"],
+        ["matugen", "image", image_path, "--show-source-colors"],
         capture_output=True,
         text=True,
-        env=env,
+        check=True  # Lanza una excepción si el comando falla
     )
-    combined = result.stdout + result.stderr
-    found = re.findall(r"#[0-9a-fA-F]{6}", combined)
-    # Deduplicate while preserving order
-    seen: set[str] = set()
-    unique: list[str] = []
+    
+    # Buscamos los hex directamente en el stdout
+    found = re.findall(r"#[0-9a-fA-F]{6}", result.stdout)
+    
+    # Deduplicar preservando el orden original
+    seen = set()
+    unique = []
     for color in found:
         lower = color.lower()
         if lower not in seen:
             seen.add(lower)
             unique.append(lower)
+            
     return unique[:count]
-
 
 def _extract_colors_materialyoucolor(image_path: str, count: int) -> list[str]:
     """Extract top dominant colors using materialyoucolor's Celebi quantization."""
