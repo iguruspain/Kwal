@@ -489,7 +489,7 @@ Kirigami.Page {
                         
                         Label {
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: %sc% for selected color, %path% for image path")
+                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for image path")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight

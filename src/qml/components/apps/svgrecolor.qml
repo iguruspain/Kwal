@@ -12,17 +12,6 @@ Kirigami.Page {
     // -1 = monochrome slot; 0-5 = gradient index
     property int _editColorIndex: -2
 
-    Components.DialogPalette {
-        id: paletteDialog
-        onAccepted: {
-            if (selectedColor === "transparent" || !controller) return
-            if (svgRecolorPage._editColorIndex === -1) {
-                controller.svgSetMonoColor(selectedColor.toString())
-            } else if (svgRecolorPage._editColorIndex >= 0) {
-                controller.svgSetGradientColor(svgRecolorPage._editColorIndex, selectedColor.toString())
-            }
-        }
-    }
 
     background: Rectangle {
         color: "transparent"
@@ -182,17 +171,6 @@ Kirigami.Page {
                                     }
                                 }
 
-                                Button {
-                                    icon.name: "color-picker"
-                                    ToolTip.text: qsTr("Pick from palette")
-                                    ToolTip.visible: hovered
-                                    enabled: index < (controller ? controller.svgColorCount : 6)
-                                    onClicked: {
-                                        svgRecolorPage._editColorIndex = index
-                                        paletteDialog.selectedColor = "transparent"
-                                        paletteDialog.open()
-                                    }
-                                }
                             }
                         }
 
@@ -243,16 +221,6 @@ Kirigami.Page {
                                 }
                             }
 
-                            Button {
-                                icon.name: "color-picker"
-                                ToolTip.text: qsTr("Pick from palette")
-                                ToolTip.visible: hovered
-                                onClicked: {
-                                    svgRecolorPage._editColorIndex = -1
-                                    paletteDialog.selectedColor = "transparent"
-                                    paletteDialog.open()
-                                }
-                            }
                         }
                     }
                 }

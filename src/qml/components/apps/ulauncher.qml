@@ -76,16 +76,6 @@ Kirigami.Page {
         return (v === undefined || v === null) ? "" : v;
     }
 
-    Components.DialogPalette {
-        id: paletteDialog
-        onAccepted: {
-            if (selectedColor !== "transparent") {
-                if (ulauncherModelProxy.editSectionIndex >= 0 && ulauncherModelProxy.editColorIndex >= 0 && controller) {
-                    controller.ulauncherModel.setPaletteColor(ulauncherModelProxy.editSectionIndex, ulauncherModelProxy.editColorIndex, selectedColor.toString())
-                }
-            }
-        }
-    }
 
     Dialog {
         id: confirmApplyDialog
@@ -392,17 +382,7 @@ Kirigami.Page {
                                             }
                                         }
 
-                                        Button {
-                                            icon.name: "color-picker"
-                                            ToolTip.text: qsTr("Pick from palette")
-                                            ToolTip.visible: hovered
-                                            onClicked: {
-                                                ulauncherModelProxy.editSectionIndex = sectionIndex
-                                                ulauncherModelProxy.editColorIndex = index
-                                                paletteDialog.selectedColor = "transparent"
-                                                paletteDialog.open()
-                                            }
-                                        }
+
                                     }
                                 }
                             }

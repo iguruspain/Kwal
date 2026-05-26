@@ -98,18 +98,6 @@ Kirigami.Page{
         return (v === undefined || v === null) ? "" : v;
     }
 
-    Components.DialogPalette {
-        id: paletteDialog
-        onAccepted: {
-            // explicit toString() for safety when passing to Python
-            if (selectedColor !== "transparent") {
-                // If we have an edit index set, write back using Controller
-                if (starshipModelProxy.paletteIndex >= 0 && starshipModelProxy.editIndex >= 0 && controller) {
-                    controller.starshipModel.setPaletteColor(starshipModelProxy.paletteIndex, starshipModelProxy.editIndex, selectedColor.toString())
-                }
-            }
-        }
-    }
 
     Dialog {
         id: confirmApplyDialog
@@ -403,18 +391,6 @@ Kirigami.Page{
                                         }                                        
                                     }
 
-                                    Button {
-                                        id: paletteColorButton
-                                        icon.name: "color-picker"
-                                        ToolTip.text: qsTr("Pick from palette")
-                                        ToolTip.visible: hovered
-                                        onClicked: {
-                                            starshipModelProxy.editIndex = index
-                                            // Reset selection state in dialog to prevent stale values
-                                            paletteDialog.selectedColor = "transparent"
-                                            paletteDialog.open()
-                                        }
-                                    }
                                 }
                             }
 

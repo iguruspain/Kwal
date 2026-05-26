@@ -5,7 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-//import "components" as Components
+import "components" as Components
 
 Kirigami.ApplicationWindow {
     id: root
@@ -121,6 +121,13 @@ Kirigami.ApplicationWindow {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    ToolButton {
+                        icon.name: "color-picker"
+                        ToolTip.text: qsTr("Open Color Palette")
+                        ToolTip.visible: hovered
+                        onClicked: globalPaletteDialog.open()
+                    }
                 }
 
                 MenuSeparator {
@@ -207,5 +214,12 @@ Kirigami.ApplicationWindow {
             leftPadding: Kirigami.Units.smallSpacing
             rightPadding: Kirigami.Units.smallSpacing
         }
+    }
+
+    Components.DialogPalette {
+        id: globalPaletteDialog
+        // Can be opened from anywhere, doesn't need to apply to a specific field.
+        // It's just a reference/generator tool globally.
+        anchors.centerIn: parent
     }
 }

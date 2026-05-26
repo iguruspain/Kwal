@@ -295,25 +295,7 @@ Kirigami.Page {
                             }
                         }
                     }
-                    Button {
-                        id: paletteColorButton
-                        icon.name: "color-picker"
-                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        ToolTip.text: qsTr("Pick from palette")
-                        ToolTip.visible: hovered
-                        onClicked: {
-                            // Identify current image being previewed
-                            var currentImg = "";
-                            if (controller.selectedFile && controller.selectedFile !== "") {
-                                currentImg = controller.selectedFile;
-                            } else if (controller.fastfetchConfigImage && controller.fastfetchConfigImage !== "") {
-                                currentImg = controller.fastfetchConfigImage.replace("file://", "");
-                            }
-                            
-                            paletteDialog.sourceImage = currentImg;
-                            paletteDialog.open();
-                        }                                                   
-                    }
+
                 }
 
                 Item { Layout.fillHeight: true }
@@ -525,22 +507,5 @@ Kirigami.Page {
         }
     }
 
-    Components.DialogPalette {
-        id: paletteDialog
-        onAccepted: {
-            if (selectedColor != "transparent") {
-                controller.fastfetchDraftColor = selectedColor
-                
-                // Refresh preview logic same as color picker
-                if (controller.selectedFile) {
-                    controller.generateTintedPreview(controller.selectedFile, selectedColor);
-                } else if (controller.fastfetchTemplateIndex !== -1 && templateSelector.model) {
-                    var info = templateSelector.model.get(controller.fastfetchTemplateIndex);
-                    if (info && info.fileUrl) {
-                        controller.generateTintedPreview(info.fileUrl, selectedColor);
-                    }
-                }
-            }
-        }
-    }
+
 }
