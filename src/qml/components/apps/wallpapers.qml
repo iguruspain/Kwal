@@ -167,12 +167,12 @@ Kirigami.Page {
 
             // --- Drawer State ---
             property bool drawerOpen: false
+            property int selectedScoreColorIndex: 0
 
             Connections {
                 target: controller
                 function onSelectedWallpaperChanged() {
-                    rightPaneWallpapers.drawerOpen = (controller.selectedWallpaper !== "")
-                    bottomDrawer.selectedScoreColorIndex = 0
+                    rightPaneWallpapers.selectedScoreColorIndex = 0
                 }
             }
 
@@ -229,6 +229,15 @@ Kirigami.Page {
                         onTextChanged: imageModel.filterText = text
                     }
                     
+                    ToolButton {
+                        icon.name: "preferences-system-symbolic"
+                        checkable: true
+                        checked: rightPaneWallpapers.drawerOpen
+                        onToggled: rightPaneWallpapers.drawerOpen = checked
+                        ToolTip.text: qsTr("Toggle Preferences Panel")
+                        ToolTip.visible: hovered
+                        display: AbstractButton.IconOnly
+                    }
                 }
                 Item { Layout.fillHeight: true }
                 //Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.textColor, 0.4)}
@@ -274,6 +283,14 @@ Kirigami.Page {
                                 border.width: isSelected ? 3 : 1
                                 radius: Kirigami.Units.smallSpacing
 
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        controller.selectWallpaper(filePath)
+                                    }
+                                }
+
                                 Image {
                                     anchors.fill: parent
                                     anchors.margins: Kirigami.Units.smallSpacing
@@ -306,13 +323,91 @@ Kirigami.Page {
                                     }
                                 }
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        controller.selectWallpaper(filePath)
-                                        rightPaneWallpapers.drawerOpen = true
+                                Item {
+                                    id: scoreColorsSidebar
+                                    anchors.left: parent.left
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width * 0.4
+                                    visible: isSelected
+
+                                    HoverHandler { id: leftHover }
+
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.margins: Kirigami.Units.smallSpacing
+                                        width: Kirigami.Units.gridUnit + Kirigami.Units.smallSpacing * 1.75
+                                        height: colorColumn.implicitHeight + Kirigami.Units.smallSpacing * 1.75
+                                        
+                                        radius: Kirigami.Units.cornerRadius
+                                        color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
+                                        border.color: Kirigami.Theme.highlightColor
+                                        border.width: 0.5
+                                        
+                                        opacity: leftHover.hovered ? 1.0 : 0.0
+                                        visible: opacity > 0
+                                        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration } }
+
+                                        ColumnLayout {
+                                            id: colorColumn
+                                            anchors.centerIn: parent
+                                            spacing: Kirigami.Units.smallSpacing
+
+                                            Repeater {
+                                                model: controller.wallpaperColors
+                                                delegate: Rectangle {
+                                                    required property string modelData
+                                                    required property int index
+                                                    width: Kirigami.Units.gridUnit
+                                                    height: Kirigami.Units.gridUnit
+                                                    radius: Kirigami.Units.smallSpacing
+                                                    color: modelData
+                                                    border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.2)
+                                                    border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+
+                                                    HoverHandler { id: colorHover }
+                                                    TapHandler {
+                                                        acceptedButtons: Qt.LeftButton
+                                                        onTapped: rightPaneWallpapers.selectedScoreColorIndex = index
+                                                    }
+                                                    TapHandler {
+                                                        acceptedButtons: Qt.RightButton
+                                                        onTapped: clipboardHelper.copyToClipboard(modelData)
+                                                    }
+                                                    ToolTip.text: modelData.toUpperCase()
+                                                    ToolTip.visible: colorHover.hovered
+                                                    ToolTip.delay: Kirigami.Units.toolTipDelay
+                                                }
+                                            }
+                                        }
                                     }
+                                }
+
+                                ToolButton {
+                                    anchors.top: parent.top
+                                    anchors.right: parent.right
+                                    anchors.margins: Kirigami.Units.smallSpacing
+                                    icon.name: "dialog-ok-apply"
+                                    icon.color: Kirigami.Theme.positiveTextColor
+                                    display: AbstractButton.IconOnly
+                                    visible: isSelected
+                                    onClicked: {
+                                        controller.setAsWallpaper(controller.selectedWallpaper)
+                                        let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                        cmd = cmd.replace(/%path%/g, controller.selectedWallpaper)
+                                        if (cmd.trim() !== "") {
+                                            controller.runCMD(cmd)
+                                        }
+
+                                        let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                        cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper)
+                                        if (cmd2.trim() !== "") {
+                                            controller.runCMD(cmd2)
+                                        }
+                                    }
+                                    ToolTip.text: qsTr("Set as Wallpaper")
+                                    ToolTip.visible: hovered
                                 }
                                 
                                 HoverHandler { id: hoverHandler }
@@ -332,19 +427,27 @@ Kirigami.Page {
                 visible: running
             }
 
+            TextEdit {
+                id: clipboardHelper
+                visible: false
+                function copyToClipboard(text) {
+                    clipboardHelper.text = text
+                    clipboardHelper.selectAll()
+                    clipboardHelper.copy()
+                    root.notifyClipboard(text)
+                }
+            }
+
             // Bottom Drawer
             Rectangle {
                 id: bottomDrawer
                 // Use y position for sliding animation instead of anchors.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 
-                //width: parent.width * 0.8
-                width: Math.min(parent.width * 0.8, drawerContent.implicitWidth + Kirigami.Units.largeSpacing * 4)
+                width: parent.width - Kirigami.Units.largeSpacing * 4
                 height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
                 
-                property bool isOpen: rightPaneWallpapers.drawerOpen && controller.selectedWallpaper !== "" && controller.selectedWallpaper.length > 0
-                property bool commandVisible: false
-                property int selectedScoreColorIndex: 0
+                property bool isOpen: rightPaneWallpapers.drawerOpen
 
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
@@ -368,123 +471,37 @@ Kirigami.Page {
                     onWheel: wheel => wheel.accepted = true
                 }
 
-                TextEdit {
-                    id: clipboardHelper
-                    visible: false
-                    function copyToClipboard(text) {
-                        clipboardHelper.text = text
-                        clipboardHelper.selectAll()
-                        clipboardHelper.copy()
-                        root.notifyClipboard(text)
-                    }
-                }
-
                 ColumnLayout {
                     id: drawerContent
                     anchors.fill: parent
                     anchors.margins: Kirigami.Units.largeSpacing
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.smallSpacing
+
                     RowLayout {
-                        id: actionsRow
                         Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignHCenter
-                        spacing: Kirigami.Units.largeSpacing
-                        //Layout.preferredWidth: 400
-
-                        ToolButton {
-                            checkable: true
-                            Layout.alignment: Qt.AlignLeft
-                            checked: bottomDrawer.commandVisible
-                            icon.name: bottomDrawer.commandVisible ? "arrow-down" : "arrow-right"
-                            onToggled: bottomDrawer.commandVisible = checked
-                            ToolTip.text: bottomDrawer.commandVisible ? qsTr("Hide custom command input") : qsTr("Show custom command input")
-                            ToolTip.visible: hovered
-                            ToolTip.delay: Kirigami.Units.toolTipDelay
+                        
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Placeholders: %sc% for selected color, %path% for image path")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            elide: Text.ElideRight
                         }
-                        Item { Layout.fillWidth: true }
 
                         ToolButton {
-                            text: qsTr("Set as Wallpaper")
-                            icon.name: "dialog-ok-apply"
-                            icon.color: Kirigami.Theme.positiveTextColor
-                            palette.buttonText: Kirigami.Theme.positiveTextColor
-
-                            onClicked: {
-                                controller.setAsWallpaper(controller.selectedWallpaper)
-                                let cmd = controller.customCommandWallpaper.replace(/%sc%/g, bottomDrawer.selectedScoreColorIndex.toString())
-                                cmd = cmd.replace(/%path%/g, controller.selectedWallpaper)
-                                if (cmd.trim() !== "") {
-                                    controller.runCMD(cmd)
-                                }
-
-                                let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, bottomDrawer.selectedScoreColorIndex.toString())
-                                cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper)
-                                if (cmd2.trim() !== "") {
-                                    controller.runCMD(cmd2)
-                                }
-
-                                rightPaneWallpapers.drawerOpen = false
-                            }
-                        }
-                        ToolButton {
-                            text: qsTr("Close")
                             icon.name: "dialog-close"
                             icon.color: Kirigami.Theme.negativeTextColor
-                            palette.buttonText: Kirigami.Theme.negativeTextColor
-
-                            onClicked: {
-                                rightPaneWallpapers.drawerOpen = false
-                            }
+                            display: AbstractButton.IconOnly
+                            onClicked: rightPaneWallpapers.drawerOpen = false
+                            ToolTip.text: qsTr("Close Preferences")
+                            ToolTip.visible: hovered
                         }
                     }
-                    Label {
-                        text: qsTr("Scored Colors")
-                        visible: bottomDrawer.commandVisible
-                        font.bold: true
-                    }         
-                    RowLayout {
-                        id: colorRowWallpaper
-                        Layout.alignment: Qt.AlignLeft | Qt.AlignHCenter
-                        spacing: Kirigami.Units.smallSpacing
-                        visible: bottomDrawer.commandVisible
-                        
-                        Repeater {
-                            model: controller.wallpaperColors
-                            delegate: Rectangle {
-                                required property string modelData
-                                required property int index
-                                width: Kirigami.Units.gridUnit * 1.5
-                                height: Kirigami.Units.gridUnit * 1.5
-                                radius: Kirigami.Units.smallSpacing
-                                color: modelData
-                                border.color: bottomDrawer.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.2)
-                                border.width: bottomDrawer.selectedScoreColorIndex === index ? 3 : 1
 
-                                HoverHandler { id: colorHover }
-                                TapHandler {
-                                    acceptedButtons: Qt.LeftButton
-                                    onTapped: bottomDrawer.selectedScoreColorIndex = index
-                                }
-                                TapHandler {
-                                    acceptedButtons: Qt.RightButton
-                                    onTapped: clipboardHelper.copyToClipboard(modelData)
-                                }
-                                ToolTip.text: modelData.toUpperCase()
-                                ToolTip.visible: colorHover.hovered
-                                ToolTip.delay: Kirigami.Units.toolTipDelay
-                            }
-                        }
-                    }
-                    Label {
-                        text: qsTr("Placeholders:\n %sc% for selected color\n %path% for image path")
-                        visible: bottomDrawer.commandVisible
-                        font.bold: false
-                    }                    
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.preferredWidth: 400
                         spacing: Kirigami.Units.smallSpacing
-                        visible: bottomDrawer.commandVisible
+                        
                         TextField {
                             id: commandInput
                             Layout.fillWidth: true
@@ -493,11 +510,11 @@ Kirigami.Page {
                             onTextChanged: controller.customCommandWallpaper = text
                         }
                     }
+
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.preferredWidth: 400
                         spacing: Kirigami.Units.smallSpacing
-                        visible: bottomDrawer.commandVisible
+                        
                         TextField {
                             id: commandInput2
                             Layout.fillWidth: true
