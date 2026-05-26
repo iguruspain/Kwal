@@ -395,15 +395,22 @@ Kirigami.Page {
                                     onClicked: {
                                         controller.setAsWallpaper(controller.selectedWallpaper)
                                         let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        cmd = cmd.replace(/%path%/g, controller.selectedWallpaper)
-                                        if (cmd.trim() !== "") {
-                                            controller.runCMD(cmd)
-                                        }
+                                        cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
 
                                         let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper)
-                                        if (cmd2.trim() !== "") {
-                                            controller.runCMD(cmd2)
+                                        cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
+
+                                        let finalCmd = ""
+                                        if (cmd !== "" && cmd2 !== "") {
+                                            finalCmd = cmd + " && " + cmd2
+                                        } else if (cmd !== "") {
+                                            finalCmd = cmd
+                                        } else if (cmd2 !== "") {
+                                            finalCmd = cmd2
+                                        }
+
+                                        if (finalCmd !== "") {
+                                            controller.runCMD(finalCmd)
                                         }
                                     }
                                     ToolTip.text: qsTr("Set as Wallpaper")
