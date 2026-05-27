@@ -168,6 +168,7 @@ Kirigami.Page {
             // --- Drawer State ---
             property bool drawerOpen: false
             property int selectedScoreColorIndex: 0
+            property bool searchOpen: false
 
             Connections {
                 target: controller
@@ -199,8 +200,9 @@ Kirigami.Page {
                     Item { Layout.fillWidth: true }
                     
                     ColumnLayout {
+                        id: headerTitle
                         spacing: 0
-                        visible: controller.selectedWallpaper !== ""
+                        //visible: controller.selectedWallpaper !== ""
                         Layout.fillWidth: true          // ← acota el ancho
                         Layout.maximumWidth: 600        // ← opcional: límite razonable
                     
@@ -210,6 +212,7 @@ Kirigami.Page {
                             text: controller.selectedWallpaper ? controller.selectedWallpaper.split("/").pop() : ""
                             font.bold: true
                             elide: Text.ElideMiddle
+                            visible: !rightPaneWallpapers.searchOpen
                         }
                         Label {
                             Layout.fillWidth: true
@@ -217,24 +220,37 @@ Kirigami.Page {
                             text: controller.selectedWallpaperResolution
                             color: Kirigami.Theme.disabledTextColor
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            visible: !rightPaneWallpapers.searchOpen
                         }
+
+                        Kirigami.SearchField {
+                            id: searchField
+                            Layout.fillWidth: true
+                            Layout.preferredWidth: 200
+                            placeholderText: qsTr("Filter wallpapers...")
+                            onTextChanged: imageModel.filterText = text
+                            visible: rightPaneWallpapers.searchOpen
+                        }                        
                     }
-                    
+
                     Item { Layout.fillWidth: true }
                     
-                    Kirigami.SearchField {
-                        id: searchField
-                        Layout.preferredWidth: 200
-                        placeholderText: qsTr("Filter wallpapers...")
-                        onTextChanged: imageModel.filterText = text
+                    ToolButton {
+                        icon.name: "search-symbolic"
+                        checkable: true
+                        checked: rightPaneWallpapers.searchOpen
+                        onToggled: rightPaneWallpapers.searchOpen = checked
+                        ToolTip.text: qsTr("Toggle Search Panel")
+                        ToolTip.visible: hovered
+                        display: AbstractButton.IconOnly
                     }
-                    
+
                     ToolButton {
                         icon.name: "preferences-system-symbolic"
                         checkable: true
                         checked: rightPaneWallpapers.drawerOpen
                         onToggled: rightPaneWallpapers.drawerOpen = checked
-                        ToolTip.text: qsTr("Toggle Preferences Panel")
+                        ToolTip.text: qsTr("Toggle Custom Scripts")
                         ToolTip.visible: hovered
                         display: AbstractButton.IconOnly
                     }
