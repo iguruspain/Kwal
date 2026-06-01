@@ -112,8 +112,8 @@ class WallpaperFolderModel(QAbstractListModel):
                 logger.exception("Failed to remove cache directory %s", folder_cache)
 
 
-class ThumbnailWorker(QObject):
-    finished = Signal(list, list)
+class ImageScannerWorker(QObject):
+    finished = Signal(list)
 
     def __init__(self, folder_path: str, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -125,15 +125,17 @@ class ThumbnailWorker(QObject):
         try:
             p = Path(self.folder_path)
             if not p.exists() or not p.is_dir():
-                logger.warning("ThumbnailWorker: invalid folder %s", self.folder_path)
-                self.finished.emit([], [])
+                logger.warning("ImageScannerWorker: invalid folder %s", self.folder_path)
+                self.finished.emit([])
                 return
 
             exts = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-            files: list[Path] = []
+            files: list[str] = []
             
             # Gather files
             for f in sorted(p.rglob("*")):
+                if self._stopped:
+                    break
                 if not f.is_file():
                     continue
                 if f.suffix.lower() not in exts:
@@ -144,55 +146,13 @@ class ThumbnailWorker(QObject):
                 sf = str(f)
                 if "/previews/" in sf or "screenshot" in name_lower or "preview" in name_lower:
                     continue
-                files.append(f)
+                files.append(sf)
 
-            # Generate/Load thumbnails
-            cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
-            folder_digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()
-            cache_base = cache_root / folder_digest
-            cache_base.mkdir(parents=True, exist_ok=True)
-
-            thumbs: list[str] = []
-            thumb_w, thumb_h = 320, 240
-            
-            for f in files:
-                if self._stopped:
-                    break
-                
-                f_str = str(f)
-                digest = hashlib.sha1(f_str.encode("utf-8")).hexdigest()
-                thumb_path = cache_base / (digest + ".png")
-                thumb_path_str = str(thumb_path)
-
-                if not thumb_path.exists():
-                    try:
-                        img = QImage(f_str)
-                        if not img.isNull():
-                            scaled = img.scaled(thumb_w, thumb_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                            scaled.save(thumb_path_str)
-                        else:
-                            # If image load fails, append empty or fallback? 
-                            # Original code omitted lines, assuming empty is safer to avoid desync
-                            pass
-                    except Exception:
-                        logger.exception("Failed creating thumbnail for %s", f)
-                        # Ensure we append something to keep lists aligned
-                        thumbs.append("")
-                        continue
-
-                thumbs.append(thumb_path_str)
-
-            # Safety check: ensure lists are same length
-            if len(files) != len(thumbs):
-                # If we skipped some thumbs due to check, trim files?
-                # Actually my logic above guarantees append unless exception occurs before append
-                pass
-
-            self.finished.emit([str(x) for x in files], thumbs)
+            self.finished.emit(files)
 
         except Exception:
-            logger.exception("ThumbnailWorker failed for %s", self.folder_path)
-            self.finished.emit([], [])
+            logger.exception("ImageScannerWorker failed for %s", self.folder_path)
+            self.finished.emit([])
 
 
 class FastfetchTintWorker(QObject):
@@ -251,11 +211,9 @@ class ImageModel(QAbstractListModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._all_files: list[Path] = []
-        self._all_thumbs: list[str] = []
         self._files: list[Path] = []
-        self._thumbs: list[str] = []
         self._worker_thread: QThread | None = None
-        self._worker: ThumbnailWorker | None = None
+        self._worker: ImageScannerWorker | None = None
         self._loading: bool = False
         self._filter_text: str = ""
 
@@ -272,10 +230,7 @@ class ImageModel(QAbstractListModel):
         if role == ImageModel.FilePathRole:
             return str(self._files[idx])
         if role == ImageModel.ThumbnailRole:
-            # Handle potential index out of range if arrays desynced (shouldn't happen)
-            if idx < len(self._thumbs):
-                return self._thumbs[idx]
-            return ""
+            return "image://fdo_thumbnail/" + str(self._files[idx])
         return None
 
     def roleNames(self) -> dict[int, bytes]:
@@ -305,17 +260,12 @@ class ImageModel(QAbstractListModel):
         self.beginResetModel()
         if not self._filter_text:
             self._files = list(self._all_files)
-            self._thumbs = list(self._all_thumbs)
         else:
             self._files = []
-            self._thumbs = []
             term = self._filter_text.lower()
-            # Ensure lengths match in case of desync
-            length = min(len(self._all_files), len(self._all_thumbs))
-            for i in range(length):
-                if term in self._all_files[i].name.lower():
-                    self._files.append(self._all_files[i])
-                    self._thumbs.append(self._all_thumbs[i])
+            for f in self._all_files:
+                if term in f.name.lower():
+                    self._files.append(f)
         self.endResetModel()
 
     def _cleanup_worker(self) -> None:
@@ -341,9 +291,7 @@ class ImageModel(QAbstractListModel):
 
         self.beginResetModel()
         self._all_files.clear()
-        self._all_thumbs.clear()
         self._files.clear()
-        self._thumbs.clear()
         self.endResetModel()
 
         self._loading = True
@@ -355,7 +303,7 @@ class ImageModel(QAbstractListModel):
             return
 
         thread = QThread()
-        worker = ThumbnailWorker(folder_path)
+        worker = ImageScannerWorker(folder_path)
         worker.moveToThread(thread)
         
         # Connect signals
@@ -370,11 +318,10 @@ class ImageModel(QAbstractListModel):
         self._worker_thread = thread
         thread.start()
 
-    @Slot(list, list)
-    def _on_worker_done(self, files: list[str], thumbs: list[str]) -> None:
+    @Slot(list)
+    def _on_worker_done(self, files: list[str]) -> None:
         try:
             self._all_files = [Path(x) for x in files]
-            self._all_thumbs = thumbs
             self._apply_filter()
             logger.debug("ImageModel loaded %d files", len(self._all_files))
         finally:

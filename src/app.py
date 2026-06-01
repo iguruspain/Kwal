@@ -137,6 +137,10 @@ def main():
     svg_provider = SvgImageProvider()
     engine.addImageProvider("svgprovider", svg_provider)
 
+    # Register FreeDesktop Thumbnail Provider for asynchronous wallpaper loading
+    from .providers.thumbnail_provider import ThumbnailProvider
+    engine.addImageProvider("fdo_thumbnail", ThumbnailProvider())
+
     # Route Qt/QML messages into Python logging and respect application log level.
     def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
         # Map Qt message types to Python logging levels

@@ -316,7 +316,7 @@ Kirigami.Page {
                                 Image {
                                     anchors.fill: parent
                                     anchors.margins: Kirigami.Units.smallSpacing
-                                    source: thumbPath ? "file://" + thumbPath : "file://" + filePath
+                                    source: thumbPath ? thumbPath : "file://" + filePath
                                     sourceSize.width: 320
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
