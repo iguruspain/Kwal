@@ -573,7 +573,7 @@ Kirigami.Page {
                     Image {
                         id: lightboxImage
                         anchors.fill: parent
-                        anchors.margins: Kirigami.Units.largeSpacing
+                        anchors.margins: Kirigami.Units.largeSpacing * 4
                         source: controller.selectedWallpaper ? "file://" + controller.selectedWallpaper : ""
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
