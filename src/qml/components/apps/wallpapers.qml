@@ -230,6 +230,12 @@ Kirigami.Page {
                             placeholderText: qsTr("Filter wallpapers...")
                             onTextChanged: imageModel.filterText = text
                             visible: rightPaneWallpapers.searchOpen
+
+                            onVisibleChanged: {
+                                    if (visible) {
+                                        searchField.forceActiveFocus()
+                                    }
+                            }
                         }                        
                     }
 
