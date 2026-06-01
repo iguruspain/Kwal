@@ -10,8 +10,8 @@ import "components" as Components
 Kirigami.ApplicationWindow {
     id: root
     visible: true
-    width: 800
-    height: 590
+    width: 1000
+    height: 700
     title: "Kwal"
     
     // Global Safe Overlay Color
