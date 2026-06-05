@@ -261,8 +261,76 @@ Kirigami.Page {
                         display: AbstractButton.IconOnly
                     }
                 }
+                
                 Item { Layout.fillHeight: true }
-                //Kirigami.Separator {Layout.fillWidth: true; height: Kirigami.Units.smallSpacing; color: Qt.alpha(Kirigami.Theme.textColor, 0.4)}
+
+                RowLayout {
+                    id: colorFilterLayout
+                    Layout.fillWidth: true
+                    //width: searchField.width
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: rightPaneWallpapers.searchOpen
+                    spacing: Kirigami.Units.smallSpacing
+
+                    // "All" / Reset Button
+                    ToolButton {
+                        icon.name: "view-filter"
+                        text: qsTr("All")
+                        display: AbstractButton.TextBesideIcon
+                        checkable: true
+                        checked: imageModel.colorFilter === ""
+                        onClicked: imageModel.colorFilter = ""
+                    }
+
+                    Item { Layout.fillWidth: true }               
+
+                    Repeater {
+                        model: [
+                            { name: "red", hex: "#E53935", label: "Red" },
+                            { name: "orange", hex: "#FB8C00", label: "Orange" },
+                            { name: "yellow", hex: "#FDD835", label: "Yellow" },
+                            { name: "yellow-green", hex: "#7CB342", label: "Yellow-Green" },
+                            { name: "green", hex: "#43A047", label: "Green" },
+                            { name: "cyan-green", hex: "#00897B", label: "Cyan-Green" },
+                            { name: "cyan", hex: "#00ACC1", label: "Cyan" },
+                            { name: "blue-cyan", hex: "#1E88E5", label: "Blue-Cyan" },
+                            { name: "blue", hex: "#3949AB", label: "Blue" },
+                            { name: "violet", hex: "#8E24AA", label: "Violet" },
+                            { name: "magenta", hex: "#D81B60", label: "Magenta" },
+                            { name: "rose", hex: "#F06292", label: "Rose" },
+                            { name: "black", hex: "#212121", label: "Black/Dark" },
+                            { name: "gray", hex: "#757575", label: "Gray" },
+                            { name: "white", hex: "#F5F5F5", label: "White/Light" }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: Kirigami.Units.gridUnit * 1.5
+                            height: width
+                            radius: Kirigami.Units.smallSpacing
+                            //radius: width / 2
+                            color: modelData.hex
+                            border.color: imageModel.colorFilter === modelData.name ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.3)
+                            border.width: imageModel.colorFilter === modelData.name ? 3 : 1
+                            
+                            HoverHandler { id: filterHover }
+                            TapHandler {
+                                onTapped: {
+                                    if (imageModel.colorFilter === modelData.name) {
+                                        imageModel.colorFilter = "" // toggle off
+                                    } else {
+                                        imageModel.colorFilter = modelData.name
+                                    }
+                                }
+                            }
+                            
+                            ToolTip.text: modelData.label
+                            ToolTip.visible: filterHover.hovered
+                        }
+                    }
+                    Item { Layout.fillWidth: true }
+                    Item { Layout.fillWidth: true }
+                }
+                
                 MenuSeparator { Layout.fillWidth: true }
                 Item { Layout.fillHeight: true }
                 // Grid View

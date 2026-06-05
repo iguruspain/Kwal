@@ -914,7 +914,15 @@ class Controller(QObject):
                     img = QImage(path)
                     if not img.isNull():
                         self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
-                        self._start_color_extraction(path)
+                        
+                        from ..utils import color_extractor
+                        cache = color_extractor.load_color_cache()
+                        if path in cache and "colors" in cache[path]:
+                            self._wallpaper_colors = cache[path]["colors"]
+                            self.wallpaperColorsChanged.emit()
+                            self._logger.info("Instantly loaded wallpaper colors from cache.")
+                        else:
+                            self._start_color_extraction(path)
                     else:
                         self._selected_wallpaper_resolution = ""
                         self._wallpaper_colors = []
@@ -948,9 +956,31 @@ class Controller(QObject):
         """
         try:
             from ..utils.color_utils import extract_wallpaper_top_colors
+            from ..utils import color_extractor
+            import os
             
-            hex_colors = extract_wallpaper_top_colors(image_path, count=4)
+            hex_colors = extract_wallpaper_top_colors(image_path, count=8)
             self._logger.info(f"Extracted wallpaper colors: {hex_colors}")
+            
+            if hex_colors:
+                try:
+                    cache = color_extractor.load_color_cache()
+                    cats = []
+                    for c in hex_colors:
+                        cat = color_extractor.get_color_category(c)
+                        if cat not in cats:
+                            cats.append(cat)
+                        if len(cats) >= 3:
+                            break
+                            
+                    cache[image_path] = {
+                        "colors": hex_colors,
+                        "categories": cats,
+                        "last_modified": os.path.getmtime(image_path)
+                    }
+                    color_extractor.save_color_cache(cache)
+                except Exception as cache_err:
+                    self._logger.warning("Failed to save extracted colors to cache: %s", cache_err)
             
             # Only update if the selection hasn't changed while we were processing
             if self._selected_wallpaper == image_path:

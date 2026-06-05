@@ -155,6 +155,63 @@ class ImageScannerWorker(QObject):
             self.finished.emit([])
 
 
+class ColorScannerWorker(QObject):
+    progress = Signal(str, list, list) # path, colors, categories
+    finished = Signal()
+
+    def __init__(self, files: list[Path], parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.files = files
+        self._stopped = False
+
+    @Slot()
+    def process(self) -> None:
+        try:
+            from ..utils import color_extractor, color_utils
+            cache = color_extractor.load_color_cache()
+            dirty = False
+
+            for f in self.files:
+                if self._stopped:
+                    break
+                try:
+                    path_str = str(f)
+                    mtime = os.path.getmtime(path_str)
+                    
+                    cached_data = cache.get(path_str)
+                    if cached_data and cached_data.get("last_modified") == mtime:
+                        continue # Already cached
+                        
+                    # Extract colors using Matugen/Celebi utility
+                    colors = color_utils.extract_wallpaper_top_colors(path_str, 8)
+                    if colors:
+                        cats = []
+                        for c in colors:
+                            cat = color_extractor.get_color_category(c)
+                            if cat not in cats:
+                                cats.append(cat)
+                            if len(cats) >= 3:
+                                break
+                                
+                        cache[path_str] = {
+                            "colors": colors,
+                            "categories": cats,
+                            "last_modified": mtime
+                        }
+                        dirty = True
+                        self.progress.emit(path_str, colors, cats)
+                except Exception as e:
+                    logger.debug("ColorScannerWorker error processing %s: %s", f, e)
+
+            if dirty and not self._stopped:
+                color_extractor.save_color_cache(cache)
+                
+        except Exception:
+            logger.exception("ColorScannerWorker failed")
+        finally:
+            self.finished.emit()
+
+
 class FastfetchTintWorker(QObject):
     """Worker to generate a tinted image off the main thread."""
     finished = Signal(str)
@@ -207,15 +264,23 @@ class ImageModel(QAbstractListModel):
 
     loadingChanged = Signal()
     filterTextChanged = Signal()
+    colorFilterChanged = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._all_files: list[Path] = []
         self._files: list[Path] = []
+        
         self._worker_thread: QThread | None = None
         self._worker: ImageScannerWorker | None = None
+        
+        self._color_worker_thread: QThread | None = None
+        self._color_worker: ColorScannerWorker | None = None
+        
         self._loading: bool = False
         self._filter_text: str = ""
+        self._color_filter: str = ""
+        self._color_cache: dict[str, dict] = {}
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._files)
@@ -256,16 +321,41 @@ class ImageModel(QAbstractListModel):
 
     filterText = Property(str, _get_filter_text, _set_filter_text, notify=filterTextChanged)
 
+    def _get_color_filter(self) -> str:
+        return self._color_filter
+
+    def _set_color_filter(self, text: str) -> None:
+        if self._color_filter != text:
+            self._color_filter = text
+            self._apply_filter()
+            self.colorFilterChanged.emit()
+
+    colorFilter = Property(str, _get_color_filter, _set_color_filter, notify=colorFilterChanged)
+
     def _apply_filter(self) -> None:
         self.beginResetModel()
-        if not self._filter_text:
-            self._files = list(self._all_files)
-        else:
-            self._files = []
-            term = self._filter_text.lower()
-            for f in self._all_files:
-                if term in f.name.lower():
-                    self._files.append(f)
+        self._files = []
+        term = self._filter_text.lower() if self._filter_text else ""
+        
+        for f in self._all_files:
+            # Text filter
+            if term and term not in f.name.lower():
+                continue
+                
+            # Color filter
+            if self._color_filter:
+                cache_entry = self._color_cache.get(str(f))
+                if not cache_entry:
+                    continue
+                
+                cats = cache_entry.get("categories", [])
+                old_cat = cache_entry.get("category", "")
+                
+                if self._color_filter not in cats and self._color_filter != old_cat:
+                    continue
+                    
+            self._files.append(f)
+            
         self.endResetModel()
 
     def _cleanup_worker(self) -> None:
@@ -286,8 +376,27 @@ class ImageModel(QAbstractListModel):
             finally:
                 self._worker_thread = None
 
+    def _cleanup_color_worker(self) -> None:
+        if self._color_worker:
+            try:
+                self._color_worker._stopped = True
+            except Exception:
+                pass
+            self._color_worker = None
+            
+        if self._color_worker_thread:
+            try:
+                if shiboken.isValid(self._color_worker_thread) and self._color_worker_thread.isRunning():
+                    self._color_worker_thread.quit()
+                    self._color_worker_thread.wait(1000)
+            except RuntimeError:
+                pass
+            finally:
+                self._color_worker_thread = None
+
     def setFolder(self, folder_path: str) -> None:
         self._cleanup_worker()
+        self._cleanup_color_worker()
 
         self.beginResetModel()
         self._all_files.clear()
@@ -322,11 +431,50 @@ class ImageModel(QAbstractListModel):
     def _on_worker_done(self, files: list[str]) -> None:
         try:
             self._all_files = [Path(x) for x in files]
+            
+            # Load cache instantly to allow immediate filtering
+            from ..utils import color_extractor
+            self._color_cache = color_extractor.load_color_cache()
+            
             self._apply_filter()
             logger.debug("ImageModel loaded %d files", len(self._all_files))
+            
+            # Start background color extraction
+            self._start_color_scanner()
         finally:
             self._loading = False
             self.loadingChanged.emit()
+
+    def _start_color_scanner(self) -> None:
+        if not self._all_files:
+            return
+            
+        self._cleanup_color_worker()
+        
+        thread = QThread()
+        worker = ColorScannerWorker(self._all_files)
+        worker.moveToThread(thread)
+        
+        thread.started.connect(worker.process)
+        worker.progress.connect(self._on_color_progress)
+        worker.finished.connect(self._on_color_done)
+        worker.finished.connect(thread.quit)
+        thread.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        
+        self._color_worker = worker
+        self._color_worker_thread = thread
+        thread.start()
+
+    @Slot(str, list, list)
+    def _on_color_progress(self, path: str, colors: list, categories: list) -> None:
+        self._color_cache[path] = {"colors": colors, "categories": categories}
+
+    @Slot()
+    def _on_color_done(self) -> None:
+        # Reapply filter when background scanning completes
+        if self._color_filter:
+            self._apply_filter()
 
 
 class SettingsAppModel(QAbstractListModel):
