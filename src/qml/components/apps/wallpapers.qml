@@ -480,10 +480,11 @@ Kirigami.Page {
                                     onClicked: {
                                         controller.setAsWallpaper(controller.selectedWallpaper)
                                         let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
-
+                                        //cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
+                                        cmd = cmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
                                         let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
+                                        //cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
+                                        cmd2 = cmd2.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
 
                                         let finalCmd = ""
                                         if (cmd !== "" && cmd2 !== "") {
@@ -701,9 +702,11 @@ Kirigami.Page {
                         onClicked: {
                             controller.setAsWallpaper(controller.selectedWallpaper)
                             let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                            cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
+                            //cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
+                            cmd = cmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
                             let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                            cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
+                            //cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
+                            cmd2 = cmd2.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
                             let finalCmd = ""
                             if (cmd !== "" && cmd2 !== "") finalCmd = cmd + " && " + cmd2
                             else if (cmd !== "") finalCmd = cmd
