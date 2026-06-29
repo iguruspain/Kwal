@@ -448,7 +448,8 @@ Kirigami.Page {
                                             required property int index
                                             width: Kirigami.Units.gridUnit * 0.8
                                             height: width
-                                            radius: width / 2
+                                            //radius: width / 2
+                                            radius: Kirigami.Units.smallSpacing 
                                             color: modelData
                                             border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
                                             border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
@@ -625,14 +626,16 @@ Kirigami.Page {
                 parent: Overlay.overlay
                 x: Math.round((parent.width - width) / 2)
                 y: Math.round((parent.height - height) / 2)
-                width: parent.width * 0.9
-                height: parent.height * 0.9
+                width: parent.width * 0.96
+                height: parent.height * 0.86
                 modal: true
                 focus: true
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                 
                 background: Rectangle {
-                    color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.90)
+                    //color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.90)
+                    Kirigami.Theme.colorSet: Kirigami.Theme.View
+                    color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.highlightColor
                     border.width: 1
                     radius: Kirigami.Units.largeSpacing
@@ -673,7 +676,8 @@ Kirigami.Page {
                                 required property int index
                                 width: Kirigami.Units.gridUnit * 1.2
                                 height: width
-                                radius: width / 2
+                                //radius: width / 2
+                                radius: Kirigami.Units.smallSpacing
                                 color: modelData
                                 border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
                                 border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 3 : 1
