@@ -434,39 +434,51 @@ Kirigami.Page {
                                         }
                                     }
 
-                                    // Minimalist Color Palette Dots
-                                    RowLayout {
+                                    Rectangle {
                                         anchors.left: parent.left
                                         anchors.bottom: parent.bottom
                                         anchors.margins: Kirigami.Units.smallSpacing * 2
-                                        spacing: Kirigami.Units.smallSpacing
+                                        radius: Kirigami.Units.cornerRadius
                                         visible: isSelected
+                                        color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
+                                        width: colorDots.implicitWidth + Kirigami.Units.smallSpacing * 2
+                                        height: colorDots.implicitHeight + Kirigami.Units.smallSpacing
+                                        border.color: Kirigami.Theme.highlightColor
+                                        border.width: 0.5
 
-                                        Repeater {
-                                            model: controller.wallpaperColors
-                                            delegate: Rectangle {
-                                                required property string modelData
-                                                required property int index
-                                                width: Kirigami.Units.gridUnit * 0.8
-                                                height: width
-                                                //radius: width / 2
-                                                radius: Kirigami.Units.smallSpacing 
-                                                color: modelData
-                                                border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
-                                                border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+                                        // Minimalist Color Palette Dots
+                                        RowLayout {
+                                            id: colorDots
+                                            anchors.centerIn: parent
+                                            spacing: 2 //Kirigami.Units.smallSpacing
+                                            visible: isSelected
 
-                                                HoverHandler { id: colorHover }
-                                                TapHandler {
-                                                    acceptedButtons: Qt.LeftButton
-                                                    onTapped: rightPaneWallpapers.selectedScoreColorIndex = index
+                                            Repeater {
+                                                model: controller.wallpaperColors
+                                                delegate: Rectangle {
+                                                    required property string modelData
+                                                    required property int index
+                                                    width: Kirigami.Units.gridUnit * 0.8
+                                                    height: width
+                                                    //radius: width / 2
+                                                    radius: Kirigami.Units.smallSpacing 
+                                                    color: modelData
+                                                    border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
+                                                    border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+
+                                                    HoverHandler { id: colorHover }
+                                                    TapHandler {
+                                                        acceptedButtons: Qt.LeftButton
+                                                        onTapped: rightPaneWallpapers.selectedScoreColorIndex = index
+                                                    }
+                                                    TapHandler {
+                                                        acceptedButtons: Qt.RightButton
+                                                        onTapped: clipboardHelper.copyToClipboard(modelData)
+                                                    }
+                                                    ToolTip.text: modelData.toUpperCase()
+                                                    ToolTip.visible: colorHover.hovered
+                                                    ToolTip.delay: Kirigami.Units.toolTipDelay
                                                 }
-                                                TapHandler {
-                                                    acceptedButtons: Qt.RightButton
-                                                    onTapped: clipboardHelper.copyToClipboard(modelData)
-                                                }
-                                                ToolTip.text: modelData.toUpperCase()
-                                                ToolTip.visible: colorHover.hovered
-                                                ToolTip.delay: Kirigami.Units.toolTipDelay
                                             }
                                         }
                                     }
