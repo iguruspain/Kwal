@@ -138,7 +138,7 @@ Kirigami.Page {
 
                                 ToolButton {
                                     id: removeFolderButton
-                                    icon.name: "edit-delete"
+                                    icon.name: "edit-clear"
                                     icon.width: Kirigami.Units.gridUnit
                                     icon.height: Kirigami.Units.gridUnit
                                     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
@@ -550,26 +550,22 @@ Kirigami.Page {
                                             if (!isVideo) {
                                                 controller.setAsWallpaper(controller.selectedWallpaper)
 
-                                                let cmd = controller.customCommandWallpaper
-                                                let cmd2 = controller.customCommandWallpaper2
-                                                let cmd3 = controller.customCommandWallpaper3
-                                                let finalCmd = ""
-                                                
+                                                let commandsArray = []
 
-                                                for (let ccmmdd of [cmd, cmd2, cmd3]) {
-                                                    if (ccmmdd !== "") {
-                                                        // Placeholder replacement logic for custom commands
+                                                for (let i = 0; i < controller.customCommands.length; i++) {
+                                                    let ccmmdd = controller.customCommands[i]
+                                                    
+                                                    if (ccmmdd && ccmmdd.trim() !== "") {
                                                         ccmmdd = ccmmdd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
                                                         ccmmdd = ccmmdd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-
-                                                        if (finalCmd !== "") {
-                                                            finalCmd += " && " + ccmmdd
-                                                        } else {
-                                                            finalCmd = ccmmdd
-                                                        }
+                                                        ccmmdd = ccmmdd.replace(/%vidimg%/g, `"${controller.thumbPath}"`).trim()
+                                                        
+                                                        commandsArray.push(ccmmdd)
                                                     }
                                                 }
-                                                if (finalCmd !== "") {
+
+                                                if (commandsArray.length > 0) {
+                                                    let finalCmd = commandsArray.join(" && ")
                                                     controller.runCMD(finalCmd)
                                                 }
                                             }
@@ -626,8 +622,8 @@ Kirigami.Page {
                 // Use y position for sliding animation instead of anchors.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
                 
-                width: parent.width - Kirigami.Units.largeSpacing * 4
-                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
+                width: parent.width - Kirigami.Units.largeSpacing //* 4
+                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing //* 2
                 
                 property bool isOpen: rightPaneWallpapers.drawerOpen
 
@@ -661,13 +657,10 @@ Kirigami.Page {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        
                         Label {
+                            text: qsTr("Custom Commands")
+                            font.bold: true
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for image path")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            color: Kirigami.Theme.disabledTextColor
-                            elide: Text.ElideRight
                         }
 
                         ToolButton {
@@ -682,40 +675,67 @@ Kirigami.Page {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-                        
-                        TextField {
-                            id: commandInput
+                        Label {
                             Layout.fillWidth: true
-                            placeholderText: qsTr("Enter custom command")
-                            text: controller.customCommandWallpaper
-                            onTextChanged: controller.customCommandWallpaper = text
+                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for image/video path")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            elide: Text.ElideRight
+                        }
+                        ToolButton {
+                            icon.name: "list-add-symbolic"
+                            text: qsTr("Add")
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Add new command")
+                            onClicked: {
+                                controller.addCustomCommand("")
+                            }
                         }
                     }
 
-                    RowLayout {
+                    ColumnLayout {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
-                        
-                        TextField {
-                            id: commandInput2
-                            Layout.fillWidth: true
-                            placeholderText: qsTr("Enter custom command 2")
-                            text: controller.customCommandWallpaper2
-                            onTextChanged: controller.customCommandWallpaper2 = text
-                        }
-                    }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-                        
-                        TextField {
-                            id: commandInput3
-                            Layout.fillWidth: true
-                            placeholderText: qsTr("Enter custom command 3")
-                            text: controller.customCommandWallpaper3
-                            onTextChanged: controller.customCommandWallpaper3 = text
+                        Repeater {
+                            model: controller.customCommands
+
+                            delegate: RowLayout {
+                                id: commandRow
+                                required property int index
+                                required property string modelData
+                                Layout.fillWidth: true
+
+                                TextField {
+                                    id: cmdInput
+                                    text: commandRow.modelData
+                                    placeholderText: qsTr("Ex: pywal -i %1")
+                                    Layout.fillWidth: true
+                                    
+                                    onEditingFinished: {
+                                        controller.updateCustomCommand(commandRow.index, cmdInput.text)
+                                    }
+                                }
+                                ToolButton {
+                                    icon.name: "edit-clear"
+                                    ToolTip.text: qsTr("Remove command")
+                                    ToolTip.visible: hovered
+                                    onClicked: {
+                                        controller.removeCustomCommand(commandRow.index)
+                                    }
+                                }
+                                ToolButton {
+                                    icon.name: "media-playback-start"
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Execute command")
+                                    onClicked: {
+                                        let finalCmd = cmdInput.text
+                                        finalCmd = finalCmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                        finalCmd = finalCmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
+                                        controller.runCMD(finalCmd);
+                                    }
+                                }
+                            }
                         }
                     }
                 }

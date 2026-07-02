@@ -151,9 +151,7 @@ class Controller(QObject):
     # Signal for wallpaper extension badge visibility
     showExtensionBadgeChanged = Signal()
     # Wallpaper custom command signal
-    customCommandWallpaperChanged = Signal()
-    customCommandWallpaper2Changed = Signal()
-    customCommandWallpaper3Changed = Signal()
+    customCommandsChanged = Signal()
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
@@ -198,9 +196,7 @@ class Controller(QObject):
         self._result_dialog_visible: bool = False
         self._result_dialog_text: str = ""
         self._templates_installed: bool = False
-        self._custom_command_wallpaper: str = ""
-        self._custom_command_wallpaper2: str = ""
-        self._custom_command_wallpaper3: str = ""
+        self._custom_commands: list[str] = []
         self._wallpaper_colors: list[str] = []
         
         # Draft State (Persist across tabs)
@@ -241,9 +237,10 @@ class Controller(QObject):
         loaded_folders = config.get("folders", [])
         last_selected = cast(str, config.get("selected_folder", ""))
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
-        self._custom_command_wallpaper = cast(str, config.get("custom_command_wallpaper", ""))
-        self._custom_command_wallpaper2 = cast(str, config.get("custom_command_wallpaper2", ""))
-        self._custom_command_wallpaper3 = cast(str, config.get("custom_command_wallpaper3", ""))
+        if "custom_commands" in config and isinstance(config["custom_commands"], list):
+            self._custom_commands = [str(c) for c in config["custom_commands"]]
+        else:
+            self._custom_commands = []
 
         # Initialize Models
         folders: list[Folder] = []
@@ -362,16 +359,11 @@ class Controller(QObject):
         """Save current state into config file."""
         data = {
             "folders": [{"name": f.name, "path": f.path} for f in self._model._folders],
-            "selected_folder": self._selected_folder
+            "selected_folder": self._selected_folder,
+            "custom_commands": self._custom_commands
         }
         if self._last_set_wallpaper:
             data["last_set_wallpaper"] = self._last_set_wallpaper
-        if self._custom_command_wallpaper:
-            data["custom_command_wallpaper"] = self._custom_command_wallpaper
-        if self._custom_command_wallpaper2:
-            data["custom_command_wallpaper2"] = self._custom_command_wallpaper2
-        if self._custom_command_wallpaper3:
-            data["custom_command_wallpaper3"] = self._custom_command_wallpaper3
             
         try:
             with open(self._config_path_file, "w", encoding="utf-8") as fh:
@@ -502,56 +494,39 @@ class Controller(QObject):
 
     hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
 
-    def _get_custom_command_wallpaper(self) -> str:
-        return self._custom_command_wallpaper
+    def _get_custom_commands(self) -> list[str]:
+            return self._custom_commands
 
-    def _set_custom_command_wallpaper(self, cmd: str) -> None:
-        val = cmd or ""
-        if self._custom_command_wallpaper != val:
-            self._custom_command_wallpaper = val
+    def _set_custom_commands(self, cmds: list[str]) -> None:
+        if self._custom_commands != cmds:
+            self._custom_commands = list(cmds)
             self._save_config()
-            self.customCommandWallpaperChanged.emit()
+            self.customCommandsChanged.emit()
 
-    customCommandWallpaper = Property(
-        str,
-        _get_custom_command_wallpaper,
-        _set_custom_command_wallpaper,
-        notify=customCommandWallpaperChanged,
-    )
+    customCommands = Property("QStringList", _get_custom_commands, _set_custom_commands, notify=customCommandsChanged)
+    
+    @Slot(str)
+    def addCustomCommand(self, cmd: str) -> None:
+        """Añade un comando nuevo al final de la lista."""
+        self._custom_commands.append(cmd)
+        self._save_config()
+        self.customCommandsChanged.emit()
 
-    def _get_custom_command_wallpaper2(self) -> str:
-        return self._custom_command_wallpaper2
-
-    def _set_custom_command_wallpaper2(self, cmd: str) -> None:
-        val = cmd or ""
-        if self._custom_command_wallpaper2 != val:
-            self._custom_command_wallpaper2 = val
+    @Slot(int, str)
+    def updateCustomCommand(self, index: int, cmd: str) -> None:
+        """Actualiza el comando en un índice específico al editar el TextField."""
+        if 0 <= index < len(self._custom_commands):
+            self._custom_commands[index] = cmd
             self._save_config()
-            self.customCommandWallpaper2Changed.emit()
+            self.customCommandsChanged.emit()
 
-    customCommandWallpaper2 = Property(
-        str,
-        _get_custom_command_wallpaper2,
-        _set_custom_command_wallpaper2,
-        notify=customCommandWallpaper2Changed,
-    )
-
-    def _get_custom_command_wallpaper3(self) -> str:
-        return self._custom_command_wallpaper3
-
-    def _set_custom_command_wallpaper3(self, cmd: str) -> None:
-        val = cmd or ""
-        if self._custom_command_wallpaper3 != val:
-            self._custom_command_wallpaper3 = val
+    @Slot(int)
+    def removeCustomCommand(self, index: int) -> None:
+        """Elimina el comando de la lista según su posición."""
+        if 0 <= index < len(self._custom_commands):
+            self._custom_commands.pop(index)
             self._save_config()
-            self.customCommandWallpaper3Changed.emit()
-
-    customCommandWallpaper3 = Property(
-        str,
-        _get_custom_command_wallpaper3,
-        _set_custom_command_wallpaper3,
-        notify=customCommandWallpaper3Changed,
-    )
+            self.customCommandsChanged.emit()
 
     # --- Compositing Control ---
 
