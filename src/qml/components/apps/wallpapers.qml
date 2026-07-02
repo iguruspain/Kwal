@@ -362,7 +362,7 @@ Kirigami.Page {
                                 required property string filePath
                                 required property string fileName
                                 required property string thumbPath
-                                required property bool isVideo
+                                property bool isVideo: false
 
                                 property bool isSelected: filePath === controller.selectedWallpaper
                                 property bool isHovered: hoverHandler.hovered
