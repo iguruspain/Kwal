@@ -153,6 +153,7 @@ class Controller(QObject):
     # Wallpaper custom command signal
     customCommandWallpaperChanged = Signal()
     customCommandWallpaper2Changed = Signal()
+    customCommandWallpaper3Changed = Signal()
 
     tintResult = Signal(str)
     fastfetchApplyResult = Signal(bool, str)
@@ -199,6 +200,7 @@ class Controller(QObject):
         self._templates_installed: bool = False
         self._custom_command_wallpaper: str = ""
         self._custom_command_wallpaper2: str = ""
+        self._custom_command_wallpaper3: str = ""
         self._wallpaper_colors: list[str] = []
         
         # Draft State (Persist across tabs)
@@ -241,6 +243,7 @@ class Controller(QObject):
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
         self._custom_command_wallpaper = cast(str, config.get("custom_command_wallpaper", ""))
         self._custom_command_wallpaper2 = cast(str, config.get("custom_command_wallpaper2", ""))
+        self._custom_command_wallpaper3 = cast(str, config.get("custom_command_wallpaper3", ""))
 
         # Initialize Models
         folders: list[Folder] = []
@@ -367,6 +370,8 @@ class Controller(QObject):
             data["custom_command_wallpaper"] = self._custom_command_wallpaper
         if self._custom_command_wallpaper2:
             data["custom_command_wallpaper2"] = self._custom_command_wallpaper2
+        if self._custom_command_wallpaper3:
+            data["custom_command_wallpaper3"] = self._custom_command_wallpaper3
             
         try:
             with open(self._config_path_file, "w", encoding="utf-8") as fh:
@@ -529,6 +534,23 @@ class Controller(QObject):
         _get_custom_command_wallpaper2,
         _set_custom_command_wallpaper2,
         notify=customCommandWallpaper2Changed,
+    )
+
+    def _get_custom_command_wallpaper3(self) -> str:
+        return self._custom_command_wallpaper3
+
+    def _set_custom_command_wallpaper3(self, cmd: str) -> None:
+        val = cmd or ""
+        if self._custom_command_wallpaper3 != val:
+            self._custom_command_wallpaper3 = val
+            self._save_config()
+            self.customCommandWallpaper3Changed.emit()
+
+    customCommandWallpaper3 = Property(
+        str,
+        _get_custom_command_wallpaper3,
+        _set_custom_command_wallpaper3,
+        notify=customCommandWallpaper3Changed,
     )
 
     # --- Compositing Control ---

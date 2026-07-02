@@ -449,22 +449,22 @@ Kirigami.Page {
                                         }
 
                                         // Play indicator for video files (hidden once it's actually playing)
-                                        Rectangle {
-                                            anchors.centerIn: parent
-                                            width: Kirigami.Units.gridUnit * 2.5
-                                            height: width
-                                            radius: width / 2
-                                            color: Qt.rgba(0, 0, 0, 0.6)
-                                            visible: isVideo && thumbImg.status === Image.Ready && !isSelected
+                                        // Rectangle {
+                                        //     anchors.centerIn: parent
+                                        //     width: Kirigami.Units.gridUnit * 2.5
+                                        //     height: width
+                                        //     radius: width / 2
+                                        //     color: Qt.rgba(0, 0, 0, 0.6)
+                                        //     visible: isVideo && thumbImg.status === Image.Ready && !isSelected
                                             
-                                            Kirigami.Icon {
-                                                anchors.centerIn: parent
-                                                source: "media-playback-start"
-                                                width: Kirigami.Units.gridUnit * 1.5
-                                                height: width
-                                                color: "white"
-                                            }
-                                        }
+                                        //     Kirigami.Icon {
+                                        //         anchors.centerIn: parent
+                                        //         source: "media-playback-start"
+                                        //         width: Kirigami.Units.gridUnit * 1.5
+                                        //         height: width
+                                        //         color: "white"
+                                        //     }
+                                        // }
                                     }
 
                                     Rectangle {
@@ -476,14 +476,14 @@ Kirigami.Page {
                                         color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
                                         width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
                                         height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
-                                        border.color: isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.highlightColor
+                                        border.color: Kirigami.Theme.highlightColor //isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.highlightColor
                                         border.width: 0.5
 
                                         Label {
                                             id: extLabel
                                             anchors.centerIn: parent
                                             text: fileName.split(".").pop().toUpperCase()
-                                            color: isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
+                                            color: Kirigami.Theme.textColor //isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
                                             font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
                                             font.bold: true
                                         }
@@ -547,25 +547,34 @@ Kirigami.Page {
                                         display: AbstractButton.IconOnly
                                         visible: isSelected
                                         onClicked: {
-                                            controller.setAsWallpaper(controller.selectedWallpaper)
-                                            let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                            //cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
-                                            cmd = cmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-                                            let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                            //cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
-                                            cmd2 = cmd2.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
+                                            if (!isVideo) {
+                                                controller.setAsWallpaper(controller.selectedWallpaper)
 
-                                            let finalCmd = ""
-                                            if (cmd !== "" && cmd2 !== "") {
-                                                finalCmd = cmd + " && " + cmd2
-                                            } else if (cmd !== "") {
-                                                finalCmd = cmd
-                                            } else if (cmd2 !== "") {
-                                                finalCmd = cmd2
+                                                let cmd = controller.customCommandWallpaper
+                                                let cmd2 = controller.customCommandWallpaper2
+                                                let cmd3 = controller.customCommandWallpaper3
+                                                let finalCmd = ""
+                                                
+
+                                                for (let ccmmdd of [cmd, cmd2, cmd3]) {
+                                                    if (ccmmdd !== "") {
+                                                        // Placeholder replacement logic for custom commands
+                                                        ccmmdd = ccmmdd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                                        ccmmdd = ccmmdd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
+
+                                                        if (finalCmd !== "") {
+                                                            finalCmd += " && " + ccmmdd
+                                                        } else {
+                                                            finalCmd = ccmmdd
+                                                        }
+                                                    }
+                                                }
+                                                if (finalCmd !== "") {
+                                                    controller.runCMD(finalCmd)
+                                                }
                                             }
-
-                                            if (finalCmd !== "") {
-                                                controller.runCMD(finalCmd)
+                                            else {
+                                                root.notifyOther("Under construction!!")
                                             }
                                         }
                                         ToolTip.text: qsTr("Set as Wallpaper")
@@ -694,6 +703,19 @@ Kirigami.Page {
                             placeholderText: qsTr("Enter custom command 2")
                             text: controller.customCommandWallpaper2
                             onTextChanged: controller.customCommandWallpaper2 = text
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        
+                        TextField {
+                            id: commandInput3
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("Enter custom command 3")
+                            text: controller.customCommandWallpaper3
+                            onTextChanged: controller.customCommandWallpaper3 = text
                         }
                     }
                 }

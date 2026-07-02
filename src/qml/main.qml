@@ -25,6 +25,9 @@ Kirigami.ApplicationWindow {
     function notifyClipboard(text) {
         root.showPassiveNotification(qsTr("Copied: %1").arg(text), "short")
     }
+    function notifyOther(text) {
+        root.showPassiveNotification(text, "short")
+    }
     
     // Enable transparency for the main window
     color: "transparent"
