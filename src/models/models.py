@@ -123,13 +123,17 @@ class ImageScannerWorker(QObject):
     @Slot()
     def process(self) -> None:
         try:
+            from ..utils import video_utils
+            
             p = Path(self.folder_path)
             if not p.exists() or not p.is_dir():
                 logger.warning("ImageScannerWorker: invalid folder %s", self.folder_path)
                 self.finished.emit([])
                 return
 
-            exts = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+            image_exts = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+            video_exts = video_utils.VIDEO_EXTENSIONS
+            supported_exts = image_exts | video_exts
             files: list[str] = []
             
             # Gather files
@@ -138,7 +142,7 @@ class ImageScannerWorker(QObject):
                     break
                 if not f.is_file():
                     continue
-                if f.suffix.lower() not in exts:
+                if f.suffix.lower() not in supported_exts:
                     continue
                 
                 # Filters
@@ -167,7 +171,7 @@ class ColorScannerWorker(QObject):
     @Slot()
     def process(self) -> None:
         try:
-            from ..utils import color_extractor, color_utils
+            from ..utils import color_extractor, color_utils, video_utils
             cache = color_extractor.load_color_cache()
             dirty = False
 
@@ -181,9 +185,32 @@ class ColorScannerWorker(QObject):
                     cached_data = cache.get(path_str)
                     if cached_data and cached_data.get("last_modified") == mtime:
                         continue # Already cached
-                        
+                    
+                    # For videos, extract frame first, then extract colors from the frame
+                    image_path = path_str
+                    if video_utils.is_video_file(path_str):
+                        # Extract frame from video for color extraction
+                        frame_image = video_utils.get_video_frame_as_image(path_str, timestamp=0.0, max_size=512)
+                        if frame_image:
+                            # Temporarily save frame for color extraction
+                            import tempfile
+                            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                                frame_image.save(tmp.name)
+                                image_path = tmp.name
+                        else:
+                            logger.debug("Failed to extract frame from video: %s", path_str)
+                            continue
+                    
                     # Extract colors using Matugen/Celebi utility
-                    colors = color_utils.extract_wallpaper_top_colors(path_str, 8)
+                    colors = color_utils.extract_wallpaper_top_colors(image_path, 8)
+                    
+                    # Clean up temporary file if it was created
+                    if video_utils.is_video_file(path_str) and image_path != path_str:
+                        try:
+                            os.unlink(image_path)
+                        except Exception:
+                            pass
+                    
                     if colors:
                         cats = []
                         for c in colors:
@@ -261,6 +288,8 @@ class ImageModel(QAbstractListModel):
     FileNameRole = Qt.UserRole + 1
     FilePathRole = Qt.UserRole + 2
     ThumbnailRole = Qt.UserRole + 3
+    FileTypeRole = Qt.UserRole + 4
+    IsVideoRole = Qt.UserRole + 5
 
     loadingChanged = Signal()
     filterTextChanged = Signal()
@@ -290,12 +319,24 @@ class ImageModel(QAbstractListModel):
             return None
         
         idx = index.row()
+        from ..utils import video_utils
+        
         if role == ImageModel.FileNameRole:
             return self._files[idx].name
         if role == ImageModel.FilePathRole:
             return str(self._files[idx])
         if role == ImageModel.ThumbnailRole:
-            return "image://fdo_thumbnail/" + str(self._files[idx])
+            file_path = str(self._files[idx])
+            if video_utils.is_video_file(file_path):
+                return "image://video_thumbnail/" + file_path
+            return "image://fdo_thumbnail/" + file_path
+        if role == ImageModel.FileTypeRole:
+            file_path = str(self._files[idx])
+            if video_utils.is_video_file(file_path):
+                return "video"
+            return "image"
+        if role == ImageModel.IsVideoRole:
+            return video_utils.is_video_file(str(self._files[idx]))
         return None
 
     def roleNames(self) -> dict[int, bytes]:
@@ -303,6 +344,8 @@ class ImageModel(QAbstractListModel):
             ImageModel.FileNameRole: b"fileName",
             ImageModel.FilePathRole: b"filePath",
             ImageModel.ThumbnailRole: b"thumbPath",
+            ImageModel.FileTypeRole: b"fileType",
+            ImageModel.IsVideoRole: b"isVideo",
         }
 
     def _get_loading(self) -> bool:

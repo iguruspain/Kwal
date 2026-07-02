@@ -260,6 +260,10 @@ Dialog {
                             
                             source: {
                                 var finalPath = (root.sourceMode === 0) ? root.appSelectedWallpaper : root.sourceImage
+                                // Don't try to load video files as images
+                                if (finalPath && controller && controller.isVideoFile(finalPath)) {
+                                    return ""
+                                }
                                 return finalPath ? "file://" + finalPath : ""
                             }
                             

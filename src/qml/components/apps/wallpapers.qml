@@ -362,6 +362,7 @@ Kirigami.Page {
                                 required property string filePath
                                 required property string fileName
                                 required property string thumbPath
+                                required property bool isVideo
 
                                 property bool isSelected: filePath === controller.selectedWallpaper
                                 property bool isHovered: hoverHandler.hovered
@@ -410,6 +411,24 @@ Kirigami.Page {
                                             running: thumbImg.status === Image.Loading
                                             visible: running
                                         }
+                                        
+                                        // Play indicator for video files
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: Kirigami.Units.gridUnit * 2.5
+                                            height: width
+                                            radius: width / 2
+                                            color: Qt.rgba(0, 0, 0, 0.6)
+                                            visible: isVideo && thumbImg.status === Image.Ready
+                                            
+                                            Kirigami.Icon {
+                                                anchors.centerIn: parent
+                                                source: "media-playback-start"
+                                                width: Kirigami.Units.gridUnit * 1.5
+                                                height: width
+                                                color: "white"
+                                            }
+                                        }
                                     }
 
                                     Rectangle {
@@ -421,14 +440,14 @@ Kirigami.Page {
                                         color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
                                         width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
                                         height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
-                                        border.color: Kirigami.Theme.highlightColor
+                                        border.color: isVideo === true ? Kirigami.Theme.warningTextColor : Kirigami.Theme.highlightColor
                                         border.width: 0.5
 
                                         Label {
                                             id: extLabel
                                             anchors.centerIn: parent
                                             text: fileName.split(".").pop().toUpperCase()
-                                            color: Kirigami.Theme.textColor
+                                            color: isVideo === true ? Kirigami.Theme.warningTextColor : Kirigami.Theme.textColor
                                             font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
                                             font.bold: true
                                         }
@@ -666,14 +685,51 @@ Kirigami.Page {
                 }
                 
                 contentItem: Item {
+                    property bool selectedIsVideo: {
+                        if (!controller.selectedWallpaper) return false
+                        var path = controller.selectedWallpaper
+                        var ext = path.substring(path.lastIndexOf(".")).toLowerCase()
+                        return [".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".m4v", ".wmv", ".3gp"].includes(ext)
+                    }
+                    
                     Image {
                         id: lightboxImage
                         anchors.fill: parent
                         anchors.margins: Kirigami.Units.largeSpacing * 4
-                        source: controller.selectedWallpaper ? "file://" + controller.selectedWallpaper : ""
+                        source: controller.selectedWallpaper ? (parent.selectedIsVideo ? "image://video_thumbnail/" + controller.selectedWallpaper : "file://" + controller.selectedWallpaper) : ""
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
+                    }
+                    
+                    // Video indicator overlay
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Kirigami.Units.gridUnit * 4
+                        height: width
+                        radius: width / 2
+                        color: Qt.rgba(0, 0, 0, 0.7)
+                        visible: parent.selectedIsVideo && lightboxImage.status === Image.Ready
+                        
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: Kirigami.Units.smallSpacing
+                            
+                            Kirigami.Icon {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                source: "media-playback-start"
+                                width: Kirigami.Units.gridUnit * 2
+                                height: width
+                                color: "white"
+                            }
+                            
+                            Label {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: qsTr("Video")
+                                color: "white"
+                                font.bold: true
+                            }
+                        }
                     }
                     
                     ToolButton {

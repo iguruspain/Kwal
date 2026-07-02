@@ -649,12 +649,21 @@ class Controller(QObject):
             # Calculate percent (0-100)
             val = alpha / 255.0
             perc = int(round(val * 100))
-            
+             
             # If standard hex form is requested by QML tooltip style
             return f"#{c.red():02x}{c.green():02x}{c.blue():02x} alpha: {alpha} ({perc}%)"
         except Exception:
             self._logger.exception("Error formatting color tooltip for %r", color)
             return str(color or "")
+
+    @Slot(str, result=bool)
+    def isVideoFile(self, file_path: str) -> bool:
+        """Check if a file is a supported video format."""
+        try:
+            from ..utils import video_utils
+            return video_utils.is_video_file(file_path)
+        except Exception:
+            return False
 
     fastfetchDraftColor = Property(str, _get_fastfetch_draft_color, _set_fastfetch_draft_color, notify=fastfetchDraftColorChanged)
 

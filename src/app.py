@@ -141,6 +141,10 @@ def main():
     from .providers.thumbnail_provider import ThumbnailProvider
     engine.addImageProvider("fdo_thumbnail", ThumbnailProvider())
 
+    # Register Video Thumbnail Provider for extracting frames from video files
+    from .providers.video_provider import VideoThumbnailProvider
+    engine.addImageProvider("video_thumbnail", VideoThumbnailProvider())
+
     # Route Qt/QML messages into Python logging and respect application log level.
     def _qt_message_handler(msg_type: QtMsgType, context, message: str) -> None:
         # Map Qt message types to Python logging levels
