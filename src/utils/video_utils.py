@@ -163,6 +163,29 @@ def is_video_file(file_path: str) -> bool:
     return Path(file_path).suffix.lower() in VIDEO_EXTENSIONS
 
 
+def get_video_frame_path(video_path: str, timestamp: float = 0.0) -> str | None:
+    """
+    Get the cached frame path for a video, extracting if needed.
+    
+    Args:
+        video_path: Path to video file
+        timestamp: Timestamp in seconds (default 0.0 for first frame)
+    
+    Returns:
+        Path to cached frame PNG file, or None if extraction fails
+    """
+    cache_path = get_frame_cache_path(video_path, timestamp)
+    
+    # If already cached, return it
+    if cache_path.exists():
+        return str(cache_path)
+    
+    # Extract frame and cache it
+    if extract_video_frame(video_path, str(cache_path), timestamp):
+        return str(cache_path)
+    
+    return None
+
 def is_image_file(file_path: str) -> bool:
     """Check if a file is a supported image file."""
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}

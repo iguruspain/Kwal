@@ -920,18 +920,30 @@ class Controller(QObject):
                 self._selected_wallpaper = path
                 
                 if path:
-                    img = QImage(path)
+                    from ..utils import video_utils, color_extractor
+                    
+                    # For videos, extract frame and use that for color extraction
+                    image_for_colors = path
+                    if video_utils.is_video_file(path):
+                        try:
+                            frame_path = video_utils.get_video_frame_path(path)
+                            if frame_path:
+                                image_for_colors = frame_path
+                                self._logger.info("Using video frame for color extraction: %s", frame_path)
+                        except Exception as e:
+                            self._logger.warning("Failed to extract video frame for colors: %s", e)
+                    
+                    img = QImage(image_for_colors)
                     if not img.isNull():
                         self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
                         
-                        from ..utils import color_extractor
                         cache = color_extractor.load_color_cache()
                         if path in cache and "colors" in cache[path]:
                             self._wallpaper_colors = cache[path]["colors"]
                             self.wallpaperColorsChanged.emit()
                             self._logger.info("Instantly loaded wallpaper colors from cache.")
                         else:
-                            self._start_color_extraction(path)
+                            self._start_color_extraction(image_for_colors)
                     else:
                         self._selected_wallpaper_resolution = ""
                         self._wallpaper_colors = []
