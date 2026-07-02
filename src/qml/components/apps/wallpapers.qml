@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtMultimedia
 import org.kde.kirigami as Kirigami
 
 Kirigami.Page {
@@ -116,7 +117,7 @@ Kirigami.Page {
                                 ColumnLayout {
                                     Kirigami.Heading {
                                         level: 2
-                                        text: name
+                                        text: name.includes("/") ? name.split('/').filter(Boolean).pop() : name
                                     }
                                     Kirigami.Separator {Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor}
                                     Label {
@@ -362,7 +363,10 @@ Kirigami.Page {
                                 required property string filePath
                                 required property string fileName
                                 required property string thumbPath
-                                property bool isVideo: false
+                                property bool isVideo: {
+                                    var ext = fileName.substring(fileName.lastIndexOf(".")).toLowerCase()
+                                    return [".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".m4v", ".wmv", ".3gp"].includes(ext)
+                                }
 
                                 property bool isSelected: filePath === controller.selectedWallpaper
                                 property bool isHovered: hoverHandler.hovered
@@ -411,15 +415,47 @@ Kirigami.Page {
                                             running: thumbImg.status === Image.Loading
                                             visible: running
                                         }
-                                        
-                                        // Play indicator for video files
+
+                                        // Inline video playback: loads only for the selected video cell
+                                        Loader {
+                                            id: inlineVideoLoader
+                                            anchors.fill: parent
+                                            active: isVideo && isSelected
+                                            asynchronous: true
+
+                                            sourceComponent: Item {
+                                                anchors.fill: parent
+
+                                                MediaPlayer {
+                                                    id: inlineVideoPlayer
+                                                    source: "file://" + filePath
+                                                    videoOutput: inlineVideoOutput
+                                                    audioOutput: AudioOutput {
+                                                        // Preview autoplay muted like a live-wallpaper preview.
+                                                        // Set muted: false if you'd rather hear audio.
+                                                        muted: true
+                                                    }
+                                                    loops: MediaPlayer.Infinite
+
+                                                    Component.onCompleted: play()
+                                                }
+
+                                                VideoOutput {
+                                                    id: inlineVideoOutput
+                                                    anchors.fill: parent
+                                                    fillMode: VideoOutput.PreserveAspectCrop
+                                                }
+                                            }
+                                        }
+
+                                        // Play indicator for video files (hidden once it's actually playing)
                                         Rectangle {
                                             anchors.centerIn: parent
                                             width: Kirigami.Units.gridUnit * 2.5
                                             height: width
                                             radius: width / 2
                                             color: Qt.rgba(0, 0, 0, 0.6)
-                                            visible: isVideo && thumbImg.status === Image.Ready
+                                            visible: isVideo && thumbImg.status === Image.Ready && !isSelected
                                             
                                             Kirigami.Icon {
                                                 anchors.centerIn: parent
@@ -440,14 +476,14 @@ Kirigami.Page {
                                         color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
                                         width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
                                         height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
-                                        border.color: isVideo === true ? Kirigami.Theme.warningTextColor : Kirigami.Theme.highlightColor
+                                        border.color: isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.highlightColor
                                         border.width: 0.5
 
                                         Label {
                                             id: extLabel
                                             anchors.centerIn: parent
                                             text: fileName.split(".").pop().toUpperCase()
-                                            color: isVideo === true ? Kirigami.Theme.warningTextColor : Kirigami.Theme.textColor
+                                            color: isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
                                             font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
                                             font.bold: true
                                         }
@@ -700,16 +736,61 @@ Kirigami.Page {
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
+                        // Once the video is actually playing, hide the static thumbnail behind it
+                        visible: !parent.selectedIsVideo || lightboxVideoLoader.status !== Loader.Ready
+                    }
+
+                    // Inline video playback while the lightbox is open
+                    Loader {
+                        id: lightboxVideoLoader
+                        anchors.fill: parent
+                        anchors.margins: Kirigami.Units.largeSpacing * 4
+                        active: lightboxPopup.opened && parent.selectedIsVideo
+                        asynchronous: true
+
+                        sourceComponent: Item {
+                            anchors.fill: parent
+
+                            MediaPlayer {
+                                id: lightboxVideoPlayer
+                                source: "file://" + controller.selectedWallpaper
+                                videoOutput: lightboxVideoOutput
+                                audioOutput: AudioOutput {
+                                    volume: 1.0
+                                }
+                                loops: MediaPlayer.Infinite
+
+                                Component.onCompleted: play()
+                            }
+
+                            VideoOutput {
+                                id: lightboxVideoOutput
+                                anchors.fill: parent
+                                fillMode: VideoOutput.PreserveAspectFit
+                            }
+
+                            // Click to toggle play/pause
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (lightboxVideoPlayer.playbackState === MediaPlayer.PlayingState)
+                                        lightboxVideoPlayer.pause()
+                                    else
+                                        lightboxVideoPlayer.play()
+                                }
+                            }
+                        }
                     }
                     
-                    // Video indicator overlay
+                    // Video loading indicator (hidden once playback has actually started)
                     Rectangle {
                         anchors.centerIn: parent
                         width: Kirigami.Units.gridUnit * 4
                         height: width
                         radius: width / 2
                         color: Qt.rgba(0, 0, 0, 0.7)
-                        visible: parent.selectedIsVideo && lightboxImage.status === Image.Ready
+                        visible: parent.selectedIsVideo && lightboxVideoLoader.status !== Loader.Ready
                         
                         Column {
                             anchors.centerIn: parent
