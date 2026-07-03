@@ -561,7 +561,13 @@ Kirigami.Page {
                                         onClicked: {
                                             // Determine which path to use for %image% placeholder
                                             var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
-                                            if (isVideo) {root.notifyOther("Under construction!!")} else {controller.setAsWallpaper(controller.selectedWallpaper)}
+                                            if (isVideo) {
+                                                root.notifyOther("Under construction!!")
+                                                controller.setAsWallpaper(controller.thumbPath)
+                                            } 
+                                            else {
+                                                controller.setAsWallpaper(controller.selectedWallpaper)
+                                            }
 
                                             // Build command array with all replacements applied
                                             var commandsArray = []
@@ -910,6 +916,7 @@ Kirigami.Page {
                             
                             if (lightboxPopup.isVideo) {
                                 root.notifyOther("Under construction!!")
+                                controller.setAsWallpaper(lightboxPopup.selWallpaperThumb)
                             } else {
                                 controller.setAsWallpaper(lightboxPopup.selWallpaper)
                             }
