@@ -336,6 +336,9 @@ Kirigami.Page {
                     id: gridContainer
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    property string selWallpaper: ""
+                    property string selWallpaperThumb: ""
+                    property bool isVideo: false
 
                     ScrollView {
                         id: scrollView
@@ -382,9 +385,18 @@ Kirigami.Page {
                                     MouseArea {
                                         anchors.fill: parent
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: controller.selectWallpaper(filePath)
+                                        //onClicked: controller.selectWallpaper(filePath)
+                                        onClicked: {
+                                            controller.selectWallpaper(filePath)
+                                            gridContainer.selWallpaper = controller.selectedWallpaper
+                                            gridContainer.selWallpaperThumb = controller.thumbPath
+                                            gridContainer.isVideo = isVideo
+                                        }
                                         onDoubleClicked: {
                                             controller.selectWallpaper(filePath)
+                                            gridContainer.selWallpaper = controller.selectedWallpaper
+                                            gridContainer.selWallpaperThumb = controller.thumbPath
+                                            gridContainer.isVideo = isVideo
                                             lightboxPopup.open()
                                         }
                                     }
@@ -547,30 +559,25 @@ Kirigami.Page {
                                         display: AbstractButton.IconOnly
                                         visible: isSelected
                                         onClicked: {
-                                            if (!isVideo) {
-                                                controller.setAsWallpaper(controller.selectedWallpaper)
+                                            // Determine which path to use for %image% placeholder
+                                            var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
+                                            if (isVideo) {root.notifyOther("Under construction!!")} else {controller.setAsWallpaper(controller.selectedWallpaper)}
 
-                                                let commandsArray = []
-
-                                                for (let i = 0; i < controller.customCommands.length; i++) {
-                                                    let ccmmdd = controller.customCommands[i]
-                                                    
-                                                    if (ccmmdd && ccmmdd.trim() !== "") {
-                                                        ccmmdd = ccmmdd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                                        ccmmdd = ccmmdd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-                                                        ccmmdd = ccmmdd.replace(/%vidimg%/g, `"${controller.thumbPath}"`).trim()
-                                                        
-                                                        commandsArray.push(ccmmdd)
-                                                    }
-                                                }
-
-                                                if (commandsArray.length > 0) {
-                                                    let finalCmd = commandsArray.join(" && ")
-                                                    controller.runCMD(finalCmd)
-                                                }
+                                            // Build command array with all replacements applied
+                                            var commandsArray = []
+                                            for (var i = 0; i < controller.customCommands.length; i++) {
+                                                var cmd = controller.customCommands[i]
+                                                if (!cmd || cmd.trim() === "") continue
+                                                
+                                                cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                                        .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
+                                                        .replace(/%image%/g, '"' + image + '"')
+                                                
+                                                commandsArray.push(cmd.trim())
                                             }
-                                            else {
-                                                root.notifyOther("Under construction!!")
+
+                                            if (commandsArray.length > 0) {
+                                                controller.runCMD(commandsArray.join(" && "))
                                             }
                                         }
                                         ToolTip.text: qsTr("Set as Wallpaper")
@@ -623,7 +630,7 @@ Kirigami.Page {
                 anchors.horizontalCenter: parent.horizontalCenter
                 
                 width: parent.width - Kirigami.Units.largeSpacing //* 4
-                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing //* 2
+                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
                 
                 property bool isOpen: rightPaneWallpapers.drawerOpen
 
@@ -677,7 +684,7 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         Label {
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for image/video path")
+                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for path, %image% for image/video thumb path, %video% for video path")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight
@@ -732,6 +739,7 @@ Kirigami.Page {
                                         let finalCmd = cmdInput.text
                                         finalCmd = finalCmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
                                         finalCmd = finalCmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
+                                        finalCmd = finalCmd.replace(/%vidimg%/g, `"${controller.thumbPath}"`).trim()
                                         controller.runCMD(finalCmd);
                                     }
                                 }
@@ -752,9 +760,12 @@ Kirigami.Page {
                 modal: true
                 focus: true
                 closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                property string selWallpaper: gridContainer.selWallpaper
+                property string selWallpaperThumb: gridContainer.selWallpaperThumb
+                property bool isVideo: gridContainer.isVideo
                 
                 background: Rectangle {
-                    //color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.90)
                     Kirigami.Theme.colorSet: Kirigami.Theme.View
                     color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.highlightColor
@@ -763,26 +774,19 @@ Kirigami.Page {
                 }
                 
                 contentItem: Item {
-                    property bool selectedIsVideo: {
-                        if (!controller.selectedWallpaper) return false
-                        var path = controller.selectedWallpaper
-                        var ext = path.substring(path.lastIndexOf(".")).toLowerCase()
-                        return [".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".m4v", ".wmv", ".3gp"].includes(ext)
-                    }
+                    readonly property bool selectedIsVideo: lightboxPopup.isVideo
                     
                     Image {
                         id: lightboxImage
                         anchors.fill: parent
                         anchors.margins: Kirigami.Units.largeSpacing * 4
-                        source: controller.selectedWallpaper ? (parent.selectedIsVideo ? "image://video_thumbnail/" + controller.selectedWallpaper : "file://" + controller.selectedWallpaper) : ""
+                        source: lightboxPopup.selWallpaper ? (parent.selectedIsVideo ? "image://video_thumbnail/" + lightboxPopup.selWallpaper : "file://" + lightboxPopup.selWallpaper) : ""
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
-                        // Once the video is actually playing, hide the static thumbnail behind it
                         visible: !parent.selectedIsVideo || lightboxVideoLoader.status !== Loader.Ready
                     }
 
-                    // Inline video playback while the lightbox is open
                     Loader {
                         id: lightboxVideoLoader
                         anchors.fill: parent
@@ -795,11 +799,9 @@ Kirigami.Page {
 
                             MediaPlayer {
                                 id: lightboxVideoPlayer
-                                source: "file://" + controller.selectedWallpaper
+                                source: "file://" + lightboxPopup.selWallpaper
                                 videoOutput: lightboxVideoOutput
-                                audioOutput: AudioOutput {
-                                    volume: 1.0
-                                }
+                                audioOutput: AudioOutput { muted: true }//{ volume: 1.0 }
                                 loops: MediaPlayer.Infinite
 
                                 Component.onCompleted: play()
@@ -811,7 +813,6 @@ Kirigami.Page {
                                 fillMode: VideoOutput.PreserveAspectFit
                             }
 
-                            // Click to toggle play/pause
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
@@ -825,35 +826,34 @@ Kirigami.Page {
                         }
                     }
                     
-                    // Video loading indicator (hidden once playback has actually started)
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: Kirigami.Units.gridUnit * 4
-                        height: width
-                        radius: width / 2
-                        color: Qt.rgba(0, 0, 0, 0.7)
-                        visible: parent.selectedIsVideo && lightboxVideoLoader.status !== Loader.Ready
+                    // Rectangle {
+                    //     anchors.centerIn: parent
+                    //     width: Kirigami.Units.gridUnit * 4
+                    //     height: width
+                    //     radius: width / 2
+                    //     color: Qt.rgba(0, 0, 0, 0.7)
+                    //     visible: parent.selectedIsVideo && lightboxVideoLoader.status !== Loader.Ready
                         
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: Kirigami.Units.smallSpacing
+                    //     Column {
+                    //         anchors.centerIn: parent
+                    //         spacing: Kirigami.Units.smallSpacing
                             
-                            Kirigami.Icon {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                source: "media-playback-start"
-                                width: Kirigami.Units.gridUnit * 2
-                                height: width
-                                color: "white"
-                            }
+                    //         Kirigami.Icon {
+                    //             anchors.horizontalCenter: parent.horizontalCenter
+                    //             source: "media-playback-start"
+                    //             width: Kirigami.Units.gridUnit * 2
+                    //             height: width
+                    //             color: "white"
+                    //         }
                             
-                            Label {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: qsTr("Video")
-                                color: "white"
-                                font.bold: true
-                            }
-                        }
-                    }
+                    //         Label {
+                    //             anchors.horizontalCenter: parent.horizontalCenter
+                    //             text: qsTr("Video")
+                    //             color: "white"
+                    //             font.bold: true
+                    //         }
+                    //     }
+                    // }
                     
                     ToolButton {
                         anchors.top: parent.top
@@ -865,7 +865,6 @@ Kirigami.Page {
                         onClicked: lightboxPopup.close()
                     }
                     
-                    // Dots in Lightbox
                     RowLayout {
                         anchors.top: parent.top
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -879,7 +878,6 @@ Kirigami.Page {
                                 required property int index
                                 width: Kirigami.Units.gridUnit * 1.2
                                 height: width
-                                //radius: width / 2
                                 radius: Kirigami.Units.smallSpacing
                                 color: modelData
                                 border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
@@ -906,19 +904,31 @@ Kirigami.Page {
                         anchors.margins: Kirigami.Units.largeSpacing
                         text: qsTr("Apply Wallpaper")
                         icon.name: "dialog-ok-apply"
+                        
                         onClicked: {
-                            controller.setAsWallpaper(controller.selectedWallpaper)
-                            let cmd = controller.customCommandWallpaper.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                            //cmd = cmd.replace(/%path%/g, controller.selectedWallpaper).trim()
-                            cmd = cmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-                            let cmd2 = controller.customCommandWallpaper2.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                            //cmd2 = cmd2.replace(/%path%/g, controller.selectedWallpaper).trim()
-                            cmd2 = cmd2.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-                            let finalCmd = ""
-                            if (cmd !== "" && cmd2 !== "") finalCmd = cmd + " && " + cmd2
-                            else if (cmd !== "") finalCmd = cmd
-                            else if (cmd2 !== "") finalCmd = cmd2
-                            if (finalCmd !== "") controller.runCMD(finalCmd)
+                            var image = lightboxPopup.isVideo ? lightboxPopup.selWallpaperThumb : lightboxPopup.selWallpaper
+                            
+                            if (lightboxPopup.isVideo) {
+                                root.notifyOther("Under construction!!")
+                            } else {
+                                controller.setAsWallpaper(lightboxPopup.selWallpaper)
+                            }
+
+                            var commandsArray = []
+                            for (var i = 0; i < controller.customCommands.length; i++) {
+                                var cmd = controller.customCommands[i]
+                                if (!cmd || cmd.trim() === "") continue
+                                
+                                cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                        .replace(/%path%/g, '"' + lightboxPopup.selWallpaper + '"')
+                                        .replace(/%image%/g, '"' + image + '"')
+                                
+                                commandsArray.push(cmd.trim())
+                            }
+
+                            if (commandsArray.length > 0) {
+                                controller.runCMD(commandsArray.join(" && "))
+                            }
                             
                             lightboxPopup.close()
                         }

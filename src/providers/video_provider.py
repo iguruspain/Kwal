@@ -36,7 +36,7 @@ class VideoThumbnailRunnable(QRunnable):
             frame_image = video_utils.get_video_frame_as_image(
                 req_id,
                 timestamp=0.0,
-                max_size=256
+                max_size=512
             )
             
             texture = None

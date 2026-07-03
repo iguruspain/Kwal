@@ -188,6 +188,7 @@ class Controller(QObject):
         self._selected_wallpaper: str = ""
         self._last_set_wallpaper: str = ""
         self._selected_wallpaper_resolution: str = ""
+        self._thumb_path: str = ""
         self._selected_file: str = ""
         self._fastfetch_tinted_preview: str = ""
         self._fastfetch_tinting: bool = False
@@ -417,6 +418,11 @@ class Controller(QObject):
         return self._selected_wallpaper_resolution
 
     selectedWallpaperResolution = Property(str, _get_selected_wallpaper_resolution, notify=selectedWallpaperChanged)
+
+    def _get_thumb_path(self) -> str:
+        return self._thumb_path
+
+    thumbPath = Property(str, _get_thumb_path, notify=selectedWallpaperChanged)
 
     def _get_wallpaper_colors(self) -> list[str]:
         return self._wallpaper_colors
@@ -920,6 +926,8 @@ class Controller(QObject):
                     from ..utils import video_utils, color_extractor
                     
                     # For videos, extract frame and use that for color extraction
+                    # and as the thumbnail image (%vidimg%). For regular images,
+                    # the thumbnail is simply the wallpaper itself.
                     image_for_colors = path
                     if video_utils.is_video_file(path):
                         try:
@@ -929,7 +937,9 @@ class Controller(QObject):
                                 self._logger.info("Using video frame for color extraction: %s", frame_path)
                         except Exception as e:
                             self._logger.warning("Failed to extract video frame for colors: %s", e)
-                    
+
+                    self._thumb_path = image_for_colors
+
                     img = QImage(image_for_colors)
                     if not img.isNull():
                         self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
@@ -948,6 +958,7 @@ class Controller(QObject):
                 else:
                     self._selected_wallpaper_resolution = ""
                     self._wallpaper_colors = []
+                    self._thumb_path = ""
                     self.wallpaperColorsChanged.emit()
                     
                 self.selectedWallpaperChanged.emit()

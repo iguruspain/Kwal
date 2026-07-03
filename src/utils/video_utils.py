@@ -81,7 +81,7 @@ def extract_video_frame(video_path: str, output_path: str, timestamp: float = 0.
         return False
 
 
-def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: int = 256) -> Image.Image | None:
+def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: int = 512) -> Image.Image | None:
     """
     Get a scaled frame from a video file as a PIL Image.
     Uses cache if available.
