@@ -519,6 +519,21 @@ class ImageModel(QAbstractListModel):
         if self._color_filter:
             self._apply_filter()
 
+    def updateCachedCategories(self, path: str, categories: list) -> None:
+        """Keep the in-memory color cache in sync after a manual category edit.
+
+        Called from Controller.updateWallpaperCategories() once the on-disk
+        cache has been updated, so color-filter chips reflect the change
+        immediately without needing to rescan.
+        """
+        entry = self._color_cache.get(path)
+        if not isinstance(entry, dict):
+            entry = {"colors": []}
+        entry["categories"] = list(categories)
+        self._color_cache[path] = entry
+        if self._color_filter:
+            self._apply_filter()
+
 
 class SettingsAppModel(QAbstractListModel):
     TitleRole = Qt.UserRole + 1

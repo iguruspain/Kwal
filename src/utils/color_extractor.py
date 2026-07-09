@@ -26,7 +26,7 @@ def save_color_cache(data: dict) -> None:
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         with open(cache_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, ensure_ascii=False)
     except Exception as e:
         logger.error("Failed to save color cache: %s", e)
 
@@ -82,3 +82,81 @@ def get_color_category(hex_color: str) -> str:
         return "magenta"
     else:
         return "rose"
+
+
+# Fixed list of categories produced by get_color_category(), in a sensible
+# hue-wheel order. Kept as a single source of truth for both the automatic
+# classifier and the manual category editor UI.
+CATEGORY_LIST: list[str] = [
+    "red", "orange", "yellow", "yellow-green", "green", "cyan-green",
+    "cyan", "blue-cyan", "blue", "violet", "magenta", "rose",
+    "black", "gray", "white",
+]
+
+
+def list_categories() -> list[str]:
+    """Return the fixed list of supported color categories."""
+    return list(CATEGORY_LIST)
+
+
+def get_categories_for_path(path: str) -> list[str]:
+    """Return the stored categories for a single cached path (empty if not cached)."""
+    if not path:
+        return []
+    cache = load_color_cache()
+    entry = cache.get(path)
+    if not isinstance(entry, dict):
+        return []
+    return list(entry.get("categories", []) or [])
+
+
+def list_cache_entries() -> list[dict]:
+    """Return every cached entry as a flat list, sorted by path.
+
+    Each item: {"path": str, "colors": list[str], "categories": list[str]}
+    Used by the manual category editor to show every wallpaper that has
+    already been color-analyzed.
+    """
+    cache = load_color_cache()
+    entries = []
+    for path, data in cache.items():
+        if not isinstance(data, dict):
+            continue
+        entries.append({
+            "path": path,
+            "colors": list(data.get("colors", []) or []),
+            "categories": list(data.get("categories", []) or []),
+        })
+    entries.sort(key=lambda e: e["path"].lower())
+    return entries
+
+
+def update_entry_categories(path: str, categories: list[str]) -> bool:
+    """Overwrite the stored categories for a cached image.
+
+    Preserves `colors` and `last_modified`; only `categories` is replaced.
+    Silently drops unknown category names and duplicates.
+    Returns False if there is no existing cache entry for `path`.
+    """
+    if not path:
+        return False
+
+    cache = load_color_cache()
+    entry = cache.get(path)
+    if not isinstance(entry, dict):
+        logger.warning("update_entry_categories: no cache entry for %s", path)
+        return False
+
+    seen: set[str] = set()
+    clean: list[str] = []
+    for c in categories:
+        c = str(c)
+        if c in CATEGORY_LIST and c not in seen:
+            seen.add(c)
+            clean.append(c)
+
+    entry["categories"] = clean
+    cache[path] = entry
+    save_color_cache(cache)
+    logger.info("Updated categories for %s -> %s", path, clean)
+    return True

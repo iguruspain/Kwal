@@ -28,6 +28,12 @@ def get_frame_cache_path(video_path: str, timestamp: float = 0.0) -> Path:
     """
     Generate a cache path for a video frame.
     Uses MD5 hash of video path + timestamp for uniqueness.
+
+    This is the single, shared cache file for a given (video, timestamp): it
+    always holds the native-resolution extracted frame. Callers that need a
+    thumbnail (get_video_frame_as_image) must downscale an in-memory copy
+    instead of overwriting this file, so full-resolution consumers (color
+    extraction, get_video_frame_path) always get the real frame.
     """
     cache_dir = get_video_cache_dir()
     hash_input = f"{video_path}:{timestamp}".encode('utf-8')
@@ -85,7 +91,12 @@ def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: 
     """
     Get a scaled frame from a video file as a PIL Image.
     Uses cache if available.
-    
+
+    The on-disk cache always holds the native-resolution extracted frame
+    (shared with get_video_frame_path/color extraction). This function only
+    downscales an in-memory COPY to return -- it never overwrites the cached
+    file, so callers that need full resolution are never handed a thumbnail.
+
     Args:
         video_path: Path to video file
         timestamp: Timestamp in seconds (default 0.0 for first frame)
@@ -95,29 +106,74 @@ def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: 
         PIL Image object or None if extraction fails
     """
     cache_path = get_frame_cache_path(video_path, timestamp)
-    
+
+    def _thumbnail_copy(full_img: Image.Image) -> Image.Image:
+        thumb = full_img.copy()
+        thumb.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        return thumb
+
     # Try to load from cache first
     if cache_path.exists():
         try:
             img = Image.open(cache_path)
-            return img
+            return _thumbnail_copy(img)
         except Exception as e:
             logger.warning(f"Failed to load cached frame: {e}")
             cache_path.unlink()  # Remove corrupted cache
     
-    # Extract frame and cache it
+    # Extract frame and cache it (native resolution, left untouched on disk)
     if extract_video_frame(video_path, str(cache_path), timestamp):
         try:
             img = Image.open(cache_path)
-            # Resize to max_size while preserving aspect ratio
-            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-            img.save(str(cache_path), "PNG")
-            return img
+            return _thumbnail_copy(img)
         except Exception as e:
             logger.exception(f"Failed to process extracted frame: {e}")
             return None
     
     return None
+
+
+def get_video_resolution(video_path: str) -> tuple[int, int] | None:
+    """
+    Get the native (width, height) of a video file directly from its stream
+    metadata via ffprobe -- never from an extracted/cached frame, since those
+    can be downscaled thumbnails (see get_video_frame_as_image's max_size).
+
+    Args:
+        video_path: Path to video file
+
+    Returns:
+        (width, height) tuple, or None if unable to determine
+    """
+    if not Path(video_path).exists():
+        return None
+
+    try:
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=s=x:p=0",
+            video_path
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, timeout=5, text=True)
+
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().splitlines()[0].split("x")
+            if len(parts) == 2:
+                return int(parts[0]), int(parts[1])
+
+        logger.warning(f"Could not determine resolution for {video_path}")
+        return None
+
+    except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
+        logger.warning(f"Error getting resolution for {video_path}")
+        return None
+    except Exception as e:
+        logger.exception(f"Error getting video resolution: {e}")
+        return None
 
 
 def get_video_duration(video_path: str) -> float:
@@ -165,8 +221,11 @@ def is_video_file(file_path: str) -> bool:
 
 def get_video_frame_path(video_path: str, timestamp: float = 0.0) -> str | None:
     """
-    Get the cached frame path for a video, extracting if needed.
-    
+    Get the cached native-resolution frame path for a video, extracting if needed.
+    Used for color extraction and the lightbox preview. Shares the same cache
+    file as get_video_frame_as_image, which never overwrites it with a
+    downscaled copy (see that function's docstring).
+
     Args:
         video_path: Path to video file
         timestamp: Timestamp in seconds (default 0.0 for first frame)

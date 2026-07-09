@@ -11,7 +11,7 @@ Kirigami.ApplicationWindow {
     id: root
     visible: true
     width: 1000
-    height: 700
+    height: 690
     title: "Kwal"
     
     // Global Safe Overlay Color
@@ -125,12 +125,12 @@ Kirigami.ApplicationWindow {
 
                     Item { Layout.fillWidth: true }
 
-                    ToolButton {
-                        icon.name: "color-picker"
-                        ToolTip.text: qsTr("Open Color Palette")
-                        ToolTip.visible: hovered
-                        onClicked: globalPaletteDialog.open()
-                    }
+                    // ToolButton {
+                    //     icon.name: "color-picker"
+                    //     ToolTip.text: qsTr("Open Color Palette")
+                    //     ToolTip.visible: hovered
+                    //     onClicked: globalPaletteDialog.open()
+                    // }
                 }
 
                 MenuSeparator {

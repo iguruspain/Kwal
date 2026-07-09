@@ -12,6 +12,33 @@ Kirigami.Page {
     // State for sidebar
     property bool sidePaneOpen: false
 
+    // Shared category list (name/hex/label) used both by the color-filter
+    // chips and the manual category editor panel.
+    property var categoryColorModel: [
+        { name: "red", hex: "#E53935", label: "Red" },
+        { name: "orange", hex: "#FB8C00", label: "Orange" },
+        { name: "yellow", hex: "#FDD835", label: "Yellow" },
+        { name: "yellow-green", hex: "#7CB342", label: "Yellow-Green" },
+        { name: "green", hex: "#43A047", label: "Green" },
+        { name: "cyan-green", hex: "#00897B", label: "Cyan-Green" },
+        { name: "cyan", hex: "#00ACC1", label: "Cyan" },
+        { name: "blue-cyan", hex: "#1E88E5", label: "Blue-Cyan" },
+        { name: "blue", hex: "#3949AB", label: "Blue" },
+        { name: "violet", hex: "#8E24AA", label: "Violet" },
+        { name: "magenta", hex: "#D81B60", label: "Magenta" },
+        { name: "rose", hex: "#F06292", label: "Rose" },
+        { name: "black", hex: "#212121", label: "Black/Dark" },
+        { name: "gray", hex: "#757575", label: "Gray" },
+        { name: "white", hex: "#F5F5F5", label: "White/Light" }
+    ]
+
+    function categoryInfo(name) {
+        for (var i = 0; i < wallpaperPage.categoryColorModel.length; i++) {
+            if (wallpaperPage.categoryColorModel[i].name === name) return wallpaperPage.categoryColorModel[i]
+        }
+        return { name: name, hex: "#888888", label: name }
+    }
+
     background: Rectangle {
         color: "transparent"
     }
@@ -284,23 +311,7 @@ Kirigami.Page {
                     Item { Layout.fillWidth: true }               
 
                     Repeater {
-                        model: [
-                            { name: "red", hex: "#E53935", label: "Red" },
-                            { name: "orange", hex: "#FB8C00", label: "Orange" },
-                            { name: "yellow", hex: "#FDD835", label: "Yellow" },
-                            { name: "yellow-green", hex: "#7CB342", label: "Yellow-Green" },
-                            { name: "green", hex: "#43A047", label: "Green" },
-                            { name: "cyan-green", hex: "#00897B", label: "Cyan-Green" },
-                            { name: "cyan", hex: "#00ACC1", label: "Cyan" },
-                            { name: "blue-cyan", hex: "#1E88E5", label: "Blue-Cyan" },
-                            { name: "blue", hex: "#3949AB", label: "Blue" },
-                            { name: "violet", hex: "#8E24AA", label: "Violet" },
-                            { name: "magenta", hex: "#D81B60", label: "Magenta" },
-                            { name: "rose", hex: "#F06292", label: "Rose" },
-                            { name: "black", hex: "#212121", label: "Black/Dark" },
-                            { name: "gray", hex: "#757575", label: "Gray" },
-                            { name: "white", hex: "#F5F5F5", label: "White/Light" }
-                        ]
+                        model: wallpaperPage.categoryColorModel
                         delegate: Rectangle {
                             required property var modelData
                             width: Kirigami.Units.gridUnit * 1.5
@@ -328,6 +339,18 @@ Kirigami.Page {
                     }
                     Item { Layout.fillWidth: true }
                     Item { Layout.fillWidth: true }
+                    ToolButton {
+                        icon.name: "tag-symbolic"
+                        checkable: true
+                        checked: categoryEditorPopup.visible
+                        onToggled: {
+                            if (checked) categoryEditorPopup.open()
+                            else categoryEditorPopup.close()
+                        }
+                        ToolTip.text: qsTr("Edit Color Categories")
+                        ToolTip.visible: hovered
+                        display: AbstractButton.IconOnly
+                    }
                 }
                 
                 MenuSeparator { Layout.fillWidth: true }
@@ -572,7 +595,9 @@ Kirigami.Page {
                                             // Build command array with all replacements applied
                                             var commandsArray = []
                                             for (var i = 0; i < controller.customCommands.length; i++) {
-                                                var cmd = controller.customCommands[i]
+                                                var cmdObj = controller.customCommands[i]
+                                                if (!cmdObj || !cmdObj.enabled) continue
+                                                var cmd = cmdObj.command
                                                 if (!cmd || cmd.trim() === "") continue
                                                 
                                                 cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
@@ -690,7 +715,7 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         Label {
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for path, %image% for image/video thumb path, %video% for video path")
+                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for path, %image% for image/video thumb path")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight
@@ -716,14 +741,22 @@ Kirigami.Page {
                             delegate: RowLayout {
                                 id: commandRow
                                 required property int index
-                                required property string modelData
+                                required property var modelData
                                 Layout.fillWidth: true
+
+                                Switch {
+                                    checked: commandRow.modelData.enabled
+                                    ToolTip.text: checked ? qsTr("Enabled") : qsTr("Disabled")
+                                    ToolTip.visible: hovered
+                                    onToggled: controller.setCustomCommandEnabled(commandRow.index, checked)
+                                }
 
                                 TextField {
                                     id: cmdInput
-                                    text: commandRow.modelData
+                                    text: commandRow.modelData.command
                                     placeholderText: qsTr("Ex: pywal -i %1")
                                     Layout.fillWidth: true
+                                    opacity: commandRow.modelData.enabled ? 1.0 : 0.5
                                     
                                     onEditingFinished: {
                                         controller.updateCustomCommand(commandRow.index, cmdInput.text)
@@ -738,15 +771,19 @@ Kirigami.Page {
                                     }
                                 }
                                 ToolButton {
+                                    id: runCmdButton
                                     icon.name: "media-playback-start"
                                     ToolTip.visible: hovered
-                                    ToolTip.text: qsTr("Execute command")
+                                    ToolTip.text: qsTr("Execute individual command")
                                     onClicked: {
-                                        let finalCmd = cmdInput.text
-                                        finalCmd = finalCmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        finalCmd = finalCmd.replace(/%path%/g, `"${controller.selectedWallpaper}"`).trim()
-                                        finalCmd = finalCmd.replace(/%vidimg%/g, `"${controller.thumbPath}"`).trim()
-                                        controller.runCMD(finalCmd);
+                                        var image = gridContainer.isVideo ? controller.thumbPath : controller.selectedWallpaper
+                                        let cmd = cmdInput.text
+
+                                        cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                                        .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
+                                        .replace(/%image%/g, '"' + image + '"')
+                                        controller.runCMD(cmd.trim());
+
                                     }
                                 }
                             }
@@ -770,7 +807,148 @@ Kirigami.Page {
                 property string selWallpaper: gridContainer.selWallpaper
                 property string selWallpaperThumb: gridContainer.selWallpaperThumb
                 property bool isVideo: gridContainer.isVideo
-                
+
+                // --- Palette panel state (ported from DialogPalette.qml) ---
+                property bool paletteExpanded: false
+                property string paletteCurrentBackend: "material-you" // "pywal16", "material-you-kwal", "material-you", "imagemagick"
+                property bool paletteGenerationActive: false
+                property int paletteSelectedIndex: -1
+                property string paletteSelectedSet: ""
+                property color paletteSelectedColor: "transparent"
+                property bool paletteDarkMode: true
+                property string paletteSelectedScheme: "TonalSpot"
+                property real paletteColorfulnessValue: 1.0
+                property real paletteBrightnessValue: 0.8
+                property real paletteContrastValue: 0.0
+                property string paletteSeedColor: ""
+                property string paletteActualSeed: (controller.currentPaletteData && controller.currentPaletteData.seed) ? controller.currentPaletteData.seed : ""
+
+                // --- Color categories for the currently shown wallpaper ---
+                property var categories: []
+
+                function loadCategories() {
+                    var path = lightboxPopup.selWallpaper
+                    lightboxPopup.categories = path ? (controller.getWallpaperCategories(path) || []) : []
+                }
+
+                function toggleCategory(catName) {
+                    var path = lightboxPopup.selWallpaper
+                    if (!path) return
+
+                    var cats = (lightboxPopup.categories || []).slice()
+                    var idx = cats.indexOf(catName)
+                    if (idx !== -1) cats.splice(idx, 1)
+                    else cats.push(catName)
+
+                    var ok = controller.updateWallpaperCategories(path, cats)
+                    if (ok) {
+                        lightboxPopup.categories = cats
+                        // Keep the big category-editor popup in sync too, if it has
+                        // already loaded an entry for this same path.
+                        for (var i = 0; i < categoryEditorPopup.allEntries.length; i++) {
+                            if (categoryEditorPopup.allEntries[i].path === path) {
+                                categoryEditorPopup.allEntries[i].categories = cats
+                                categoryEditorPopup.allEntries = categoryEditorPopup.allEntries.slice()
+                                break
+                            }
+                        }
+                    } else {
+                        applicationWindow().showPassiveNotification(qsTr("Failed to update categories"))
+                    }
+                }
+
+                // Source image used for palette extraction: for videos we always use the thumbnail
+                function paletteSourcePath() {
+                    return lightboxPopup.isVideo ? lightboxPopup.selWallpaperThumb : lightboxPopup.selWallpaper
+                }
+
+                function refreshPalette(path) {
+                    if (!path) return
+
+                    var params = {}
+                    if (paletteCurrentBackend === "material-you-kwal") {
+                        params = {
+                            "dark_mode": lightboxPopup.paletteDarkMode,
+                            "scheme": lightboxPopup.paletteSelectedScheme,
+                            "colorfulness": lightboxPopup.paletteColorfulnessValue,
+                            "brightness": lightboxPopup.paletteBrightnessValue,
+                            "contrast": lightboxPopup.paletteContrastValue,
+                            "seed_color": lightboxPopup.paletteSeedColor
+                        }
+                    } else if (paletteCurrentBackend === "material-you") {
+                        params = {
+                            "dark_mode": lightboxPopup.paletteDarkMode,
+                            "scheme": lightboxPopup.paletteSelectedScheme
+                        }
+                    } else if (paletteCurrentBackend === "pywal16") {
+                        params = {
+                            "dark_mode": lightboxPopup.paletteDarkMode
+                        }
+                    }
+                    controller.generatePalette(path, paletteCurrentBackend, params)
+                }
+
+                function resetPaletteParameters() {
+                    lightboxPopup.paletteSelectedScheme = "TonalSpot"
+                    lightboxPopup.paletteColorfulnessValue = 1.0
+                    lightboxPopup.paletteBrightnessValue = 0.8
+                    lightboxPopup.paletteContrastValue = 0.0
+                    lightboxPopup.paletteSeedColor = ""
+                    lightboxPopup.paletteDarkMode = true
+                }
+
+                function triggerPaletteRefresh() {
+                    if (!lightboxPopup.paletteGenerationActive) return
+                    var path = lightboxPopup.paletteSourcePath()
+                    if (path) lightboxPopup.refreshPalette(path)
+                }
+
+                onOpened: {
+                    // Fresh wallpaper: drop any palette generated for a previous image
+                    lightboxPopup.paletteGenerationActive = false
+                    lightboxPopup.paletteSelectedIndex = -1
+                    lightboxPopup.paletteSelectedSet = ""
+                    lightboxPopup.paletteSelectedColor = "transparent"
+                    if (controller && controller.clearPalette) controller.clearPalette()
+                    lightboxPopup.loadCategories()
+                }
+
+                Timer {
+                    id: paletteDebouncer
+                    interval: 300
+                    repeat: false
+                    onTriggered: lightboxPopup.triggerPaletteRefresh()
+                }
+
+                function debouncePaletteRefresh() {
+                    paletteDebouncer.restart()
+                }
+
+                Connections {
+                    target: controller
+                    function onPaletteGenerationError(msg) {
+                        applicationWindow().showPassiveNotification(qsTr("Error: ") + msg)
+                    }
+                }
+
+                Connections {
+                    target: controller
+                    function onCurrentPaletteDataChanged() {
+                        var colors = (controller.currentPaletteData && controller.currentPaletteData.colors) ? controller.currentPaletteData.colors : []
+                        var accents = (controller.currentPaletteData && controller.currentPaletteData.accents) ? controller.currentPaletteData.accents : []
+                        if (lightboxPopup.paletteSelectedSet === "palette" && lightboxPopup.paletteSelectedIndex >= colors.length) {
+                            lightboxPopup.paletteSelectedIndex = -1
+                            lightboxPopup.paletteSelectedSet = ""
+                            lightboxPopup.paletteSelectedColor = "transparent"
+                        }
+                        if (lightboxPopup.paletteSelectedSet === "accent" && lightboxPopup.paletteSelectedIndex >= accents.length) {
+                            lightboxPopup.paletteSelectedIndex = -1
+                            lightboxPopup.paletteSelectedSet = ""
+                            lightboxPopup.paletteSelectedColor = "transparent"
+                        }
+                    }
+                }
+
                 background: Rectangle {
                     Kirigami.Theme.colorSet: Kirigami.Theme.View
                     color: Kirigami.Theme.backgroundColor
@@ -862,13 +1040,579 @@ Kirigami.Page {
                     // }
                     
                     ToolButton {
+                        id: paletteToggleButton
                         anchors.top: parent.top
+                        anchors.topMargin: Kirigami.Units.smallSpacing
+                        anchors.right: closeLightboxButton.left
+                        icon.name: "palette-symbolic"
+                        icon.width: Kirigami.Units.gridUnit * 1.5
+                        icon.height: Kirigami.Units.gridUnit * 1.5
+                        display: AbstractButton.IconOnly
+                        checkable: true
+                        checked: lightboxPopup.paletteExpanded
+                        ToolTip.text: qsTr("Color Palette")
+                        ToolTip.visible: hovered
+                        onToggled: lightboxPopup.paletteExpanded = checked
+                    }
+
+                    ToolButton {
+                        id: closeLightboxButton
+                        anchors.top: parent.top
+                        anchors.topMargin: Kirigami.Units.smallSpacing
                         anchors.right: parent.right
                         icon.name: "dialog-close"
                         icon.width: Kirigami.Units.gridUnit * 1.5
                         icon.height: Kirigami.Units.gridUnit * 1.5
                         display: AbstractButton.IconOnly
                         onClicked: lightboxPopup.close()
+                    }
+
+                    // --- Palette Panel (ported from DialogPalette.qml) ---
+                    // Fixed-size container that clips its content; only the inner
+                    // Rectangle's "x" is animated, so contained controls never see
+                    // a width/height of 0 (which caused QPainter paint-device warnings).
+                    Item {
+                        id: palettePanelContainer
+                        anchors.top: closeLightboxButton.bottom
+                        anchors.bottom: parent.bottom
+                        anchors.right: parent.right
+                        anchors.topMargin: Kirigami.Units.largeSpacing
+                        anchors.bottomMargin: Kirigami.Units.largeSpacing * 4
+                        anchors.rightMargin: Kirigami.Units.largeSpacing
+                        width: Math.min(Kirigami.Units.gridUnit * 18, parent.width * 0.42)
+                        clip: true
+
+                        // Handle/tab attached to the container's left edge, always visible
+                        Rectangle {
+                            id: paletteHandle
+                            anchors.right: palettePanelContainer.left
+                            anchors.verticalCenter: palettePanelContainer.verticalCenter
+                            width: Kirigami.Units.gridUnit * 1.6
+                            height: Kirigami.Units.gridUnit * 4
+                            radius: Kirigami.Units.smallSpacing
+                            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.92)
+                            border.color: Kirigami.Theme.highlightColor
+                            border.width: 1
+                            visible: !lightboxPopup.paletteExpanded
+
+                            Kirigami.Icon {
+                                anchors.centerIn: parent
+                                source: "palette-symbolic"
+                                width: Kirigami.Units.gridUnit
+                                height: width
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: lightboxPopup.paletteExpanded = true
+                            }
+                        }
+
+                        Rectangle {
+                            id: palettePanel
+                            width: palettePanelContainer.width
+                            height: palettePanelContainer.height
+                            x: lightboxPopup.paletteExpanded ? 0 : width
+                            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.92)
+                            border.color: Kirigami.Theme.highlightColor
+                            border.width: 1
+                            radius: Kirigami.Units.smallSpacing
+
+                            Behavior on x {
+                                NumberAnimation { duration: 200; easing.type: Easing.InOutQuad }
+                            }
+
+                        ScrollView {
+                            id: palettePanelScroll
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.largeSpacing
+                            clip: true
+                            visible: lightboxPopup.paletteExpanded
+                            opacity: lightboxPopup.paletteExpanded ? 1.0 : 0.0
+
+                            Behavior on opacity {
+                                NumberAnimation { duration: 150 }
+                            }
+
+                            ColumnLayout {
+                                id: palettePanelLayout
+                                width: palettePanelScroll.availableWidth
+                                spacing: Kirigami.Units.largeSpacing
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Label {
+                                        text: qsTr("Color Palette")
+                                        font.bold: true
+                                        Layout.fillWidth: true
+                                    }
+                                    ToolButton {
+                                        icon.name: "collapse-all"
+                                        flat: true
+                                        display: AbstractButton.IconOnly
+                                        ToolTip.text: qsTr("Collapse")
+                                        ToolTip.visible: hovered
+                                        onClicked: lightboxPopup.paletteExpanded = false
+                                    }
+                                }
+
+                                Kirigami.Separator { Layout.fillWidth: true }
+
+                                // Categories
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    Label {
+                                        text: qsTr("Categories")
+                                        font.bold: true
+                                    }
+
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        Repeater {
+                                            model: lightboxPopup.categories
+                                            delegate: Rectangle {
+                                                id: lbActiveChip
+                                                required property string modelData
+                                                readonly property var catInfo: wallpaperPage.categoryInfo(lbActiveChip.modelData)
+                                                implicitWidth: lbChipRow.implicitWidth + Kirigami.Units.largeSpacing
+                                                implicitHeight: Kirigami.Units.gridUnit * 1.6
+                                                radius: Kirigami.Units.smallSpacing
+                                                color: Qt.alpha(lbActiveChip.catInfo.hex, 0.22)
+                                                border.color: lbActiveChip.catInfo.hex
+                                                border.width: 1
+
+                                                RowLayout {
+                                                    id: lbChipRow
+                                                    anchors.centerIn: parent
+                                                    spacing: Kirigami.Units.smallSpacing / 2
+
+                                                    Rectangle {
+                                                        Layout.preferredWidth: Kirigami.Units.gridUnit * 0.55
+                                                        Layout.preferredHeight: width
+                                                        radius: 2 //width / 2
+                                                        color: lbActiveChip.catInfo.hex
+                                                        border.color: Qt.alpha("#000000", 0.25)
+                                                        border.width: 1
+                                                    }
+
+                                                    Label {
+                                                        text: lbActiveChip.catInfo.label
+                                                        color: Kirigami.Theme.textColor
+                                                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                                    }
+
+                                                    Label {
+                                                        text: "\u2715"
+                                                        color: Kirigami.Theme.disabledTextColor
+                                                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+
+                                                        TapHandler {
+                                                            onTapped: lightboxPopup.toggleCategory(lbActiveChip.modelData)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            id: lbAddChip
+                                            implicitWidth: lbAddChipRow.implicitWidth + Kirigami.Units.largeSpacing
+                                            implicitHeight: Kirigami.Units.gridUnit * 1.6
+                                            radius: Kirigami.Units.smallSpacing
+                                            color: lbAddChipHover.hovered ? Qt.alpha(Kirigami.Theme.highlightColor, 0.18) : "transparent"
+                                            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.35)
+                                            border.width: 1
+
+                                            RowLayout {
+                                                id: lbAddChipRow
+                                                anchors.centerIn: parent
+                                                spacing: Kirigami.Units.smallSpacing / 2
+
+                                                Label {
+                                                    text: "+"
+                                                    color: Kirigami.Theme.disabledTextColor
+                                                    font.bold: true
+                                                }
+                                                Label {
+                                                    text: qsTr("Add")
+                                                    color: Kirigami.Theme.disabledTextColor
+                                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                                }
+                                            }
+
+                                            HoverHandler { id: lbAddChipHover }
+                                            TapHandler {
+                                                onTapped: lbAddCategoryMenu.popup()
+                                            }
+
+                                            Menu {
+                                                id: lbAddCategoryMenu
+                                                Repeater {
+                                                    model: wallpaperPage.categoryColorModel.filter(function (c) {
+                                                        return (lightboxPopup.categories || []).indexOf(c.name) === -1
+                                                    })
+                                                    delegate: MenuItem {
+                                                        required property var modelData
+                                                        text: modelData.label
+                                                        icon.color: modelData.hex
+                                                        onTriggered: lightboxPopup.toggleCategory(modelData.name)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Kirigami.Separator { Layout.fillWidth: true }
+
+                                // Extraction Controls
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    ComboBox {
+                                        id: extractMethodCombo
+                                        model: ["pywal16", "material-you-kwal", "material-you", "imagemagick"]
+                                        currentIndex: model.indexOf(lightboxPopup.paletteCurrentBackend)
+                                        Layout.fillWidth: true
+                                        onActivated: {
+                                            lightboxPopup.paletteCurrentBackend = currentText
+                                            lightboxPopup.paletteGenerationActive = false
+                                            lightboxPopup.paletteSelectedColor = "transparent"
+                                            lightboxPopup.paletteSelectedIndex = -1
+                                            lightboxPopup.paletteSelectedSet = ""
+                                            lightboxPopup.resetPaletteParameters()
+                                            if (controller && controller.clearPalette) controller.clearPalette()
+                                        }
+                                    }
+
+                                    ToolButton {
+                                        id: extractButton
+                                        icon.name: "palette-symbolic"
+                                        ToolTip.text: qsTr("Extract Color Palette")
+                                        ToolTip.visible: hovered
+                                        onClicked: {
+                                            var path = lightboxPopup.paletteSourcePath()
+                                            if (!path) {
+                                                applicationWindow().showPassiveNotification(qsTr("No image available to extract from"))
+                                                return
+                                            }
+                                            lightboxPopup.paletteGenerationActive = true
+                                            lightboxPopup.refreshPalette(path)
+                                        }
+                                    }
+                                }
+
+                                Kirigami.Separator {
+                                    Layout.fillWidth: true
+                                    visible: lightboxPopup.paletteGenerationActive
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    visible: lightboxPopup.paletteGenerationActive
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    Label {
+                                        text: qsTr("Palette Colors")
+                                        font.bold: true
+                                    }
+
+                                    Grid {
+                                        id: paletteGrid
+                                        Layout.fillWidth: true
+                                        columns: 8
+                                        spacing: Kirigami.Units.smallSpacing / 6
+                                        clip: true
+
+                                        Repeater {
+                                            model: (controller.currentPaletteData && controller.currentPaletteData.colors) ? controller.currentPaletteData.colors : []
+                                            delegate: Item {
+                                                required property string modelData
+                                                required property int index
+                                                width: Kirigami.Units.gridUnit * 1.5
+                                                height: Kirigami.Units.gridUnit * 1.5
+
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    anchors.margins: Kirigami.Units.smallSpacing / 2
+                                                    color: parent.modelData
+                                                    border.width: (lightboxPopup.paletteSelectedSet === "palette" && lightboxPopup.paletteSelectedIndex === parent.index) ? 2 : 1
+                                                    border.color: (lightboxPopup.paletteSelectedSet === "palette" && lightboxPopup.paletteSelectedIndex === parent.index) ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+                                                    radius: 3
+
+                                                    MouseArea {
+                                                        id: maPalette
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                        onClicked: (mouse) => {
+                                                            if (mouse.button === Qt.RightButton) {
+                                                                clipboardHelper.copyToClipboard(parent.parent.modelData)
+                                                                return
+                                                            }
+                                                            lightboxPopup.paletteSelectedIndex = parent.parent.index
+                                                            lightboxPopup.paletteSelectedSet = "palette"
+                                                            lightboxPopup.paletteSelectedColor = parent.parent.modelData
+                                                        }
+                                                    }
+
+                                                    ToolTip.visible: maPalette.containsMouse
+                                                    ToolTip.text: parent.modelData
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.topMargin: Kirigami.Units.smallSpacing
+                                        spacing: Kirigami.Units.smallSpacing
+                                        Label {
+                                            text: qsTr("Accent Colors")
+                                            font.bold: true
+                                        }
+                                        Label {
+                                            text: lightboxPopup.paletteCurrentBackend === "material-you-kwal" ? qsTr("(Right click: new variation)") : ""
+                                            font.pixelSize: parent.children[0].font.pixelSize * 0.8
+                                            font.italic: true
+                                            color: Kirigami.Theme.disabledTextColor
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Grid {
+                                        id: accentGrid
+                                        Layout.fillWidth: true
+                                        columns: 8
+                                        spacing: Kirigami.Units.smallSpacing / 6
+                                        clip: true
+
+                                        Repeater {
+                                            model: (controller.currentPaletteData && controller.currentPaletteData.accents) ? controller.currentPaletteData.accents : []
+                                            delegate: Item {
+                                                required property string modelData
+                                                required property int index
+                                                width: Kirigami.Units.gridUnit * 1.5
+                                                height: Kirigami.Units.gridUnit * 1.5
+
+                                                Rectangle {
+                                                    id: accentRect
+                                                    anchors.fill: parent
+                                                    anchors.margins: Kirigami.Units.smallSpacing / 2
+                                                    color: parent.modelData
+                                                    border.width: (lightboxPopup.paletteSelectedSet === "accent" && lightboxPopup.paletteSelectedIndex === parent.index) ? 2 : 1
+                                                    border.color: (lightboxPopup.paletteSelectedSet === "accent" && lightboxPopup.paletteSelectedIndex === parent.index) ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+                                                    radius: 3
+
+                                                    MouseArea {
+                                                        id: maAccent
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                        onClicked: (mouse) => {
+                                                            if (mouse.button === Qt.LeftButton) {
+                                                                lightboxPopup.paletteSelectedIndex = parent.parent.index
+                                                                lightboxPopup.paletteSelectedSet = "accent"
+                                                                lightboxPopup.paletteSelectedColor = parent.parent.modelData
+                                                            } else if (mouse.button === Qt.RightButton) {
+                                                                if (lightboxPopup.paletteCurrentBackend === "material-you-kwal") {
+                                                                    lightboxPopup.paletteSeedColor = parent.parent.modelData
+                                                                    lightboxPopup.triggerPaletteRefresh()
+                                                                } else {
+                                                                    clipboardHelper.copyToClipboard(parent.parent.modelData)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    ToolTip.visible: maAccent.containsMouse
+                                                    ToolTip.text: parent.modelData
+
+                                                    Item {
+                                                        anchors.top: parent.top
+                                                        anchors.right: parent.right
+                                                        anchors.margins: Kirigami.Units.smallSpacing / 4
+                                                        width: Kirigami.Units.gridUnit * 0.6
+                                                        height: width
+                                                        visible: lightboxPopup.paletteCurrentBackend === "material-you-kwal" &&
+                                                                 (lightboxPopup.paletteSeedColor === parent.parent.modelData)
+
+                                                        Label {
+                                                            anchors.centerIn: parent
+                                                            text: "\u2605"
+                                                            color: Kirigami.Theme.positiveTextColor
+                                                            font.pixelSize: Math.max(10, parent.width * 0.6)
+                                                            style: Text.Outline
+                                                            styleColor: Kirigami.Theme.backgroundColor
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Kirigami.Separator {
+                                    Layout.fillWidth: true
+                                    visible: lightboxPopup.paletteGenerationActive && (lightboxPopup.paletteCurrentBackend === "material-you-kwal" || lightboxPopup.paletteCurrentBackend === "material-you" || lightboxPopup.paletteCurrentBackend === "pywal16")
+                                }
+
+                                // Aux Controls (for Material You and pywal16)
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    visible: lightboxPopup.paletteGenerationActive && (lightboxPopup.paletteCurrentBackend === "material-you-kwal" || lightboxPopup.paletteCurrentBackend === "material-you" || lightboxPopup.paletteCurrentBackend === "pywal16")
+                                    spacing: Kirigami.Units.smallSpacing
+
+                                    Label {
+                                        text: qsTr("Parameters")
+                                        font.bold: true
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        RadioButton {
+                                            text: qsTr("Dark")
+                                            checked: lightboxPopup.paletteDarkMode
+                                            onToggled: {
+                                                if (checked) {
+                                                    lightboxPopup.paletteDarkMode = true
+                                                    lightboxPopup.triggerPaletteRefresh()
+                                                }
+                                            }
+                                        }
+                                        RadioButton {
+                                            text: qsTr("Light")
+                                            checked: !lightboxPopup.paletteDarkMode
+                                            onToggled: {
+                                                if (checked) {
+                                                    lightboxPopup.paletteDarkMode = false
+                                                    lightboxPopup.triggerPaletteRefresh()
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        visible: lightboxPopup.paletteCurrentBackend === "material-you-kwal"
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        Label { text: qsTr("Seed:") }
+                                        Rectangle {
+                                            id: seedRect
+                                            width: Kirigami.Units.gridUnit
+                                            height: width
+                                            radius: 3
+                                            color: (lightboxPopup.paletteSeedColor !== "") ? lightboxPopup.paletteSeedColor : lightboxPopup.paletteActualSeed
+                                            border.color: Kirigami.Theme.disabledTextColor
+                                            border.width: 1
+
+                                            ToolTip.text: (lightboxPopup.paletteSeedColor !== "") ? (lightboxPopup.paletteSeedColor + " (Manual)") : (lightboxPopup.paletteActualSeed + " (Auto)")
+                                            ToolTip.visible: seedMouse.containsMouse
+
+                                            MouseArea {
+                                                id: seedMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                            }
+                                        }
+                                        Label {
+                                            text: (lightboxPopup.paletteSeedColor !== "") ? qsTr("Manual") : qsTr("Auto")
+                                            opacity: 0.7
+                                        }
+                                        ToolButton {
+                                            visible: lightboxPopup.paletteSeedColor !== ""
+                                            icon.name: "edit-clear"
+                                            flat: true
+                                            ToolTip.text: qsTr("Reset to Auto")
+                                            onClicked: {
+                                                lightboxPopup.paletteSeedColor = ""
+                                                lightboxPopup.triggerPaletteRefresh()
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        visible: lightboxPopup.paletteCurrentBackend !== "pywal16"
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        Label { text: qsTr("Tone:") }
+                                        ComboBox {
+                                            Layout.fillWidth: true
+                                            model: ["TonalSpot", "Vibrant", "Expressive", "Content", "FruitSalad", "Rainbow", "Monochrome", "Neutral", "Fidelity"]
+                                            currentIndex: model.indexOf(lightboxPopup.paletteSelectedScheme)
+                                            onActivated: {
+                                                lightboxPopup.paletteSelectedScheme = currentText
+                                                if (!lightboxPopup.paletteGenerationActive && lightboxPopup.paletteSourcePath()) {
+                                                    lightboxPopup.paletteGenerationActive = true
+                                                }
+                                                lightboxPopup.triggerPaletteRefresh()
+                                            }
+                                        }
+                                        ToolButton {
+                                            icon.name: "edit-clear"
+                                            flat: true
+                                            opacity: (lightboxPopup.paletteSelectedScheme !== "TonalSpot") ? 1.0 : 0.0
+                                            enabled: (lightboxPopup.paletteSelectedScheme !== "TonalSpot")
+                                            ToolTip.text: qsTr("Reset to TonalSpot")
+                                            onClicked: {
+                                                lightboxPopup.paletteSelectedScheme = "TonalSpot"
+                                                lightboxPopup.triggerPaletteRefresh()
+                                            }
+                                        }
+                                    }
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        columns: 3
+                                        rowSpacing: Kirigami.Units.smallSpacing
+                                        columnSpacing: Kirigami.Units.smallSpacing
+                                        visible: lightboxPopup.paletteCurrentBackend === "material-you-kwal"
+
+                                        Label { text: qsTr("Colorfulness:") }
+                                        Slider {
+                                            Layout.fillWidth: true
+                                            from: 0.0
+                                            to: 2.0
+                                            value: lightboxPopup.paletteColorfulnessValue
+                                            stepSize: 0.1
+                                            onMoved: {
+                                                lightboxPopup.paletteColorfulnessValue = Math.round(value * 10) / 10
+                                                lightboxPopup.debouncePaletteRefresh()
+                                            }
+                                        }
+                                        Label { text: lightboxPopup.paletteColorfulnessValue.toFixed(1) }
+
+                                        Label { text: qsTr("Brightness:") }
+                                        Slider {
+                                            Layout.fillWidth: true
+                                            from: 0.1
+                                            to: 2.0
+                                            value: lightboxPopup.paletteBrightnessValue
+                                            stepSize: 0.1
+                                            onMoved: {
+                                                lightboxPopup.paletteBrightnessValue = Math.round(value * 10) / 10
+                                                lightboxPopup.debouncePaletteRefresh()
+                                            }
+                                        }
+                                        Label { text: lightboxPopup.paletteBrightnessValue.toFixed(1) }
+                                    }
+                                }
+
+                                Item { Layout.preferredHeight: Kirigami.Units.largeSpacing }
+                            }
+                        }
+                        }
                     }
                     
                     RowLayout {
@@ -923,7 +1667,9 @@ Kirigami.Page {
 
                             var commandsArray = []
                             for (var i = 0; i < controller.customCommands.length; i++) {
-                                var cmd = controller.customCommands[i]
+                                var cmdObj = controller.customCommands[i]
+                                if (!cmdObj || !cmdObj.enabled) continue
+                                var cmd = cmdObj.command
                                 if (!cmd || cmd.trim() === "") continue
                                 
                                 cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
@@ -938,6 +1684,293 @@ Kirigami.Page {
                             }
                             
                             lightboxPopup.close()
+                        }
+                    }
+                }
+            }
+
+            // Color Category Editor Popup
+            Popup {
+                id: categoryEditorPopup
+                parent: Overlay.overlay
+                x: Math.round((parent.width - width) / 2)
+                y: Math.round((parent.height - height) / 2)
+                width: parent.width * 0.96
+                height: parent.height * 0.86                
+                modal: true
+                focus: true
+                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+                property var allEntries: []
+                property string searchText: ""
+
+                function reload() {
+                    categoryEditorPopup.allEntries = controller.getCachedColorEntries()
+                }
+
+                function toggleCategory(path, catName) {
+                    var target = null
+                    for (var i = 0; i < categoryEditorPopup.allEntries.length; i++) {
+                        if (categoryEditorPopup.allEntries[i].path === path) {
+                            target = categoryEditorPopup.allEntries[i]
+                            break
+                        }
+                    }
+                    if (!target) return
+
+                    var cats = (target.categories || []).slice()
+                    var idx = cats.indexOf(catName)
+                    if (idx !== -1) cats.splice(idx, 1)
+                    else cats.push(catName)
+
+                    var ok = controller.updateWallpaperCategories(path, cats)
+                    if (ok) {
+                        target.categories = cats
+                        // Reassign so the ListView model binding re-evaluates
+                        // and every chip in this row reflects the new state.
+                        categoryEditorPopup.allEntries = categoryEditorPopup.allEntries.slice()
+                        // Keep the lightbox's own category editor (if open on
+                        // this same wallpaper) in sync too.
+                        if (lightboxPopup.selWallpaper === path) {
+                            lightboxPopup.categories = cats
+                        }
+                    } else {
+                        applicationWindow().showPassiveNotification(qsTr("Failed to update categories"))
+                    }
+                }
+
+                onOpened: categoryEditorPopup.reload()
+
+                background: Rectangle {
+                    Kirigami.Theme.colorSet: Kirigami.Theme.View
+                    color: Kirigami.Theme.backgroundColor
+                    border.color: Kirigami.Theme.highlightColor
+                    border.width: 1
+                    radius: Kirigami.Units.largeSpacing
+                }
+
+                contentItem: ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.largeSpacing * 4
+                    spacing: Kirigami.Units.largeSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Heading {
+                            text: qsTr("Color Category Editor")
+                            level: 2
+                            Layout.fillWidth: true
+                        }
+                        Label {
+                            text: qsTr("%1 wallpapers").arg(categoryEditorPopup.allEntries.length)
+                            color: Kirigami.Theme.disabledTextColor
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        }
+                        ToolButton {
+                            icon.name: "view-refresh"
+                            flat: true
+                            ToolTip.text: qsTr("Reload from cache")
+                            ToolTip.visible: hovered
+                            onClicked: categoryEditorPopup.reload()
+                        }
+                        ToolButton {
+                            icon.name: "dialog-close"
+                            flat: true
+                            ToolTip.text: qsTr("Close")
+                            ToolTip.visible: hovered
+                            onClicked: categoryEditorPopup.close()
+                        }
+                    }
+
+                    Kirigami.SearchField {
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Filter by filename...")
+                        onTextChanged: categoryEditorPopup.searchText = text
+                    }
+
+                    Kirigami.Separator { Layout.fillWidth: true }
+
+                    Label {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: categoryEditorPopup.allEntries.length === 0
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        color: Kirigami.Theme.disabledTextColor
+                        text: qsTr("No cached wallpapers found yet. Browse a folder first so colors get extracted.")
+                        wrapMode: Text.WordWrap
+                    }
+
+                    ListView {
+                        id: categoryListView
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        visible: categoryEditorPopup.allEntries.length > 0
+                        clip: true
+                        spacing: Kirigami.Units.smallSpacing
+                        ScrollBar.vertical: ScrollBar {}
+
+                        model: {
+                            var term = categoryEditorPopup.searchText.toLowerCase()
+                            if (!term) return categoryEditorPopup.allEntries
+                            return categoryEditorPopup.allEntries.filter(function (e) {
+                                return e.path.toLowerCase().indexOf(term) !== -1
+                            })
+                        }
+
+                        delegate: Rectangle {
+                            id: entryDelegate
+                            required property var modelData
+                            width: categoryListView.width
+                            height: entryRowLayout.implicitHeight + Kirigami.Units.largeSpacing
+                            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.5)
+                            radius: Kirigami.Units.smallSpacing
+                            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.15)
+                            border.width: 1
+
+                            RowLayout {
+                                id: entryRowLayout
+                                anchors.fill: parent
+                                anchors.margins: Kirigami.Units.smallSpacing
+                                spacing: Kirigami.Units.largeSpacing
+
+                                Item { Layout.fillWidth: true }
+                                Image {
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 4.5
+                                    Layout.preferredHeight: Kirigami.Units.gridUnit * 2.8
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    cache: true
+                                    source: entryDelegate.modelData.isVideo
+                                            ? ("image://video_thumbnail/" + entryDelegate.modelData.path)
+                                            : ("image://fdo_thumbnail/" + entryDelegate.modelData.path)
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: "transparent"
+                                        border.color: Qt.alpha(Kirigami.Theme.textColor, 0.2)
+                                        border.width: 1
+                                        radius: 2
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: Kirigami.Units.smallSpacing / 2
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: entryDelegate.modelData.path.split("/").pop()
+                                        elide: Text.ElideMiddle
+                                        font.bold: true
+                                    }
+
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        spacing: Kirigami.Units.smallSpacing
+
+                                        Repeater {
+                                            model: entryDelegate.modelData.categories || []
+                                            delegate: Rectangle {
+                                                id: activeChip
+                                                required property string modelData
+                                                readonly property var catInfo: wallpaperPage.categoryInfo(activeChip.modelData)
+                                                implicitWidth: chipRow.implicitWidth + Kirigami.Units.largeSpacing
+                                                implicitHeight: Kirigami.Units.gridUnit * 1.6
+                                                radius: Kirigami.Units.smallSpacing
+                                                color: Qt.alpha(activeChip.catInfo.hex, 0.22)
+                                                border.color: activeChip.catInfo.hex
+                                                border.width: 1
+
+                                                RowLayout {
+                                                    id: chipRow
+                                                    anchors.centerIn: parent
+                                                    spacing: Kirigami.Units.smallSpacing / 2
+
+                                                    Rectangle {
+                                                        Layout.preferredWidth: Kirigami.Units.gridUnit * 0.55
+                                                        Layout.preferredHeight: width
+                                                        radius: 2 //width / 2
+                                                        color: activeChip.catInfo.hex
+                                                        border.color: Qt.alpha("#000000", 0.25)
+                                                        border.width: 1
+                                                    }
+
+                                                    Label {
+                                                        text: activeChip.catInfo.label
+                                                        color: Kirigami.Theme.textColor
+                                                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                                    }
+
+                                                    Label {
+                                                        text: "\u2715"
+                                                        color: Kirigami.Theme.disabledTextColor
+                                                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+
+                                                        TapHandler {
+                                                            onTapped: categoryEditorPopup.toggleCategory(entryDelegate.modelData.path, activeChip.modelData)
+                                                        }
+                                                    }
+                                                }
+
+                                                HoverHandler {
+                                                    id: activeChipHover
+                                                }
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            id: addChip
+                                            implicitWidth: addChipRow.implicitWidth + Kirigami.Units.largeSpacing
+                                            implicitHeight: Kirigami.Units.gridUnit * 1.6
+                                            radius: Kirigami.Units.smallSpacing
+                                            color: addChipHover.hovered ? Qt.alpha(Kirigami.Theme.highlightColor, 0.18) : "transparent"
+                                            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.35)
+                                            border.width: 1
+
+                                            RowLayout {
+                                                id: addChipRow
+                                                anchors.centerIn: parent
+                                                spacing: Kirigami.Units.smallSpacing / 2
+
+                                                Label {
+                                                    text: "+"
+                                                    color: Kirigami.Theme.disabledTextColor
+                                                    font.bold: true
+                                                }
+                                                Label {
+                                                    text: qsTr("Add")
+                                                    color: Kirigami.Theme.disabledTextColor
+                                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                                }
+                                            }
+
+                                            HoverHandler { id: addChipHover }
+                                            TapHandler {
+                                                onTapped: addCategoryMenu.popup()
+                                            }
+
+                                            Menu {
+                                                id: addCategoryMenu
+                                                Repeater {
+                                                    model: wallpaperPage.categoryColorModel.filter(function (c) {
+                                                        return (entryDelegate.modelData.categories || []).indexOf(c.name) === -1
+                                                    })
+                                                    delegate: MenuItem {
+                                                        required property var modelData
+                                                        text: modelData.label
+                                                        icon.color: modelData.hex
+                                                        onTriggered: categoryEditorPopup.toggleCategory(entryDelegate.modelData.path, modelData.name)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

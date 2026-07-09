@@ -197,7 +197,7 @@ class Controller(QObject):
         self._result_dialog_visible: bool = False
         self._result_dialog_text: str = ""
         self._templates_installed: bool = False
-        self._custom_commands: list[str] = []
+        self._custom_commands: list[dict[str, Any]] = []
         self._wallpaper_colors: list[str] = []
         
         # Draft State (Persist across tabs)
@@ -239,7 +239,7 @@ class Controller(QObject):
         last_selected = cast(str, config.get("selected_folder", ""))
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
         if "custom_commands" in config and isinstance(config["custom_commands"], list):
-            self._custom_commands = [str(c) for c in config["custom_commands"]]
+            self._custom_commands = self._normalize_custom_commands(config["custom_commands"])
         else:
             self._custom_commands = []
 
@@ -336,6 +336,25 @@ class Controller(QObject):
         cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal"
         cfg_dir.mkdir(parents=True, exist_ok=True)
         return cfg_dir / "folders.json"
+
+    @staticmethod
+    def _normalize_custom_commands(raw: list) -> list[dict[str, Any]]:
+        """Normalize custom commands to {"command": str, "enabled": bool}.
+
+        Accepts the legacy format (plain list of command strings, all
+        implicitly enabled) as well as the current dict format, so existing
+        config files keep working after upgrading.
+        """
+        normalized: list[dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, str):
+                normalized.append({"command": item, "enabled": True})
+            elif isinstance(item, dict):
+                normalized.append({
+                    "command": str(item.get("command", "")),
+                    "enabled": bool(item.get("enabled", True)),
+                })
+        return normalized
 
     def _load_config(self) -> dict[str, Any]:
         """Load persisted config."""
@@ -500,29 +519,38 @@ class Controller(QObject):
 
     hasFastfetchBackup = Property(bool, _get_fastfetch_backup_exists, notify=fastfetchBackupExistsChanged)
 
-    def _get_custom_commands(self) -> list[str]:
+    def _get_custom_commands(self) -> list[dict[str, Any]]:
             return self._custom_commands
 
-    def _set_custom_commands(self, cmds: list[str]) -> None:
-        if self._custom_commands != cmds:
-            self._custom_commands = list(cmds)
+    def _set_custom_commands(self, cmds: list) -> None:
+        normalized = self._normalize_custom_commands(cmds)
+        if self._custom_commands != normalized:
+            self._custom_commands = normalized
             self._save_config()
             self.customCommandsChanged.emit()
 
-    customCommands = Property("QStringList", _get_custom_commands, _set_custom_commands, notify=customCommandsChanged)
+    customCommands = Property("QVariantList", _get_custom_commands, _set_custom_commands, notify=customCommandsChanged)
     
     @Slot(str)
     def addCustomCommand(self, cmd: str) -> None:
-        """Añade un comando nuevo al final de la lista."""
-        self._custom_commands.append(cmd)
+        """Añade un comando nuevo al final de la lista (activado por defecto)."""
+        self._custom_commands.append({"command": cmd, "enabled": True})
         self._save_config()
         self.customCommandsChanged.emit()
 
     @Slot(int, str)
     def updateCustomCommand(self, index: int, cmd: str) -> None:
-        """Actualiza el comando en un índice específico al editar el TextField."""
+        """Actualiza el texto del comando en un índice específico, preservando su estado enabled."""
         if 0 <= index < len(self._custom_commands):
-            self._custom_commands[index] = cmd
+            self._custom_commands[index]["command"] = cmd
+            self._save_config()
+            self.customCommandsChanged.emit()
+
+    @Slot(int, bool)
+    def setCustomCommandEnabled(self, index: int, enabled: bool) -> None:
+        """Activa/desactiva un comando sin tocar su texto."""
+        if 0 <= index < len(self._custom_commands):
+            self._custom_commands[index]["enabled"] = enabled
             self._save_config()
             self.customCommandsChanged.emit()
 
@@ -596,7 +624,7 @@ class Controller(QObject):
                 self._logger.info("Detected '%s' installed, enabling tab", binary_name)
             else:
                 self._logger.info("'%s' not found in PATH, tab hidden", binary_name)
-        apps.append(SettingsApp(app_name="SVG Recolor", section="Apps", qml_page="apps/svgrecolor.qml", title="SVG Recolor"))
+        #apps.append(SettingsApp(app_name="SVG Recolor", section="Apps", qml_page="apps/svgrecolor.qml", title="SVG Recolor"))
         return apps
 
     # --- Draft Properties ---
@@ -942,8 +970,15 @@ class Controller(QObject):
 
                     img = QImage(image_for_colors)
                     if not img.isNull():
-                        self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
-                        
+                        if video_utils.is_video_file(path):
+                            # Never trust the extracted/cached frame's size for
+                            # videos: it can be a downscaled thumbnail shared
+                            # with the grid preview cache. Ask the video itself.
+                            res = video_utils.get_video_resolution(path)
+                            self._selected_wallpaper_resolution = f"{res[0]}x{res[1]}" if res else f"{img.width()}x{img.height()}"
+                        else:
+                            self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
+
                         cache = color_extractor.load_color_cache()
                         if path in cache and "colors" in cache[path]:
                             self._wallpaper_colors = cache[path]["colors"]
@@ -1409,6 +1444,52 @@ class Controller(QObject):
         """Clear current palette data and notify QML."""
         self._current_palette_data = {}
         self.currentPaletteDataChanged.emit()
+
+    # --- Manual color-category editor (fixes for the automatic classifier) ---
+
+    @Slot(result="QVariantList")
+    def getColorCategoryList(self) -> list[str]:
+        """Return the fixed list of color categories used for classification."""
+        from ..utils import color_extractor
+        return color_extractor.list_categories()
+
+    @Slot(str, result="QVariantList")
+    def getWallpaperCategories(self, path: str) -> list[str]:
+        """Return the categories currently stored for a single wallpaper path."""
+        try:
+            from ..utils import color_extractor
+            return color_extractor.get_categories_for_path(path)
+        except Exception:
+            self._logger.exception("Failed reading categories for %s", path)
+            return []
+
+    @Slot(result="QVariantList")
+    def getCachedColorEntries(self) -> list[dict[str, Any]]:
+        """Return every cached wallpaper's colors/categories for the editor panel."""
+        try:
+            from ..utils import color_extractor, video_utils
+            entries = color_extractor.list_cache_entries()
+            for e in entries:
+                e["isVideo"] = video_utils.is_video_file(e["path"])
+            return entries
+        except Exception:
+            self._logger.exception("Failed loading cached color entries")
+            return []
+
+    @Slot(str, "QVariantList", result=bool)
+    def updateWallpaperCategories(self, path: str, categories: list) -> bool:
+        """Persist a manual correction of an image's color categories."""
+        try:
+            from ..utils import color_extractor
+            clean = [str(c) for c in categories]
+            ok = color_extractor.update_entry_categories(path, clean)
+            if ok:
+                # Keep the live ImageModel color cache (used by the filter chips) in sync
+                self._image_model.updateCachedCategories(path, clean)
+            return ok
+        except Exception:
+            self._logger.exception("Failed updating categories for %s", path)
+            return False
 
     @Slot(result="QVariantMap")
     def restoreFastfetchBackup(self) -> dict[str, Any]:
