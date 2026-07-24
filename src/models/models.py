@@ -186,30 +186,20 @@ class ColorScannerWorker(QObject):
                     if cached_data and cached_data.get("last_modified") == mtime:
                         continue # Already cached
                     
-                    # For videos, extract frame first, then extract colors from the frame
+                    # For videos, use the cached native-resolution frame for color extraction.
+                    # This ensures consistency with the controller path (selectWallpaper) and
+                    # avoids artifacts from downscaled thumbnails or PIL re-encoding.
                     image_path = path_str
                     if video_utils.is_video_file(path_str):
-                        # Extract frame from video for color extraction
-                        frame_image = video_utils.get_video_frame_as_image(path_str, timestamp=0.0, max_size=512)
-                        if frame_image:
-                            # Temporarily save frame for color extraction
-                            import tempfile
-                            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                                frame_image.save(tmp.name)
-                                image_path = tmp.name
+                        frame_path = video_utils.get_video_frame_path(path_str, timestamp=0.0)
+                        if frame_path:
+                            image_path = frame_path
                         else:
                             logger.debug("Failed to extract frame from video: %s", path_str)
                             continue
-                    
+
                     # Extract colors using Matugen/Celebi utility
                     colors = color_utils.extract_wallpaper_top_colors(image_path, 8)
-                    
-                    # Clean up temporary file if it was created
-                    if video_utils.is_video_file(path_str) and image_path != path_str:
-                        try:
-                            os.unlink(image_path)
-                        except Exception:
-                            pass
                     
                     if colors:
                         cats = []
