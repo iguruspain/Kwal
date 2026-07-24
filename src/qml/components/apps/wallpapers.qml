@@ -1197,7 +1197,7 @@ Kirigami.Page {
                                                         Layout.preferredHeight: width
                                                         radius: 2 //width / 2
                                                         color: lbActiveChip.catInfo.hex
-                                                        border.color: Qt.alpha("#000000", 0.25)
+                                                        border.color: Qt.alpha("#000000",  0.25)
                                                         border.width: 1
                                                     }
 
@@ -1262,8 +1262,26 @@ Kirigami.Page {
                                                     delegate: MenuItem {
                                                         required property var modelData
                                                         text: modelData.label
-                                                        icon.color: modelData.hex
                                                         onTriggered: lightboxPopup.toggleCategory(modelData.name)
+
+                                                        contentItem: RowLayout {
+                                                            spacing: Kirigami.Units.smallSpacing
+                                                            Rectangle {
+                                                                width: Kirigami.Units.gridUnit * 0.6
+                                                                height: Kirigami.Units.gridUnit * 0.6
+                                                                color: modelData.hex
+                                                                border.color: Qt.alpha("#000000",  0.25)
+                                                                border.width: 1
+                                                                radius: 2
+                                                                Layout.preferredWidth: width
+                                                                Layout.preferredHeight: height
+                                                            }
+                                                            Label {
+                                                                text: modelData.label
+                                                                Layout.fillWidth: true
+                                                                Layout.alignment: Qt.AlignVCenter
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1898,7 +1916,7 @@ Kirigami.Page {
                                                         Layout.preferredHeight: width
                                                         radius: 2 //width / 2
                                                         color: activeChip.catInfo.hex
-                                                        border.color: Qt.alpha("#000000", 0.25)
+                                                        border.color: Qt.alpha("#000000",  0.25)
                                                         border.width: 1
                                                     }
 
@@ -1969,8 +1987,26 @@ Kirigami.Page {
                                                     delegate: MenuItem {
                                                         required property var modelData
                                                         text: modelData.label
-                                                        icon.color: modelData.hex
                                                         onTriggered: categoryEditorPopup.toggleCategory(entryDelegate.modelData.path, modelData.name)
+
+                                                        contentItem: RowLayout {
+                                                            spacing: Kirigami.Units.smallSpacing
+                                                            Rectangle {
+                                                                width: Kirigami.Units.gridUnit * 0.6
+                                                                height: Kirigami.Units.gridUnit * 0.6
+                                                                color: modelData.hex
+                                                                border.color: Qt.alpha("#000000",  0.25)
+                                                                border.width: 1
+                                                                radius: 2
+                                                                Layout.preferredWidth: width
+                                                                Layout.preferredHeight: height
+                                                            }
+                                                            Label {
+                                                                text: modelData.label
+                                                                Layout.fillWidth: true
+                                                                Layout.alignment: Qt.AlignVCenter
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
