@@ -1,10 +1,14 @@
-import colorsys
 import json
 import logging
 import os
 from pathlib import Path
 
+from materialyoucolor.hct import Hct
+
 logger = logging.getLogger(__name__)
+
+# Maximum number of unique color categories stored per wallpaper
+MAX_CATEGORIES = 5
 
 def get_cache_path() -> Path:
     return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "wallpapers_colors.json"
@@ -33,52 +37,71 @@ def save_color_cache(data: dict) -> None:
 def get_color_category(hex_color: str) -> str:
     """
     Map a hex color to one of 12 chromatic categories (+ black/white/gray).
-    Each category covers a 30 degree Hue arc in the chromatic wheel.
+
+    Uses OKLCH-based HCT (Hue, Chroma, Tone) from materialyoucolor for
+    perceptually uniform classification. Each chromatic category covers a
+    30 degree arc on the OKLCH hue wheel.
     """
     if not hex_color or not hex_color.startswith('#') or len(hex_color) < 7:
         return "gray"
-        
+
     try:
-        r = int(hex_color[1:3], 16) / 255.0
-        g = int(hex_color[3:5], 16) / 255.0
-        b = int(hex_color[5:7], 16) / 255.0
-    except ValueError:
+        # Hct.from_int() expects an ARGB integer; input is #RRGGBB, so we parse
+        # each component and pack them with full alpha (255).
+        hex_str = hex_color.lstrip('#')
+        r = int(hex_str[0:2], 16)
+        g = int(hex_str[2:4], 16)
+        b = int(hex_str[4:6], 16)
+        int_color = (255 << 24) | (r << 16) | (g << 8) | b
+    except (ValueError, IndexError):
         return "gray"
 
-    h, s, v = colorsys.rgb_to_hsv(r, g, b)
-    h_deg = h * 360.0
+    try:
+        hct = Hct.from_int(int_color)
+    except (ValueError, OverflowError):
+        return "gray"
 
-    # Handle achromatic cases based on saturation and value
-    if v < 0.15:
+    hue = hct.hue
+    chroma = hct.chroma
+    tone = hct.tone
+
+    # Achromatic classification using perceptually uniform OKLCH metrics
+    if tone < 20:
         return "black"
-    if s < 0.15 and v > 0.85:
+    if tone > 90 and chroma < 10:
         return "white"
-    if s < 0.15:
+    if chroma < 10:
         return "gray"
 
-    # 12 chromatic categories
-    # Adjusted Hue thresholds for better human perception
-    if h_deg < 12 or h_deg >= 348:
+    # 12 chromatic categories calibrated for OKLCH hue wheel.
+    # Thresholds are midpoints between adjacent pure-color hue anchors:
+    #   rose: 2.5°, red: 27.4°, orange: 52.5°, yellow: 111.1°,
+    #   yellow-green: 136.0°, green: 142.1°, cyan-green: 152.7°,
+    #   cyan: 196.5°, blue-cyan: 263.9°, blue: 282.8°,
+    #   violet: 304.5°, magenta: 334.6°
+    if hue < 15.0 or hue >= 348.5:
+        return "rose"
+    elif hue < 40.0:
         return "red"
-    elif h_deg < 45:
+    elif hue < 81.8:
         return "orange"
-    elif h_deg < 75:
+    elif hue < 123.6:
         return "yellow"
-    elif h_deg < 105:
+    elif hue < 139.0:
         return "yellow-green"
-    elif h_deg < 140:
+    elif hue < 147.4:
         return "green"
-    elif h_deg < 170:
+    elif hue < 174.6:
         return "cyan-green"
-    elif h_deg < 200:
+    elif hue < 230.2:
         return "cyan"
-    elif h_deg < 230:
+    elif hue < 273.4:
         return "blue-cyan"
-    elif h_deg < 260:
+    elif hue < 293.7:
         return "blue"
-    elif h_deg < 290:
+    elif hue < 319.6:
         return "violet"
-    elif h_deg < 320:
+    elif hue < 348.5:
         return "magenta"
     else:
         return "rose"

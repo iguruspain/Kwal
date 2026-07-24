@@ -1034,7 +1034,7 @@ class Controller(QObject):
                         cat = color_extractor.get_color_category(c)
                         if cat not in cats:
                             cats.append(cat)
-                        if len(cats) >= 3:
+                        if len(cats) > color_extractor.MAX_CATEGORIES:
                             break
                             
                     cache[image_path] = {
