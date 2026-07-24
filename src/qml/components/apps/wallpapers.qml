@@ -1183,7 +1183,8 @@ Kirigami.Page {
                                                 implicitHeight: Kirigami.Units.gridUnit * 1.6
                                                 radius: Kirigami.Units.smallSpacing
                                                 color: Qt.alpha(lbActiveChip.catInfo.hex, 0.22)
-                                                border.color: lbActiveChip.catInfo.hex
+                                                //border.color: lbActiveChip.catInfo.hex
+                                                border.color: lbActiveChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : lbActiveChip.catInfo.hex
                                                 border.width: 1
 
                                                 RowLayout {
@@ -1202,13 +1203,15 @@ Kirigami.Page {
 
                                                     Label {
                                                         text: lbActiveChip.catInfo.label
-                                                        color: Kirigami.Theme.textColor
+                                                        //color: Kirigami.Theme.textColor
+                                                        color: lbActiveChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : lbActiveChip.catInfo.hex
                                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                                                     }
 
                                                     Label {
                                                         text: "\u2715"
-                                                        color: Kirigami.Theme.disabledTextColor
+                                                        //color: Kirigami.Theme.disabledTextColor
+                                                        color: lbActiveChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : lbActiveChip.catInfo.hex
                                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
 
                                                         TapHandler {
@@ -1881,7 +1884,8 @@ Kirigami.Page {
                                                 implicitHeight: Kirigami.Units.gridUnit * 1.6
                                                 radius: Kirigami.Units.smallSpacing
                                                 color: Qt.alpha(activeChip.catInfo.hex, 0.22)
-                                                border.color: activeChip.catInfo.hex
+                                                //border.color: activeChip.catInfo.hex
+                                                border.color: activeChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : activeChip.catInfo.hex
                                                 border.width: 1
 
                                                 RowLayout {
@@ -1900,13 +1904,16 @@ Kirigami.Page {
 
                                                     Label {
                                                         text: activeChip.catInfo.label
-                                                        color: Kirigami.Theme.textColor
+                                                        //Si activeChip.catInfo.label es "Black/Dark", cambiar el color a Kirigami.Theme.textColor para ser legible
+                                                        color: activeChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : activeChip.catInfo.hex
+                                                        //color: Kirigami.Theme.textColor
                                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                                                     }
 
                                                     Label {
                                                         text: "\u2715"
-                                                        color: Kirigami.Theme.disabledTextColor
+                                                        color: activeChip.catInfo.label === "Black/Dark" ? Kirigami.Theme.textColor : activeChip.catInfo.hex 
+                                                        //color: Kirigami.Theme.disabledTextColor
                                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
 
                                                         TapHandler {
