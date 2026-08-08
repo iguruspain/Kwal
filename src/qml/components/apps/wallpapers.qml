@@ -165,7 +165,7 @@ Kirigami.Page {
 
                                 ToolButton {
                                     id: removeFolderButton
-                                    icon.name: "edit-clear"
+                                    icon.name: "edit-delete"
                                     icon.width: Kirigami.Units.gridUnit
                                     icon.height: Kirigami.Units.gridUnit
                                     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
