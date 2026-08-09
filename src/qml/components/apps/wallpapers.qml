@@ -389,10 +389,10 @@ Kirigami.Page {
                             // Reserve space for the scrollbar to prevent visual overlap
                             anchors.rightMargin: Kirigami.Units.smallSpacing + Kirigami.Units.largeSpacing 
                         
-                            // Use strict integer division to avoid sub-pixel jitter
-                            cellWidth: Math.floor(width / Math.max(2, Math.floor(width / 250)))
-                            cellHeight: Math.floor(cellWidth / 2) 
-                            //cellHeight: Math.floor(cellWidth * 0.5625)
+                            // Column count: at least 2, ~250px per column
+                            property int columnCount: Math.max(2, Math.floor(width / 250))
+                            cellWidth: Math.floor(width / thumbnailGrid.columnCount)
+                            cellHeight: Math.floor(cellWidth * 0.5625)
                         
                             model: imageModel
 
