@@ -205,6 +205,15 @@ Kirigami.Page {
                 }
             }
 
+            // Accessibility: Shortcut for Ctrl+F to toggle search
+            Shortcut {
+                sequence: "Ctrl+F"
+                context: Qt.ApplicationShortcut
+                onActivated: {
+                    rightPaneWallpapers.searchOpen = !rightPaneWallpapers.searchOpen
+                }
+            }
+
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.smallSpacing
@@ -336,7 +345,7 @@ Kirigami.Page {
                         checkable: true
                         checked: imageModel.colorFilter === ""
                         onClicked: imageModel.colorFilter = ""
-                        ToolTip.text: qsTr("Show All Wallpapers")
+                        ToolTip.text: qsTr("Show All Colors")
                         ToolTip.visible: hovered
                     }
 
