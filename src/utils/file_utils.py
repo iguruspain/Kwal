@@ -99,31 +99,6 @@ def ensure_fastfetch_config_dir() -> Path:
     return cfg
 
 
-def copy_image_to_fastfetch(src: str, dest_name: str) -> str:
-    """Copy an image file to the fastfetch config directory."""
-    if not src:
-        raise FileNotFoundError("Empty source path")
-        
-    src_path = Path(src.replace("file://", "") if src.startswith("file://") else src)
-    if not src_path.is_file():
-        raise FileNotFoundError(f"Source image not found: {src_path}")
-
-    dest_dir = ensure_fastfetch_config_dir()
-    dest_basename = os.path.basename(dest_name) or "chica-tinted.png"
-    dst = dest_dir / dest_basename
-
-    try:
-        shutil.copyfile(src_path, dst)
-        try:
-            dst.chmod(0o644)
-        except Exception:
-            pass
-        return str(dst)
-    except Exception:
-        logger.exception("Failed copying %s to %s", src_path, dst)
-        raise
-
-
 def set_fastfetch_source_inplace(config_path: str | None, new_source: str) -> bool:
     """Replace the `source` key value in config.jsonc textually."""
     cfg = Path(config_path).expanduser() if config_path else (Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc")

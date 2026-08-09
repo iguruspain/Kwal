@@ -27,7 +27,6 @@ from PySide6.QtQuick import QQuickImageProvider
 from PySide6.QtSvg import QSvgRenderer
 
 from ..models.models import (
-    FastfetchTemplateModel,
     Folder,
     ImageModel,
     SettingsApp,
@@ -129,7 +128,6 @@ class Controller(QObject):
     fastfetchTintingChanged = Signal()
     resultDialogVisibleChanged = Signal()
     resultDialogTextChanged = Signal()
-    fastfetchDestNameChanged = Signal()
     fastfetchBackupExistsChanged = Signal()
     fastfetchConfigImageChanged = Signal()
     # Palette signals
@@ -137,8 +135,6 @@ class Controller(QObject):
     paletteGenerationError = Signal(str)
     # Draft signals
     fastfetchDraftColorChanged = Signal()
-    fastfetchIsFileModeChanged = Signal()
-    fastfetchTemplateIndexChanged = Signal()
     # Starship Draft signals
     starshipDraftColorChanged = Signal()
     starshipIsFileModeChanged = Signal()
@@ -192,7 +188,6 @@ class Controller(QObject):
         self._selected_file: str = ""
         self._fastfetch_tinted_preview: str = ""
         self._fastfetch_tinting: bool = False
-        self._fastfetch_dest_name: str = ""
         self._fastfetch_config_image: str = ""
         self._result_dialog_visible: bool = False
         self._result_dialog_text: str = ""
@@ -202,8 +197,6 @@ class Controller(QObject):
         
         # Draft State (Persist across tabs)
         self._fastfetch_draft_color: str = "transparent"
-        self._fastfetch_is_file_mode: bool = False
-        self._fastfetch_template_index: int = -1
         
         # Starship Draft State (Persist across tabs)
         self._starship_draft_color: str = "transparent"
@@ -254,15 +247,6 @@ class Controller(QObject):
 
         self._model = WallpaperFolderModel(folders)
         self._image_model = ImageModel()
-
-        # Fastfetch Model
-        self._fastfetch_model = FastfetchTemplateModel()
-        self._fastfetch_templates_folder = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "fastfetch")
-        
-        try:
-            self._fastfetch_model.refresh(self._fastfetch_templates_folder)
-        except Exception:
-            self._logger.debug("Initial fastfetch template refresh failed or empty")
 
         # Settings App Model
         # Full list of optional apps (used for simulate mode and filtering)
@@ -408,9 +392,6 @@ class Controller(QObject):
     def wallpaperModel(self) -> WallpaperFolderModel:
         return self._model
 
-    def fastfetchTemplateModel(self) -> FastfetchTemplateModel:
-        return self._fastfetch_model
-
     @Property(QObject, constant=True)
     def settingsAppModel(self) -> SettingsAppModel:
         return self._settings_app_model
@@ -467,17 +448,6 @@ class Controller(QObject):
         return self._fastfetch_tinting
 
     fastfetchTinting = Property(bool, _get_fastfetch_tinting, notify=fastfetchTintingChanged)
-
-    def _get_fastfetch_dest_name(self) -> str:
-        return self._fastfetch_dest_name
-
-    def _set_fastfetch_dest_name(self, name: str) -> None:
-        val = name or ""
-        if self._fastfetch_dest_name != val:
-            self._fastfetch_dest_name = val
-            self.fastfetchDestNameChanged.emit()
-
-    fastfetchDestName = Property(str, _get_fastfetch_dest_name, _set_fastfetch_dest_name, notify=fastfetchDestNameChanged)
 
     def _get_fastfetch_config_image(self) -> str:
         return self._fastfetch_config_image
@@ -698,25 +668,34 @@ class Controller(QObject):
 
     fastfetchDraftColor = Property(str, _get_fastfetch_draft_color, _set_fastfetch_draft_color, notify=fastfetchDraftColorChanged)
 
-    def _get_fastfetch_is_file_mode(self) -> bool:
-        return self._fastfetch_is_file_mode
+    @Slot(result=bool)
+    def fastfetchTintedExists(self) -> bool:
+        """Check if a tinted image already exists next to the selected file."""
+        try:
+            if not self._selected_file:
+                return False
+            src_path = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
+            tinted_path = self._get_tinted_path(src_path)
+            return tinted_path.exists()
+        except Exception:
+            return False
 
-    def _set_fastfetch_is_file_mode(self, v: bool) -> None:
-        if self._fastfetch_is_file_mode != v:
-            self._fastfetch_is_file_mode = v
-            self.fastfetchIsFileModeChanged.emit()
+    @Slot(str, result=str)
+    def getTintedPath(self, src: str) -> str:
+        """Return the tinted path for a given source path."""
+        try:
+            return str(self._get_tinted_path(src))
+        except Exception:
+            return ""
 
-    fastfetchIsFileMode = Property(bool, _get_fastfetch_is_file_mode, _set_fastfetch_is_file_mode, notify=fastfetchIsFileModeChanged)
-
-    def _get_fastfetch_template_index(self) -> int:
-        return self._fastfetch_template_index
-
-    def _set_fastfetch_template_index(self, idx: int) -> None:
-        if self._fastfetch_template_index != idx:
-            self._fastfetch_template_index = idx
-            self.fastfetchTemplateIndexChanged.emit()
-
-    fastfetchTemplateIndex = Property(int, _get_fastfetch_template_index, _set_fastfetch_template_index, notify=fastfetchTemplateIndexChanged)
+    def _get_tinted_path(self, src: str) -> Path:
+        """Calculate the tinted image path next to the source image.
+        
+        Always uses .png extension since tint_image always outputs PNG.
+        """
+        src_path = Path(src.replace("file://", "") if src.startswith("file://") else src)
+        stem = src_path.stem
+        return src_path.with_name(f"{stem}-tinted.png")
 
     # --- Starship Properties ---
 
@@ -869,14 +848,6 @@ class Controller(QObject):
             self.fastfetchTintingChanged.emit()
             self._tint_thread = None
 
-    @Slot(str)
-    def refreshFastfetchTemplates(self, folder: str) -> None:
-        try:
-            self._fastfetch_templates_folder = folder or self._fastfetch_templates_folder
-            self._fastfetch_model.refresh(self._fastfetch_templates_folder)
-        except Exception:
-            self._logger.exception("Failed refreshing fastfetch templates for %s", folder)
-
     @Slot()
     def refreshFastfetchConfigImage(self) -> None:
         """Re-detect the current fastfetch config image from disk.
@@ -912,15 +883,13 @@ class Controller(QObject):
                      self.fastfetchConfigImageChanged.emit()
 
             return {
-                "config_image": config_image, 
-                "template_folder": self._fastfetch_templates_folder, 
-                "config_path": ""  # path logic simplified out of detection
+                "config_image": config_image,
+                "config_path": ""
             }
         except Exception:
             self._logger.exception("Failed reading fastfetch info")
             return {
-                "config_image": "", 
-                "template_folder": self._fastfetch_templates_folder, 
+                "config_image": "",
                 "config_path": ""
             }
 
@@ -1266,7 +1235,10 @@ class Controller(QObject):
     def openFileDialog(self) -> None:
         try:
             initial_dir = QStandardPaths.writableLocation(QStandardPaths.PicturesLocation) or os.path.expanduser("~")
-            selected, _ = QFileDialog.getOpenFileName(parent=None, caption="Select file", dir=initial_dir)
+            image_filter = "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.tiff *.tif);;All Files (*)"
+            selected, _ = QFileDialog.getOpenFileName(
+                parent=None, caption="Select image", dir=initial_dir, filter=image_filter
+            )
             if selected:
                 self.selectFile(selected)
         except Exception:
@@ -1322,39 +1294,73 @@ class Controller(QObject):
         except Exception:
             self._logger.exception("Error clearing selected file")
 
-    @Slot(str, result=bool)
-    def applyTintedImage(self, dest_name: str) -> bool:
-        if not dest_name:
-            self._show_result_dialog("No destination filename available.")
-            return False
-        
-        src = self._fastfetch_tinted_preview
-        if not src:
-            self._show_result_dialog("No tinted preview available to apply.")
+    @Slot(result=bool)
+    def applyTintedImage(self) -> bool:
+        """Apply the tinted image: save it next to the original and update fastfetch config."""
+        if not self._selected_file:
+            self._show_result_dialog("No image selected.")
             return False
 
-        src_path = src.replace("file://", "") if src.startswith("file://") else src
+        src = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
 
         thr = threading.Thread(
-            target=self._apply_tint_task, 
-            args=(src_path, dest_name), 
+            target=self._apply_tint_task,
+            args=(src,),
             daemon=True
         )
         thr.start()
         self._apply_thread = thr
         return True
 
-    def _apply_tint_task(self, src: str, dname: str) -> None:
+    def _apply_tint_task(self, src: str) -> None:
+        """Generate tinted image next to the original and update fastfetch config."""
         try:
-            dst_path = file_utils.copy_image_to_fastfetch(src, dname)
-            ok = file_utils.set_fastfetch_source_inplace(None, dst_path)
-            
+            src_path = Path(src)
+            tinted_path = self._get_tinted_path(src)
+
+            # Tint the image and save next to the original
+            tint_hex = self._fastfetch_draft_color
+            if not self._is_valid_tint(tint_hex):
+                msg = "No valid tint color selected."
+                self.fastfetchApplyResult.emit(False, msg)
+                self._show_result_dialog(msg)
+                return
+
+            dst_str = color_utils.tint_image(str(src_path), tint_hex, 0.8)
+            if not dst_str:
+                msg = "Failed to generate tinted image."
+                self.fastfetchApplyResult.emit(False, msg)
+                self._show_result_dialog(msg)
+                return
+
+            # The tint_image function returns a temp file; copy it to the final location
+            import shutil
+            shutil.copy2(dst_str, str(tinted_path))
+            # Clean up temp file
+            try:
+                Path(dst_str).unlink()
+            except Exception:
+                pass
+
+            # Create backup of fastfetch config before modifying
+            cfg_path = Path.home() / ".config" / "fastfetch" / "config.jsonc"
+            bak_path = cfg_path.with_name(cfg_path.name + ".bak")
+            if cfg_path.exists():
+                try:
+                    shutil.copy2(cfg_path, bak_path)
+                    self.fastfetchBackupExistsChanged.emit()
+                except Exception:
+                    self._logger.warning("Failed to create fastfetch backup")
+
+            # Update fastfetch config with the tinted image path
+            ok = file_utils.set_fastfetch_source_inplace(None, str(tinted_path))
+
             if not ok:
-                msg = f"Copied to {dst_path} but failed to update config."
+                msg = f"Generated tinted image at {tinted_path} but failed to update fastfetch config."
                 self.fastfetchApplyResult.emit(False, msg)
                 self._show_result_dialog(msg)
             else:
-                self._on_apply_success(dst_path)
+                self._on_apply_success(str(tinted_path))
 
         except FileNotFoundError as exc:
             self._logger.error("applyTintedImage task: %s", exc)
@@ -1365,17 +1371,17 @@ class Controller(QObject):
             self.fastfetchApplyResult.emit(False, "Unexpected error.")
             self._show_result_dialog("Unexpected error while applying tinted image.")
 
-    def _on_apply_success(self, dst_path: Path) -> None:
-        # Notify success
+    def _on_apply_success(self, dst_path: str) -> None:
+        """Handle successful apply."""
         self.fastfetchTintedPreviewChanged.emit()
-        
+
         try:
             file_utils.clear_fastfetch_cache()
         except Exception:
             self._logger.warning("Failed clearing fastfetch cache")
 
         msg = f"Applied tinted image to {dst_path}"
-        self._set_fastfetch_config_image('file://' + str(dst_path))
+        self._set_fastfetch_config_image("file://" + dst_path)
         self.fastfetchBackupExistsChanged.emit()
         self.fastfetchApplyResult.emit(True, msg)
         self._show_result_dialog(msg)

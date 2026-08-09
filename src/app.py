@@ -129,8 +129,6 @@ def main():
     engine.rootContext().setContextProperty("controller", controller)
     engine.rootContext().setContextProperty("wallpaperFolderModel", controller.wallpaperModel())
     engine.rootContext().setContextProperty("imageModel", controller.imageModel())
-    # Expose Fastfetch template model directly to QML as a context property
-    engine.rootContext().setContextProperty("fastfetchTemplateModel", controller.fastfetchTemplateModel())
 
     # Register SVG image provider so QML Image items can render SVGs via
     # source: "image://svgprovider" + absolutePath

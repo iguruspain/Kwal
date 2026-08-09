@@ -9,14 +9,6 @@ import ".." as Components
 Kirigami.Page {
     id: fastfetchPage
     title: qsTr("Fastfetch Settings")
-    
-    // Properties
-    // Local ephemeral properties derived from controller
-    property string sTintedName: ""
-
-    // Controller Helper
-    // Safe access to controller in case it's not injected yet (though it should be)
-
 
     background: Rectangle {
         color: "transparent"
@@ -71,7 +63,7 @@ Kirigami.Page {
         visible: false
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.smallSpacing
-            Label { text: qsTr("A tinted image with that name already exists. Overwrite?") }
+            Label { text: qsTr("A tinted image already exists next to the selected file. Overwrite?") }
             RowLayout {
                 Button {
                     text: qsTr("Cancel")
@@ -82,7 +74,7 @@ Kirigami.Page {
                     onClicked: {
                         confirmDialog.visible = false
                         if (controller) {
-                            var started = controller.applyTintedImage(controller.fastfetchDestName);
+                            var started = controller.applyTintedImage();
                             if (!started) {
                                 controller.resultDialogText = qsTr("Failed to start apply operation.");
                                 controller.resultDialogVisible = true;
@@ -123,15 +115,14 @@ Kirigami.Page {
 
                 MenuSeparator { Layout.fillWidth: true }
 
-                // Template Selection Header
-                RowLayout{
+                // Image Selection Header
+                RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
                     Label {
-                        id: selectTemplateLabel
                         Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter                        
-                        text: qsTr("Select a template")
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+                        text: qsTr("Select an image")
                     }
                     ToolButton {
                         id: clearSelectionButton
@@ -141,99 +132,51 @@ Kirigami.Page {
                         ToolTip.visible: hovered
                         onClicked: {
                             if (controller) {
-                                controller.clearSelectedFile(); 
-                                controller.fastfetchIsFileMode = false;
-                                controller.fastfetchTemplateIndex = -1;
+                                controller.clearSelectedFile();
                             }
                         }
-                    }              
+                    }
                 }
 
-                // Inputs
-                GridLayout {
-                    columns: 1
+                // Image Selector
+                RowLayout {
                     Layout.fillWidth: true
 
-                    ComboBox {
-                        id: templateSelector
+                    TextField {
+                        id: imageField
                         Layout.fillWidth: true
-                        // Access model directly
-                        model: (typeof fastfetchTemplateModel !== "undefined") ? fastfetchTemplateModel : null
-                        textRole: "fileName"
-                        
-                        // Binding to controller
-                        currentIndex: controller ? controller.fastfetchTemplateIndex : -1
-                        onCurrentIndexChanged: {
-                            if (controller && currentIndex !== controller.fastfetchTemplateIndex) {
-                                controller.fastfetchTemplateIndex = currentIndex;
-                            }
-                        }
-                        
-                        // Simplify enabled check
-                        enabled: (controller && !controller.fastfetchIsFileMode) && (model ? model.rowCount() > 0 : false)
-                        opacity: enabled ? 1.0 : 0.5
-
-                        displayText: currentIndex === -1 ? qsTr("Select predefined") : currentText
-                        ToolTip.text: qsTr("Select a predefined template")
-                        ToolTip.visible: hovered
-                        
-                        onActivated: {
-                            if (currentIndex !== -1 && model && controller) {
-                                // Sync Index first
-                                controller.fastfetchTemplateIndex = currentIndex;
-                                
-                                var info = model.get(currentIndex);
-                                var url = info ? info.fileUrl : "";
-                                var tint = controller.fastfetchDraftColor;
-                                if (url && tint !== "transparent" && tint !== "") {
-                                    controller.generateTintedPreview(url, tint);
-                                }
-                            }
+                        placeholderText: qsTr("No image selected")
+                        readOnly: true
+                        text: {
+                            if (!controller || !controller.selectedFile) return ""
+                            var f = controller.selectedFile.replace("file://", "")
+                            var parts = f.split("/")
+                            return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 2).join("/") : f
                         }
                     }
+                    ToolButton {
+                        id: openFileButton
+                        icon.name: "document-open"
+                        Layout.alignment: Qt.AlignRight
+                        hoverEnabled: true
+                        ToolTip.text: qsTr("Select an image")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
 
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        TextField {
-                            id: customTemplateField
-                            Layout.fillWidth: true
-                            placeholderText: qsTr("Select your own image")
-                            readOnly: true
-                            text: {
-                                if (!controller || !controller.selectedFile) return ""
-                                var f = controller.selectedFile.replace("file://", "")
-                                var parts = f.split("/")
-                                return parts.length > 1 ? "..." + "/" + parts.slice(parts.length - 2).join("/") : f
-                            }
-                        }
-                        ToolButton {
-                            id: openFileButton
-                            icon.name: "document-open"
-                            Layout.alignment: Qt.AlignRight
-                            hoverEnabled: true
-                            ToolTip.text: qsTr("Select a custom image")
-                            ToolTip.visible: hovered
-                            ToolTip.delay: Kirigami.Units.toolTipDelay
-                            
-                            onClicked: {
-                                if (!controller) return;
-                                controller.openFileDialog();
-                                if (controller.selectedFile) {
-                                    controller.fastfetchIsFileMode = true;
-                                    var tint = controller.fastfetchDraftColor;
+                        onClicked: {
+                            if (!controller) return;
+                            controller.openFileDialog();
+                            if (controller.selectedFile) {
+                                var tint = controller.fastfetchDraftColor;
+                                if (tint && tint !== "transparent" && tint !== "") {
                                     controller.generateTintedPreview(controller.selectedFile, tint);
-                                } else {
-                                    // kept previous state if cancelled? Or force false?
-                                    // Usually dialog cancel returns empty string but doesn't signify "unselect"
-                                    // But if clearSelectedFile wasn't called, selectedFile remains.
                                 }
                             }
-                        }     
+                        }
                     }
                 }
 
-                Kirigami.Separator {Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor}
+                Kirigami.Separator { Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor }
 
                 // Color Picker
                 RowLayout {
@@ -249,14 +192,13 @@ Kirigami.Page {
                         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                         width: Kirigami.Units.gridUnit * 1.5
                         height: Kirigami.Units.gridUnit * 1.5
-                        
-                        // Bind to controller property
+
                         color: controller ? (controller.fastfetchDraftColor === "" ? "transparent" : controller.fastfetchDraftColor) : "transparent"
-                        
+
                         border.color: Kirigami.Theme.disabledTextColor
                         border.width: 1
                         radius: Kirigami.Units.smallSpacing
-                        
+
                         ToolTip.text: {
                             if (!controller) return qsTr("Pick color")
                             var t = controller.formatColorWithAlpha(controller.fastfetchDraftColor)
@@ -281,21 +223,15 @@ Kirigami.Page {
                                 var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
                                 if (color) {
                                     controller.fastfetchDraftColor = color;
-                                    
-                                    // Regenerate preview
+
+                                    // Regenerate preview if image is selected
                                     if (controller.selectedFile) {
                                         controller.generateTintedPreview(controller.selectedFile, color);
-                                    } else if (controller.fastfetchTemplateIndex !== -1 && templateSelector.model) {
-                                        var info = templateSelector.model.get(controller.fastfetchTemplateIndex);
-                                        if (info && info.fileUrl) {
-                                            controller.generateTintedPreview(info.fileUrl, color);
-                                        }
                                     }
                                 }
                             }
                         }
                     }
-
                 }
 
                 Item { Layout.fillHeight: true }
@@ -313,23 +249,23 @@ Kirigami.Page {
                         ToolTip.text: qsTr("Apply the tinted image to fastfetch config")
                         ToolTip.visible: hovered
                         ToolTip.delay: Kirigami.Units.toolTipDelay
-                        enabled: controller && controller.fastfetchDestName && controller.fastfetchDestName !== ""
-                        
+                        enabled: controller && controller.selectedFile && controller.selectedFile !== ""
+
                         onClicked: {
                             if (!controller) return;
-                            
-                            if (!controller.fastfetchDestName || controller.fastfetchDestName === "") {
-                                controller.resultDialogText = qsTr("No destination filename available.");
+
+                            if (!controller.selectedFile || controller.selectedFile === "") {
+                                controller.resultDialogText = qsTr("No image selected.");
                                 controller.resultDialogVisible = true;
                                 return;
                             }
-                            
-                            if (controller.fastfetchDestinationExists(controller.fastfetchDestName)) {
+
+                            if (controller.fastfetchTintedExists()) {
                                 confirmDialog.visible = true;
                             } else {
-                                var started = controller.applyTintedImage(controller.fastfetchDestName);
+                                var started = controller.applyTintedImage();
                                 if (!started) {
-                                    controller.resultDialogText = qsTr("Failed to start apply operation. Check filename.");
+                                    controller.resultDialogText = qsTr("Failed to start apply operation.");
                                     controller.resultDialogVisible = true;
                                 }
                             }
@@ -342,7 +278,7 @@ Kirigami.Page {
                         ToolTip.visible: hovered
                         ToolTip.delay: Kirigami.Units.toolTipDelay
                         enabled: controller && controller.hasFastfetchBackup
-                        
+
                         onClicked: {
                             if (!controller) return;
                             var res = controller.restoreFastfetchBackup();
@@ -408,97 +344,108 @@ Kirigami.Page {
                     Layout.fillHeight: true
                     spacing: Kirigami.Units.smallSpacing
                     Layout.preferredHeight: 4
-                    visible: controller ? (controller.fastfetchIsFileMode || controller.fastfetchTemplateIndex !== -1) : false
+                    visible: controller ? (controller.selectedFile && controller.selectedFile !== "") : false
 
-                    GridLayout {
-                        columns: 2
+                    RowLayout {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        
-                        Label {
-                            id: selectedTemplateLabel
-                            visible: selectedTemplateName !== ""
-                            font.bold: true
-                            text: selectedTemplateName !== "" ? qsTr("Template: %1").arg(selectedTemplateName) : ""
-                            
-                            // Computed property for current template name
-                            readonly property string selectedTemplateName: {
-                                if (!controller) return "";
-                                if (controller.fastfetchIsFileMode) {
-                                    return controller.selectedFile ? controller.selectedFile.split("/").pop() : "";
-                                }
-                                return controller.fastfetchTemplateIndex !== -1 ? templateSelector.currentText : "";
-                            }
-                            
-                            // Update destination name and tinted name when template changes
-                            onSelectedTemplateNameChanged: {
-                                if (!controller) return;
-                                if (selectedTemplateName !== "") {
-                                    var dst = selectedTemplateName.replace(/\.[^/.]+$/, "") + "-tinted.png";
-                                    fastfetchPage.sTintedName = dst;
-                                    if (controller.fastfetchDestName !== dst) {
-                                        controller.fastfetchDestName = dst;
-                                    }
-                                } else {
-                                    fastfetchPage.sTintedName = "";
-                                    controller.fastfetchDestName = "";
-                                }
-                            }
-                        }
-                        
-                        Label {
-                            id: tintedLabel
-                            font.bold: true
-                            visible: text !== qsTr("Tinted:")
-                            text: fastfetchPage.sTintedName !== "" ? qsTr("Tinted: %1").arg(fastfetchPage.sTintedName) : qsTr("Tinted:")
-                        }
+                        spacing: Kirigami.Units.largeSpacing
 
-                        // Left cell: Original Template Preview
-                        Item {
+                        // Left column: Original Image
+                        ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            Image {
-                                id: fastfetchPreviewTemplate
-                                anchors.fill: parent
-                                fillMode: Image.PreserveAspectFit
-                                source: {
-                                    if (!controller) return "";
-                                    if (controller.fastfetchIsFileMode && controller.selectedFile) return controller.selectedFile;
-                                    
-                                    if (!controller.fastfetchIsFileMode && templateSelector.currentIndex !== -1 && templateSelector.model) {
-                                        var info = templateSelector.model.get(templateSelector.currentIndex);
-                                        return info ? info.fileUrl : "";
-                                    }
-                                    return "";
+                            Layout.minimumWidth: 200
+                            spacing: Kirigami.Units.smallSpacing
+
+                            Label {
+                                font.bold: true
+                                text: {
+                                    if (!controller || !controller.selectedFile) return ""
+                                    var f = controller.selectedFile.replace("file://", "")
+                                    var parts = f.split("/")
+                                    return qsTr("Image: %1").arg(parts[parts.length - 1])
+                                }
+                            }
+
+                            Rectangle {
+                                id: originalPreviewContainer
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                Layout.minimumHeight: 200
+                                color: "transparent" //Kirigami.Theme.backgroundColor
+                                radius: Kirigami.Units.smallSpacing
+                                //border.color: Kirigami.Theme.disabledTextColor
+                                //border.width: 1
+
+                                Image {
+                                    id: fastfetchPreviewOriginal
+                                    anchors.fill: parent
+                                    anchors.margins: Kirigami.Units.smallSpacing
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    cache: false
+                                    source: controller ? controller.selectedFile : ""
+                                }
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: qsTr("Loading...")
+                                    color: Kirigami.Theme.disabledTextColor
+                                    visible: fastfetchPreviewOriginal.status === Image.Loading
                                 }
                             }
                         }
 
-                        // Right cell: Tinted Preview
-                        Item {
+                        // Right column: Tinted Preview
+                        ColumnLayout {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            Layout.minimumWidth: 200
+                            spacing: Kirigami.Units.smallSpacing
 
-                            Image {
-                                id: fastfetchPreviewTinted
-                                anchors.fill: parent
-                                fillMode: Image.PreserveAspectFit
-                                cache: false
-                                
-                                // Source Logic: Tinted -> Selected File -> Template -> Empty
-                                source: {
-                                    if (controller && controller.fastfetchTintedPreview && controller.fastfetchTintedPreview !== "")
-                                        return controller.fastfetchTintedPreview;
-                                        
-                                    // Fallback to original if no tint available
-                                    return fastfetchPreviewTemplate.source;
-                                }
+                            Label {
+                                font.bold: true
+                                text: qsTr("Tinted")
                             }
 
-                            BusyIndicator {
-                                anchors.centerIn: parent
-                                running: controller ? controller.fastfetchTinting : false
-                                visible: running
+                            Rectangle {
+                                id: tintedPreviewContainer
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                Layout.minimumHeight: originalPreviewContainer.height
+                                color: "transparent" //Kirigami.Theme.backgroundColor
+                                radius: Kirigami.Units.smallSpacing
+                                //border.color: Kirigami.Theme.disabledTextColor
+                                //border.width: 1
+
+                                Image {
+                                    id: fastfetchPreviewTinted
+                                    anchors.fill: parent
+                                    anchors.margins: Kirigami.Units.smallSpacing
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    cache: false
+
+                                    source: {
+                                        if (controller && controller.fastfetchTintedPreview && controller.fastfetchTintedPreview !== "")
+                                            return controller.fastfetchTintedPreview;
+                                        return fastfetchPreviewOriginal.source;
+                                    }
+                                }
+
+                                BusyIndicator {
+                                    anchors.centerIn: parent
+                                    running: controller ? controller.fastfetchTinting : false
+                                    visible: running
+                                }
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: qsTr("Loading...")
+                                    color: Kirigami.Theme.disabledTextColor
+                                    visible: fastfetchPreviewTinted.status === Image.Loading && !(controller && controller.fastfetchTinting)
+                                }
                             }
                         }
                     }
