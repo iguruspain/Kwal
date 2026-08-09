@@ -298,7 +298,7 @@ class ImageModel(QAbstractListModel):
         
         self._loading: bool = False
         self._filter_text: str = ""
-        self._color_filter: str = ""
+        self._color_filter: list[str] = []
         self._color_cache: dict[str, dict] = {}
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -354,16 +354,16 @@ class ImageModel(QAbstractListModel):
 
     filterText = Property(str, _get_filter_text, _set_filter_text, notify=filterTextChanged)
 
-    def _get_color_filter(self) -> str:
+    def _get_color_filters(self) -> list:
         return self._color_filter
 
-    def _set_color_filter(self, text: str) -> None:
-        if self._color_filter != text:
-            self._color_filter = text
+    def _set_color_filters(self, filters: list) -> None:
+        if self._color_filter != filters:
+            self._color_filter = list(filters) if filters else []
             self._apply_filter()
             self.colorFilterChanged.emit()
 
-    colorFilter = Property(str, _get_color_filter, _set_color_filter, notify=colorFilterChanged)
+    colorFilters = Property(list, _get_color_filters, _set_color_filters, notify=colorFilterChanged)
 
     def _apply_filter(self) -> None:
         self.beginResetModel()
@@ -375,7 +375,7 @@ class ImageModel(QAbstractListModel):
             if term and term not in f.name.lower():
                 continue
                 
-            # Color filter
+            # Color filter (AND logic: must have ALL selected colors)
             if self._color_filter:
                 cache_entry = self._color_cache.get(str(f))
                 if not cache_entry:
@@ -384,7 +384,12 @@ class ImageModel(QAbstractListModel):
                 cats = cache_entry.get("categories", [])
                 old_cat = cache_entry.get("category", "")
                 
-                if self._color_filter not in cats and self._color_filter != old_cat:
+                has_all_colors = True
+                for filter_name in self._color_filter:
+                    if filter_name not in cats and filter_name != old_cat:
+                        has_all_colors = False
+                        break
+                if not has_all_colors:
                     continue
                     
             self._files.append(f)

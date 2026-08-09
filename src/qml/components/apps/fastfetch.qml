@@ -314,6 +314,16 @@ Kirigami.Page {
                     Layout.preferredHeight: 6
 
                     Label { text: qsTr("Current (config):"); font.bold: true }
+                    // Preview current image path in fastfetch config (clean path, no file:// or ?t=)
+                    Label {
+                        id: currentConfigPathLabel
+                        text: (controller && controller.fastfetchConfigImagePath !== "")
+                             ? controller.fastfetchConfigImagePath
+                             : qsTr("No image found")
+                        font.italic: true
+                        wrapMode: Text.WrapAnywhere
+                        Layout.fillWidth: true
+                    }
 
                     Image {
                         id: fastfetchCurrentImage
@@ -359,12 +369,20 @@ Kirigami.Page {
                             spacing: Kirigami.Units.smallSpacing
 
                             Label {
+                                text: qsTr("Selected image:")
                                 font.bold: true
+                            }
+                            Label {
+                                id: selectedImagePathLabel
+                                font.italic: true
+                                wrapMode: Text.WrapAnywhere
+                                Layout.fillWidth: true
                                 text: {
                                     if (!controller || !controller.selectedFile) return ""
                                     var f = controller.selectedFile.replace("file://", "")
-                                    var parts = f.split("/")
-                                    return qsTr("Image: %1").arg(parts[parts.length - 1])
+                                    //var parts = f.split("/")
+                                    //return qsTr("Image: %1").arg(parts[parts.length - 1])
+                                    return qsTr("%1").arg(f)
                                 }
                             }
 
@@ -406,7 +424,20 @@ Kirigami.Page {
 
                             Label {
                                 font.bold: true
-                                text: qsTr("Tinted")
+                                text: qsTr("Tinted:")
+                            }
+                            Label {
+                                id: tintedImagePathLabel
+                                font.italic: true
+                                wrapMode: Text.WrapAnywhere
+                                Layout.fillWidth: true
+                                text: {
+                                    if (!controller || !controller.selectedFile) return ""
+                                    var f = controller.selectedFile.replace("file://", "")
+                                    var parts = f.split("/")
+                                    var tintedName = parts[parts.length - 1].replace(/\.(png|jpg|jpeg|bmp|webp)$/i, "-tinted.$1")
+                                    return qsTr("%1").arg(f.replace(parts[parts.length - 1], tintedName))
+                                }
                             }
 
                             Rectangle {

@@ -308,7 +308,7 @@ Kirigami.Page {
                     spacing: Kirigami.Units.smallSpacing
 
                     Item { Layout.fillWidth: true }
-                    Item { Layout.fillWidth: true }         
+                    Item { Layout.fillWidth: true }
 
                     Repeater {
                         model: wallpaperPage.categoryColorModel
@@ -317,22 +317,24 @@ Kirigami.Page {
                             width: Kirigami.Units.gridUnit * 1.5
                             height: width
                             radius: Kirigami.Units.smallSpacing
-                            //radius: width / 2
                             color: modelData.hex
-                            border.color: imageModel.colorFilter === modelData.name ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.3)
-                            border.width: imageModel.colorFilter === modelData.name ? 3 : 1
-                            
+                            border.color: imageModel.colorFilters.indexOf(modelData.name) !== -1 ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.3)
+                            border.width: imageModel.colorFilters.indexOf(modelData.name) !== -1 ? 3 : 1
+
                             HoverHandler { id: filterHover }
                             TapHandler {
                                 onTapped: {
-                                    if (imageModel.colorFilter === modelData.name) {
-                                        imageModel.colorFilter = "" // toggle off
+                                    var currentFilters = imageModel.colorFilters.slice()
+                                    var idx = currentFilters.indexOf(modelData.name)
+                                    if (idx !== -1) {
+                                        currentFilters.splice(idx, 1)
                                     } else {
-                                        imageModel.colorFilter = modelData.name
+                                        currentFilters.push(modelData.name)
                                     }
+                                    imageModel.colorFilters = currentFilters
                                 }
                             }
-                            
+
                             ToolTip.text: modelData.label
                             ToolTip.visible: filterHover.hovered
                         }
@@ -340,12 +342,11 @@ Kirigami.Page {
                     // "All" / Reset Button
                     ToolButton {
                         icon.name: "view-filter"
-                        //text: qsTr("All")
                         display: AbstractButton.TextBesideIcon
                         checkable: true
-                        checked: imageModel.colorFilter === ""
-                        onClicked: imageModel.colorFilter = ""
-                        ToolTip.text: qsTr("Show All Colors")
+                        checked: imageModel.colorFilters.length === 0
+                        onClicked: imageModel.colorFilters = []
+                        ToolTip.text: qsTr("Reset Color Filter")
                         ToolTip.visible: hovered
                     }
 

@@ -97,10 +97,13 @@ class StarshipRenderer:
         text = text.replace('\\ ', ' ')
 
         # 3. Limpiar grupos opcionales vacíos residuales ( ) que no sean estilos
+        python = f"v{sys.version_info.major}.{sys.version_info.minor}"
         for _ in range(4):
             text = re.sub(r'(?<!\])\(\s*\)', '', text)
             text = re.sub(r'(?<!\])\(\s+\)', '', text)
             text = text.replace('()', '').replace('( )', '')
+            text = text.replace('( )', '')
+            text = text.replace('( ' + python + ')', ' (' + python + ')')
 
         # 4. Normalizar espacios
         text = re.sub(r'\s{2,}', ' ', text)

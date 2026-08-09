@@ -130,6 +130,7 @@ class Controller(QObject):
     resultDialogTextChanged = Signal()
     fastfetchBackupExistsChanged = Signal()
     fastfetchConfigImageChanged = Signal()
+    fastfetchConfigImagePathChanged = Signal()
     # Palette signals
     currentPaletteDataChanged = Signal()
     paletteGenerationError = Signal(str)
@@ -457,8 +458,23 @@ class Controller(QObject):
         if self._fastfetch_config_image != p:
             self._fastfetch_config_image = p
             self.fastfetchConfigImageChanged.emit()
+            self._emit_fastfetch_config_image_path()
 
     fastfetchConfigImage = Property(str, _get_fastfetch_config_image, _set_fastfetch_config_image, notify=fastfetchConfigImageChanged)
+
+    def _get_fastfetch_config_image_path(self) -> str:
+        """Return the clean file path (no file:// prefix, no cache-buster query)."""
+        p = self._fastfetch_config_image or ""
+        p = p.replace("file://", "")
+        q = p.find("?")
+        if q != -1:
+            p = p[:q]
+        return p
+
+    def _emit_fastfetch_config_image_path(self) -> None:
+        self.fastfetchConfigImagePathChanged.emit()
+
+    fastfetchConfigImagePath = Property(str, _get_fastfetch_config_image_path, notify=fastfetchConfigImagePathChanged)
 
     def _get_result_dialog_visible(self) -> bool:
         return self._result_dialog_visible
@@ -863,10 +879,12 @@ class Controller(QObject):
                 url = f"file://{detected}?t={int(time.time() * 1000)}"
                 self._fastfetch_config_image = url
                 self.fastfetchConfigImageChanged.emit()
+                self._emit_fastfetch_config_image_path()
             else:
                 if self._fastfetch_config_image != "":
                     self._fastfetch_config_image = ""
                     self.fastfetchConfigImageChanged.emit()
+                    self._emit_fastfetch_config_image_path()
         except Exception:
             self._logger.exception("Failed refreshing fastfetch config image")
 
