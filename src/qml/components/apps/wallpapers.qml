@@ -381,7 +381,8 @@ Kirigami.Page {
                         
                             // Use strict integer division to avoid sub-pixel jitter
                             cellWidth: Math.floor(width / Math.max(2, Math.floor(width / 250)))
-                            cellHeight: Math.floor(cellWidth * 0.5625)
+                            cellHeight: Math.floor(cellWidth / 2) 
+                            //cellHeight: Math.floor(cellWidth * 0.5625)
                         
                             model: imageModel
 
@@ -400,25 +401,35 @@ Kirigami.Page {
                                 property bool isSelected: filePath === controller.selectedWallpaper
                                 property bool isHovered: hoverHandler.hovered
 
+                                // Border drawn outside the clipped area so it's always visible
                                 Rectangle {
+                                    id: borderRect
+                                    anchors.fill: parent
+                                    anchors.margins: 2
+                                    color: "transparent"
+                                    border.color: isSelected ? Kirigami.Theme.positiveTextColor : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)) //Kirigami.Theme.textColor) 
+                                    //border.width: isSelected ? 3 : (isHovered ? 2 : 1)
+                                    border.width: isSelected ? 3 : 2
+                                    radius: Kirigami.Units.smallSpacing
+                                    z: 10
+                                }
+
+                                Rectangle {
+                                    id: thumbContainer
                                     anchors.fill: parent
                                     anchors.margins: Kirigami.Units.smallSpacing
-                                    color: Qt.alpha(Kirigami.Theme.textColor, 0.05)
-                                    border.color: isHovered ? Kirigami.Theme.focusColor : (isSelected ? Kirigami.Theme.highlightColor : "transparent")
-                                    border.width: isSelected ? 3 : 1
+                                    color: "transparent"
                                     radius: Kirigami.Units.smallSpacing
+                                    clip: true
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        //onClicked: controller.selectWallpaper(filePath)
-                                        onClicked: {
+                                    TapHandler {
+                                        onTapped: {
                                             controller.selectWallpaper(filePath)
                                             gridContainer.selWallpaper = controller.selectedWallpaper
                                             gridContainer.selWallpaperThumb = controller.thumbPath
                                             gridContainer.isVideo = isVideo
                                         }
-                                        onDoubleClicked: {
+                                        onDoubleTapped: {
                                             controller.selectWallpaper(filePath)
                                             gridContainer.selWallpaper = controller.selectedWallpaper
                                             gridContainer.selWallpaperThumb = controller.thumbPath
@@ -427,82 +438,52 @@ Kirigami.Page {
                                         }
                                     }
 
-                                    Item {
+                                    Image {
+                                        id: thumbImg
                                         anchors.fill: parent
-                                        anchors.margins: Kirigami.Units.smallSpacing
-                                        clip: true
+                                        source: thumbPath ? thumbPath : "file://" + filePath
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        smooth: true
                                     
-                                        Image {
-                                            id: thumbImg
-                                            anchors.fill: parent
-                                            source: thumbPath ? thumbPath : "file://" + filePath
-                                            sourceSize.width: 320
-                                            fillMode: Image.PreserveAspectCrop
-                                            asynchronous: true
-                                            smooth: true
-                                        
-                                            scale: isHovered ? 1.05 : 1.0
-                                            Behavior on scale { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
-                                        
-                                            opacity: status === Image.Ready ? 1.0 : 0.0
-                                            Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad } }
-                                        }
+                                        scale: isHovered ? 1.05 : 1.0
+                                        Behavior on scale { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
                                     
-                                        BusyIndicator {
-                                            anchors.centerIn: parent
-                                            running: thumbImg.status === Image.Loading
-                                            visible: running
-                                        }
+                                        opacity: status === Image.Ready ? 1.0 : 0.0
+                                        Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad } }
+                                    }
 
-                                        // Inline video playback: loads only for the selected video cell
-                                        Loader {
-                                            id: inlineVideoLoader
+                                    BusyIndicator {
+                                        anchors.centerIn: parent
+                                        running: thumbImg.status === Image.Loading
+                                        visible: running
+                                    }
+
+                                    // Inline video playback: loads only for the selected video cell
+                                    Loader {
+                                        id: inlineVideoLoader
+                                        anchors.fill: parent
+                                        active: isVideo && isSelected
+                                        asynchronous: true
+
+                                        sourceComponent: Item {
                                             anchors.fill: parent
-                                            active: isVideo && isSelected
-                                            asynchronous: true
 
-                                            sourceComponent: Item {
+                                            MediaPlayer {
+                                                id: inlineVideoPlayer
+                                                source: "file://" + filePath
+                                                videoOutput: inlineVideoOutput
+                                                audioOutput: AudioOutput { muted: true }
+                                                loops: MediaPlayer.Infinite
+                                                Component.onCompleted: play()
+                                            }
+
+                                            VideoOutput {
+                                                id: inlineVideoOutput
                                                 anchors.fill: parent
-
-                                                MediaPlayer {
-                                                    id: inlineVideoPlayer
-                                                    source: "file://" + filePath
-                                                    videoOutput: inlineVideoOutput
-                                                    audioOutput: AudioOutput {
-                                                        // Preview autoplay muted like a live-wallpaper preview.
-                                                        // Set muted: false if you'd rather hear audio.
-                                                        muted: true
-                                                    }
-                                                    loops: MediaPlayer.Infinite
-
-                                                    Component.onCompleted: play()
-                                                }
-
-                                                VideoOutput {
-                                                    id: inlineVideoOutput
-                                                    anchors.fill: parent
-                                                    fillMode: VideoOutput.PreserveAspectCrop
-                                                }
+                                                fillMode: VideoOutput.PreserveAspectCrop
                                             }
                                         }
-
-                                        // Play indicator for video files (hidden once it's actually playing)
-                                        // Rectangle {
-                                        //     anchors.centerIn: parent
-                                        //     width: Kirigami.Units.gridUnit * 2.5
-                                        //     height: width
-                                        //     radius: width / 2
-                                        //     color: Qt.rgba(0, 0, 0, 0.6)
-                                        //     visible: isVideo && thumbImg.status === Image.Ready && !isSelected
-                                            
-                                        //     Kirigami.Icon {
-                                        //         anchors.centerIn: parent
-                                        //         source: "media-playback-start"
-                                        //         width: Kirigami.Units.gridUnit * 1.5
-                                        //         height: width
-                                        //         color: "white"
-                                        //     }
-                                        // }
                                     }
 
                                     Rectangle {
@@ -514,14 +495,14 @@ Kirigami.Page {
                                         color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
                                         width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
                                         height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
-                                        border.color: Kirigami.Theme.highlightColor //isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.highlightColor
+                                        border.color: Kirigami.Theme.highlightColor
                                         border.width: 0.5
 
                                         Label {
                                             id: extLabel
                                             anchors.centerIn: parent
                                             text: fileName.split(".").pop().toUpperCase()
-                                            color: Kirigami.Theme.textColor //isVideo === true ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
+                                            color: Kirigami.Theme.textColor
                                             font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
                                             font.bold: true
                                         }
@@ -539,11 +520,10 @@ Kirigami.Page {
                                         border.color: Kirigami.Theme.highlightColor
                                         border.width: 0.5
 
-                                        // Minimalist Color Palette Dots
                                         RowLayout {
                                             id: colorDots
                                             anchors.centerIn: parent
-                                            spacing: 2 //Kirigami.Units.smallSpacing
+                                            spacing: 2
                                             visible: isSelected
 
                                             Repeater {
@@ -553,7 +533,6 @@ Kirigami.Page {
                                                     required property int index
                                                     width: Kirigami.Units.gridUnit * 0.8
                                                     height: width
-                                                    //radius: width / 2
                                                     radius: Kirigami.Units.smallSpacing 
                                                     color: modelData
                                                     border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
@@ -585,7 +564,6 @@ Kirigami.Page {
                                         display: AbstractButton.IconOnly
                                         visible: isSelected
                                         onClicked: {
-                                            // Determine which path to use for %image% placeholder
                                             var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
                                             if (isVideo) {
                                                 root.notifyOther("Under construction!!")
@@ -595,7 +573,6 @@ Kirigami.Page {
                                                 controller.setAsWallpaper(controller.selectedWallpaper)
                                             }
 
-                                            // Build command array with all replacements applied
                                             var commandsArray = []
                                             for (var i = 0; i < controller.customCommands.length; i++) {
                                                 var cmdObj = controller.customCommands[i]
@@ -975,7 +952,7 @@ Kirigami.Page {
                         anchors.right: parent.right
                         anchors.leftMargin: Kirigami.Units.largeSpacing * 2
                         anchors.rightMargin: Kirigami.Units.largeSpacing
-                        //color: lightboxPopup.overlayColor
+                        color: lightboxBackground.color
                         clip: true
 
                         // Image fills the container with PreserveAspectCrop so the rounded
@@ -1036,17 +1013,19 @@ Kirigami.Page {
                             id: lightboxOverlayCanvas
                             anchors.fill: parent
                             visible: lightboxImage.source !== ""
+                            layer.enabled: true
+                            layer.smooth: false
 
                             onPaint: {
                                 var ctx = getContext("2d")
-                                ctx.clearRect(0, 0, width, height)
+                                ctx.clearRect(0, 0, width + 2, height + 2)
 
                                 // 1) Fill with background color (replaces frame1)
                                 ctx.fillStyle = lightboxBackground.color
-                                ctx.fillRect(0, 0, width, height)
+                                ctx.fillRect(0, 0, width + 2, height + 2)
 
                                 // Hole dimensions (matches former frame2 / frame3 area)
-                                var margin = Kirigami.Units.largeSpacing
+                                var margin = 2 //Kirigami.Units.smallSpacing
                                 var holeX = margin
                                 var holeY = margin
                                 var holeW = width - margin * 2
