@@ -298,17 +298,8 @@ Kirigami.Page {
                     visible: rightPaneWallpapers.searchOpen
                     spacing: Kirigami.Units.smallSpacing
 
-                    // "All" / Reset Button
-                    ToolButton {
-                        icon.name: "view-filter"
-                        text: qsTr("All")
-                        display: AbstractButton.TextBesideIcon
-                        checkable: true
-                        checked: imageModel.colorFilter === ""
-                        onClicked: imageModel.colorFilter = ""
-                    }
-
-                    Item { Layout.fillWidth: true }               
+                    Item { Layout.fillWidth: true }
+                    Item { Layout.fillWidth: true }         
 
                     Repeater {
                         model: wallpaperPage.categoryColorModel
@@ -337,20 +328,32 @@ Kirigami.Page {
                             ToolTip.visible: filterHover.hovered
                         }
                     }
-                    Item { Layout.fillWidth: true }
-                    Item { Layout.fillWidth: true }
+                    // "All" / Reset Button
                     ToolButton {
-                        icon.name: "tag-symbolic"
+                        icon.name: "view-filter"
+                        //text: qsTr("All")
+                        display: AbstractButton.TextBesideIcon
                         checkable: true
-                        checked: categoryEditorPopup.visible
-                        onToggled: {
-                            if (checked) categoryEditorPopup.open()
-                            else categoryEditorPopup.close()
-                        }
-                        ToolTip.text: qsTr("Edit Color Categories")
+                        checked: imageModel.colorFilter === ""
+                        onClicked: imageModel.colorFilter = ""
+                        ToolTip.text: qsTr("Show All Wallpapers")
                         ToolTip.visible: hovered
-                        display: AbstractButton.IconOnly
                     }
+
+                    Item { Layout.fillWidth: true }
+                    Item { Layout.fillWidth: true }
+                    // ToolButton {
+                    //     icon.name: "tag-symbolic"
+                    //     checkable: true
+                    //     checked: categoryEditorPopup.visible
+                    //     onToggled: {
+                    //         if (checked) categoryEditorPopup.open()
+                    //         else categoryEditorPopup.close()
+                    //     }
+                    //     ToolTip.text: qsTr("Edit Color Categories")
+                    //     ToolTip.visible: hovered
+                    //     display: AbstractButton.IconOnly
+                    // }
                 }
                 
                 MenuSeparator { Layout.fillWidth: true }
@@ -950,6 +953,7 @@ Kirigami.Page {
                 }
 
                 background: Rectangle {
+                    id: lightboxBackground
                     Kirigami.Theme.colorSet: Kirigami.Theme.View
                     color: Kirigami.Theme.backgroundColor
                     border.color: Kirigami.Theme.highlightColor
@@ -960,52 +964,121 @@ Kirigami.Page {
                 contentItem: Item {
                     readonly property bool selectedIsVideo: lightboxPopup.isVideo
                     
-                    Image {
-                        id: lightboxImage
-                        anchors.fill: parent
-                        anchors.margins: Kirigami.Units.largeSpacing * 4
-                        source: lightboxPopup.selWallpaper ? (parent.selectedIsVideo ? "image://video_thumbnail/" + lightboxPopup.selWallpaper : "file://" + lightboxPopup.selWallpaper) : ""
-                        fillMode: Image.PreserveAspectFit
-                        asynchronous: true
-                        smooth: true
-                        visible: !parent.selectedIsVideo || lightboxVideoLoader.status !== Loader.Ready
-                    }
+                    // Media container - fills all available space as background area
+                    Rectangle {
+                        id: mediaContainer
+                        anchors.top: topBar.bottom
+                        anchors.topMargin: Kirigami.Units.largeSpacing
+                        anchors.bottom: lightboxApplyWallpaper.top
+                        anchors.bottomMargin: Kirigami.Units.largeSpacing
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: Kirigami.Units.largeSpacing * 2
+                        anchors.rightMargin: Kirigami.Units.largeSpacing
+                        //color: lightboxPopup.overlayColor
+                        clip: true
 
-                    Loader {
-                        id: lightboxVideoLoader
-                        anchors.fill: parent
-                        anchors.margins: Kirigami.Units.largeSpacing * 4
-                        active: lightboxPopup.opened && parent.selectedIsVideo
-                        asynchronous: true
-
-                        sourceComponent: Item {
+                        // Image fills the container with PreserveAspectCrop so the rounded
+                        // overlay frame always aligns with the container edges (no black bars).
+                        Image {
+                            id: lightboxImage
                             anchors.fill: parent
+                            source: lightboxPopup.selWallpaper ? (parent.parent.selectedIsVideo ? "image://video_thumbnail/" + lightboxPopup.selWallpaper : "file://" + lightboxPopup.selWallpaper) : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            smooth: true
+                            visible: !parent.parent.selectedIsVideo || lightboxVideoLoader.status !== Loader.Ready
+                        }
 
-                            MediaPlayer {
-                                id: lightboxVideoPlayer
-                                source: "file://" + lightboxPopup.selWallpaper
-                                videoOutput: lightboxVideoOutput
-                                audioOutput: AudioOutput { muted: true }//{ volume: 1.0 }
-                                loops: MediaPlayer.Infinite
+                        // Video loader fills the container
+                        Loader {
+                            id: lightboxVideoLoader
+                            anchors.fill: parent
+                            active: lightboxPopup.opened && parent.parent.selectedIsVideo
+                            asynchronous: true
 
-                                Component.onCompleted: play()
-                            }
-
-                            VideoOutput {
-                                id: lightboxVideoOutput
+                            sourceComponent: Item {
                                 anchors.fill: parent
-                                fillMode: VideoOutput.PreserveAspectFit
-                            }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (lightboxVideoPlayer.playbackState === MediaPlayer.PlayingState)
-                                        lightboxVideoPlayer.pause()
-                                    else
-                                        lightboxVideoPlayer.play()
+                                MediaPlayer {
+                                    id: lightboxVideoPlayer
+                                    source: "file://" + lightboxPopup.selWallpaper
+                                    videoOutput: lightboxVideoOutput
+                                    audioOutput: AudioOutput { muted: true }//{ volume: 1.0 }
+                                    loops: MediaPlayer.Infinite
+
+                                    Component.onCompleted: play()
                                 }
+
+                                VideoOutput {
+                                    id: lightboxVideoOutput
+                                    anchors.fill: parent
+                                    fillMode: VideoOutput.PreserveAspectCrop
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (lightboxVideoPlayer.playbackState === MediaPlayer.PlayingState)
+                                            lightboxVideoPlayer.pause()
+                                        else
+                                            lightboxVideoPlayer.play()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Overlay frame: draws the background color with a rounded
+                        // hole (where lightboxOverlayFrame3 was) so the image/video
+                        // is visible, plus a highlight border around the cutout.
+                        Canvas {
+                            id: lightboxOverlayCanvas
+                            anchors.fill: parent
+                            visible: lightboxImage.source !== ""
+
+                            onPaint: {
+                                var ctx = getContext("2d")
+                                ctx.clearRect(0, 0, width, height)
+
+                                // 1) Fill with background color (replaces frame1)
+                                ctx.fillStyle = lightboxBackground.color
+                                ctx.fillRect(0, 0, width, height)
+
+                                // Hole dimensions (matches former frame2 / frame3 area)
+                                var margin = Kirigami.Units.largeSpacing
+                                var holeX = margin
+                                var holeY = margin
+                                var holeW = width - margin * 2
+                                var holeH = height - margin * 2
+                                var radius = lightboxBackground.radius
+
+                                // 2) Cut out the rounded hole (replaces frame3 green area)
+                                ctx.globalCompositeOperation = 'destination-out'
+                                lightboxOverlayCanvas._drawRoundedRect(ctx, holeX, holeY, holeW, holeH, radius)
+                                ctx.fill()
+
+                                // 3) Restore and draw the highlight border (replaces frame2)
+                                ctx.globalCompositeOperation = 'source-over'
+                                ctx.lineWidth = lightboxBackground.border.width
+                                ctx.strokeStyle = lightboxBackground.border.color
+                                lightboxOverlayCanvas._drawRoundedRect(ctx, holeX, holeY, holeW, holeH, radius)
+                                ctx.stroke()
+                            }
+
+                            // Shared helper for rounded-rect paths
+                            function _drawRoundedRect(ctx, x, y, w, h, r) {
+                                ctx.beginPath()
+                                ctx.moveTo(x + r, y)
+                                ctx.lineTo(x + w - r, y)
+                                ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+                                ctx.lineTo(x + w, y + h - r)
+                                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+                                ctx.lineTo(x + r, y + h)
+                                ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+                                ctx.lineTo(x, y + r)
+                                ctx.quadraticCurveTo(x, y, x + r, y)
+                                ctx.closePath()
                             }
                         }
                     }
@@ -1039,32 +1112,69 @@ Kirigami.Page {
                     //     }
                     // }
                     
-                    ToolButton {
-                        id: paletteToggleButton
+                    // Top bar: score colors + close/settings buttons in one row
+                    RowLayout {
+                        id: topBar
                         anchors.top: parent.top
-                        anchors.topMargin: Kirigami.Units.smallSpacing
-                        anchors.right: closeLightboxButton.left
-                        icon.name: "palette-symbolic"
-                        icon.width: Kirigami.Units.gridUnit * 1.5
-                        icon.height: Kirigami.Units.gridUnit * 1.5
-                        display: AbstractButton.IconOnly
-                        checkable: true
-                        checked: lightboxPopup.paletteExpanded
-                        ToolTip.text: qsTr("Color Palette")
-                        ToolTip.visible: hovered
-                        onToggled: lightboxPopup.paletteExpanded = checked
-                    }
-
-                    ToolButton {
-                        id: closeLightboxButton
-                        anchors.top: parent.top
-                        anchors.topMargin: Kirigami.Units.smallSpacing
+                        anchors.left: parent.left
                         anchors.right: parent.right
-                        icon.name: "dialog-close"
-                        icon.width: Kirigami.Units.gridUnit * 1.5
-                        icon.height: Kirigami.Units.gridUnit * 1.5
-                        display: AbstractButton.IconOnly
-                        onClicked: lightboxPopup.close()
+                        anchors.margins: Kirigami.Units.largeSpacing
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Item { Layout.fillWidth: true }
+
+                        // Score colors
+                        Repeater {
+                            model: controller.wallpaperColors
+                            delegate: Rectangle {
+                                required property string modelData
+                                required property int index
+                                width: Kirigami.Units.gridUnit * 1.2
+                                height: width
+                                radius: Kirigami.Units.smallSpacing
+                                color: modelData
+                                border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
+                                border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 3 : 1
+
+                                HoverHandler { id: lightboxColorHover }
+                                TapHandler {
+                                    acceptedButtons: Qt.LeftButton
+                                    onTapped: rightPaneWallpapers.selectedScoreColorIndex = index
+                                }
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
+                                    onTapped: clipboardHelper.copyToClipboard(modelData)
+                                }
+                                ToolTip.text: modelData.toUpperCase()
+                                ToolTip.visible: lightboxColorHover.hovered
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        // Settings toggle button
+                        ToolButton {
+                            id: paletteToggleButton
+                            icon.name: lightboxPopup.paletteExpanded ? "expand" : "preferences-system-symbolic"
+                            icon.width: Kirigami.Units.gridUnit * 1.5
+                            icon.height: Kirigami.Units.gridUnit * 1.5
+                            display: AbstractButton.IconOnly
+                            checkable: true
+                            checked: lightboxPopup.paletteExpanded
+                            ToolTip.text: lightboxPopup.paletteExpanded ? qsTr("Hide Settings") : qsTr("Show Settings")
+                            ToolTip.visible: hovered
+                            onToggled: lightboxPopup.paletteExpanded = checked
+                        }
+
+                        // Close button
+                        ToolButton {
+                            id: closeLightboxButton
+                            icon.name: "dialog-close"
+                            icon.width: Kirigami.Units.gridUnit * 1.5
+                            icon.height: Kirigami.Units.gridUnit * 1.5
+                            display: AbstractButton.IconOnly
+                            onClicked: lightboxPopup.close()
+                        }
                     }
 
                     // --- Palette Panel (ported from DialogPalette.qml) ---
@@ -1073,13 +1183,13 @@ Kirigami.Page {
                     // a width/height of 0 (which caused QPainter paint-device warnings).
                     Item {
                         id: palettePanelContainer
-                        anchors.top: closeLightboxButton.bottom
+                        anchors.top: topBar.bottom
                         anchors.bottom: parent.bottom
                         anchors.right: parent.right
                         anchors.topMargin: Kirigami.Units.largeSpacing
                         anchors.bottomMargin: Kirigami.Units.largeSpacing * 4
                         anchors.rightMargin: Kirigami.Units.largeSpacing
-                        width: Math.min(Kirigami.Units.gridUnit * 18, parent.width * 0.42)
+                        width: Math.min(Kirigami.Units.gridUnit * 20, parent.width * 0.42)
                         clip: true
 
                         // Handle/tab attached to the container's left edge, always visible
@@ -1097,7 +1207,7 @@ Kirigami.Page {
 
                             Kirigami.Icon {
                                 anchors.centerIn: parent
-                                source: "palette-symbolic"
+                                source: lightboxPopup.paletteExpanded ? "expand" : "preferences-system-symbolic"
                                 width: Kirigami.Units.gridUnit
                                 height: width
                             }
@@ -1143,12 +1253,13 @@ Kirigami.Page {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     Label {
-                                        text: qsTr("Color Palette")
+                                        //text: qsTr("Color Palette")
+                                        text: qsTr("Settings")
                                         font.bold: true
                                         Layout.fillWidth: true
                                     }
                                     ToolButton {
-                                        icon.name: "collapse-all"
+                                        icon.name: "collapse"
                                         flat: true
                                         display: AbstractButton.IconOnly
                                         ToolTip.text: qsTr("Collapse")
@@ -1291,6 +1402,11 @@ Kirigami.Page {
 
                                 Kirigami.Separator { Layout.fillWidth: true }
 
+                                Label {
+                                    text: qsTr("Palette")
+                                    font.bold: true
+                                }
+
                                 // Extraction Controls
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -1314,7 +1430,7 @@ Kirigami.Page {
 
                                     ToolButton {
                                         id: extractButton
-                                        icon.name: "palette-symbolic"
+                                        icon.name: "media-playback-start" //"palette-symbolic"
                                         ToolTip.text: qsTr("Extract Color Palette")
                                         ToolTip.visible: hovered
                                         onClicked: {
@@ -1636,40 +1752,8 @@ Kirigami.Page {
                         }
                     }
                     
-                    RowLayout {
-                        anchors.top: parent.top
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.margins: Kirigami.Units.largeSpacing
-                        spacing: Kirigami.Units.smallSpacing
-
-                        Repeater {
-                            model: controller.wallpaperColors
-                            delegate: Rectangle {
-                                required property string modelData
-                                required property int index
-                                width: Kirigami.Units.gridUnit * 1.2
-                                height: width
-                                radius: Kirigami.Units.smallSpacing
-                                color: modelData
-                                border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
-                                border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 3 : 1
-
-                                HoverHandler { id: lightboxColorHover }
-                                TapHandler {
-                                    acceptedButtons: Qt.LeftButton
-                                    onTapped: rightPaneWallpapers.selectedScoreColorIndex = index
-                                }
-                                TapHandler {
-                                    acceptedButtons: Qt.RightButton
-                                    onTapped: clipboardHelper.copyToClipboard(modelData)
-                                }
-                                ToolTip.text: modelData.toUpperCase()
-                                ToolTip.visible: lightboxColorHover.hovered
-                            }
-                        }
-                    }
-
                     Button {
+                        id: lightboxApplyWallpaper
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.margins: Kirigami.Units.largeSpacing
