@@ -311,7 +311,6 @@ Kirigami.Page {
                     id: previewSectionTop
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.preferredHeight: 6
 
                     Label { text: qsTr("Current (config):"); font.bold: true }
                     // Preview current image path in fastfetch config (clean path, no file:// or ?t=)
@@ -331,6 +330,7 @@ Kirigami.Page {
                         Layout.fillHeight: true
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
+                        cache: false
                         
                         // Cleaner binding: property access preferred, immediate fallback handled by property value
                         source: (controller && controller.fastfetchConfigImage !== "") 
@@ -350,10 +350,10 @@ Kirigami.Page {
                 
                 // Bottom: Selection & Preview
                 ColumnLayout {
+                    id: previewSectionBottom
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: Kirigami.Units.smallSpacing
-                    Layout.preferredHeight: 4
                     visible: controller ? (controller.selectedFile && controller.selectedFile !== "") : false
 
                     RowLayout {
@@ -444,7 +444,7 @@ Kirigami.Page {
                                 id: tintedPreviewContainer
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                Layout.minimumHeight: originalPreviewContainer.height
+                                Layout.minimumHeight: 200
                                 color: "transparent" //Kirigami.Theme.backgroundColor
                                 radius: Kirigami.Units.smallSpacing
                                 //border.color: Kirigami.Theme.disabledTextColor

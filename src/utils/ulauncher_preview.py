@@ -315,7 +315,7 @@ class UlauncherIconResolver:
                 if full_path.exists():
                     uri = full_path.as_uri()
                     self._cache[name] = uri
-                    logger.info(f"Resolved Ulauncher icon {name}: {uri}")
+                    logger.debug(f"Resolved Ulauncher icon {name}: {uri}")
                     return uri
 
         logger.warning(f"Failed to resolve Ulauncher icon {name}")
