@@ -474,7 +474,7 @@ Kirigami.Page {
                                     Loader {
                                         id: inlineVideoLoader
                                         anchors.fill: parent
-                                        active: isVideo && isSelected
+                                        active: isVideo && isSelected && wallpaperPage.visible
                                         asynchronous: true
 
                                         sourceComponent: Item {
@@ -855,7 +855,7 @@ Kirigami.Page {
                                 TextField {
                                     id: cmdInput
                                     text: commandRow.modelData.command
-                                    placeholderText: qsTr("Ex: pywal -i %1")
+                                    placeholderText: qsTr("e.g: notify-send 'Wallpaper changed to %path%'")
                                     Layout.fillWidth: true
                                     opacity: commandRow.modelData.enabled ? 1.0 : 0.5
                                     
@@ -1092,7 +1092,7 @@ Kirigami.Page {
                         Loader {
                             id: lightboxVideoLoader
                             anchors.fill: parent
-                            active: lightboxPopup.opened && parent.parent.selectedIsVideo
+                            active: lightboxPopup.opened && parent.parent.selectedIsVideo && wallpaperPage.visible
                             asynchronous: true
 
                             sourceComponent: Item {
