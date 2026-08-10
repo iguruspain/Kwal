@@ -568,6 +568,7 @@ Kirigami.Page {
                                     }
 
                                     ToolButton {
+                                        id: setWallpaperButton
                                         anchors.top: parent.top
                                         anchors.right: parent.right
                                         anchors.margins: Kirigami.Units.smallSpacing
@@ -578,7 +579,7 @@ Kirigami.Page {
                                         onClicked: {
                                             var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
                                             if (isVideo) {
-                                                root.notifyOther("Under construction!!")
+                                                //root.notifyOther("Under construction!!")
                                                 controller.setAsWallpaper(controller.thumbPath)
                                             } 
                                             else {
@@ -1863,7 +1864,7 @@ Kirigami.Page {
                             var image = lightboxPopup.isVideo ? lightboxPopup.selWallpaperThumb : lightboxPopup.selWallpaper
                             
                             if (lightboxPopup.isVideo) {
-                                root.notifyOther("Under construction!!")
+                                //root.notifyOther("Under construction!!")
                                 controller.setAsWallpaper(lightboxPopup.selWallpaperThumb)
                             } else {
                                 controller.setAsWallpaper(lightboxPopup.selWallpaper)

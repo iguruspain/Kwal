@@ -6,12 +6,12 @@ $os\
 [ ](fg:accent bg:accent)\
 $username\
 [ ](fg:accent bg:accent)\
-[](fg:accent bg:dir_bg)\
+[](fg:accent bg:dir_bg)\
 $directory\
-[](fg:dir_bg bg:git_bg)\
+[](fg:dir_bg bg:git_bg)\
 $git_branch\
 $git_status\
-[](fg:git_bg bg:other_bg)\
+[](fg:git_bg bg:other_bg)\
 $c\
 $cpp\
 $rust\
@@ -25,7 +25,7 @@ $python\
 $docker_context\
 $conda\
 $pixi\
-[](fg:other_bg bg:dir_bg)\
+[](fg:other_bg bg:dir_bg)\
 $time\
 [ ](fg:dir_bg)\
 $line_break\
