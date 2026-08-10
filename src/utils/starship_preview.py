@@ -50,7 +50,7 @@ STANDARD_COLORS: dict[str, str] = {
 POWERLINE_GLYPHS = ""
 
 # Triangle connectors that get the `glyph2` CSS class for independent styling
-TRIANGLE_CONNECTORS = ""
+TRIANGLE_CONNECTORS = ""
 
 # Modules that may be expanded when encountered as `$module_name` in a format string
 WHITELIST_MODULES = frozenset({
