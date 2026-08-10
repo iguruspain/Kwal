@@ -43,8 +43,8 @@ kwal = "kwal.app:main"
 
 
 [tool.setuptools]
-packages = ["kwal", "kwal.controllers", "kwal.models", "kwal.utils"]
-package-dir = {kwal = "src", "kwal.controllers" = "src/controllers", "kwal.models" = "src/models", "kwal.utils" = "src/utils"}
+packages = ["kwal", "kwal.controllers", "kwal.models", "kwal.providers", "kwal.utils"]
+package-dir = {kwal = "src", "kwal.controllers" = "src/controllers", "kwal.models" = "src/models", "kwal.providers" = "src/providers", "kwal.utils" = "src/utils"}
 
 
 

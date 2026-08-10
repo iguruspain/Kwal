@@ -40,38 +40,19 @@ def main():
     """
     args = _parse_args()
 
-    # Auto-install templates if missing (First Run) or explicitly requested
+    # Handle explicit --install-templates flag only
     force_install = getattr(args, "install_templates", False)
     should_exit = False
     
-    try:
-        from .utils.template_installer import install_templates_to_user
-        from pathlib import Path
-        
-        config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-        tpl_dir = config_home / "kwal" / "templates"
-        
-        # Check if we need to install:
-        # 1. Explicit request (--install-templates) -> Force overwrite
-        # 2. Templates dir missing or empty -> Safe install (no overwrite)
-        
-        if force_install:
-             print("Installing templates (forced)...")
-             install_templates_to_user(force=True)
-             should_exit = True
-        elif not tpl_dir.exists() or not any(tpl_dir.iterdir()):
-             # Silent auto-install
-             install_templates_to_user(force=False)
-             
-    except Exception as exc:
-        # Don't crash the app for this on auto-run, just warn
-        msg = f"Failed to check/install templates: {exc}"
-        if force_install:
-            print(msg)
+    if force_install:
+        try:
+            from .utils.template_installer import install_templates_to_user
+            print("Installing templates (forced)...")
+            install_templates_to_user(force=True)
+            should_exit = True
+        except Exception as exc:
+            print(f"Failed to install templates: {exc}")
             return 1
-        else:
-            # We can't use logger yet as it's not configured
-            print(f"Warning: {msg}", file=sys.stderr)
 
     if should_exit:
         return 0
