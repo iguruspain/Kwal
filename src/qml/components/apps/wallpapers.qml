@@ -387,7 +387,8 @@ Kirigami.Page {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             // Reserve space for the scrollbar to prevent visual overlap
-                            anchors.rightMargin: Kirigami.Units.smallSpacing + Kirigami.Units.largeSpacing 
+                            anchors.rightMargin: Kirigami.Units.smallSpacing + Kirigami.Units.largeSpacing
+
                         
                             // Column count: at least 2, ~250px per column
                             property int columnCount: Math.max(2, Math.floor(width / 250))
@@ -519,6 +520,7 @@ Kirigami.Page {
                                     }
 
                                     Rectangle {
+                                        id: colorDotsContainer
                                         anchors.left: parent.left
                                         anchors.bottom: parent.bottom
                                         anchors.margins: Kirigami.Units.smallSpacing * 2
@@ -644,21 +646,66 @@ Kirigami.Page {
                 }
             }
 
+            // Capa bloqueadora: misma posición/tamaño que bottomDrawer, transparente,
+            // situada por encima del grid pero por debajo del contenido del drawer.
+            // grid (z: 0) -> drawerBlocker (z: 50) -> bottomDrawer (z: 100)
+            //
+            // Es necesaria porque TapHandler (usado dentro del drawer, p.ej. en los dots
+            // de color) solo toma el grab exclusivo cerca del release, no en el press.
+            // Durante esa ventana, el evento puede seguir siendo entregado a otros
+            // TapHandler por debajo (los delegates del GridView) aunque el dot ya lo haya
+            // procesado. Un MouseArea sí es opaco: acepta y agarra el evento en el press,
+            // así que aunque el dot "deje pasar" el evento, esta capa lo intercepta antes
+            // de que llegue al grid. Fuera del área/tiempo del drawer, el grid sigue
+            // funcionando con normalidad.
+            Rectangle {
+                id: drawerBlocker
+                anchors.horizontalCenter: parent.horizontalCenter
+                z: 50
+
+                // Sigue exactamente la geometría animada de bottomDrawer, frame a frame,
+                // sin necesitar su propio Behavior.
+                width: bottomDrawer.width
+                height: bottomDrawer.height
+                y: bottomDrawer.y
+
+                visible: bottomDrawer.visible
+                enabled: bottomDrawer.visible
+
+                color: "transparent"
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.AllButtons
+                    propagateComposedEvents: false
+                    preventStealing: true
+                    onWheel: (wheel) => wheel.accepted = true
+                    onPressed: (mouse) => mouse.accepted = true
+                    onClicked: (mouse) => mouse.accepted = true
+                    onReleased: (mouse) => mouse.accepted = true
+                    onDoubleClicked: (mouse) => mouse.accepted = true
+                }
+            }
+
             // Bottom Drawer
             Rectangle {
                 id: bottomDrawer
                 // Use y position for sliding animation instead of anchors.bottom
                 anchors.horizontalCenter: parent.horizontalCenter
-                
+
+                z: 100 // Asegura que esté por encima del grid también en el hit-testing, no solo visualmente
+
                 width: parent.width - Kirigami.Units.largeSpacing //* 4
                 height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
-                
+
                 property bool isOpen: rightPaneWallpapers.drawerOpen
 
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
                 opacity: isOpen ? 1.0 : 0.0
                 visible: y < parent.height
+                enabled: visible // Clave: permanece activo mientras siga siendo alcanzable visualmente (incluida la animación de cierre)
 
                 Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
                 Behavior on height { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
@@ -666,16 +713,10 @@ Kirigami.Page {
 
                 radius: Kirigami.Units.largeSpacing
                 //color: root.overlayBackgroundColor
+                //color: Kirigami.Theme.backgroundColor
                 color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.95)
                 border.color: Kirigami.Theme.highlightColor
                 border.width: 1
-
-                // Block mouse events from passing through to items behind the drawer
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.AllButtons
-                    onWheel: wheel => wheel.accepted = true
-                }
 
                 ColumnLayout {
                     id: drawerContent
@@ -705,13 +746,82 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         Label {
                             Layout.fillWidth: true
+                            text: qsTr("Matugen source color index: %1").arg(rightPaneWallpapers.selectedScoreColorIndex)
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Rectangle {
+                            id: colorDotsContainerCC
+                            color: "transparent"
+                            width: colorDotsCC.implicitWidth + Kirigami.Units.smallSpacing * 2
+                            height: colorDotsCC.implicitHeight + Kirigami.Units.smallSpacing
+
+                            RowLayout {
+                                id: colorDotsCC
+                                spacing: 2
+
+                                Repeater {
+                                    model: controller.wallpaperColors
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+                                        width: Kirigami.Units.gridUnit * 0.8
+                                        height: width
+                                        radius: Kirigami.Units.smallSpacing 
+                                        color: modelData
+                                        border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
+                                        border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+
+                                        HoverHandler { id: colorHover }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: false // El hover ya lo gestiona HoverHandler arriba
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                            propagateComposedEvents: false
+                                            preventStealing: true
+                                            onPressed: (mouse) => mouse.accepted = true
+                                            onClicked: (mouse) => {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    rightPaneWallpapers.selectedScoreColorIndex = index
+                                                } else if (mouse.button === Qt.RightButton) {
+                                                    clipboardHelper.copyToClipboard(modelData)
+                                                }
+                                                mouse.accepted = true
+                                            }
+                                        }
+                                        ToolTip.text: modelData.toUpperCase()
+                                        ToolTip.visible: colorHover.hovered
+                                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.largeSpacing
+                    }
+                    
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Label {
+                            Layout.fillWidth: true
                             text: qsTr("Placeholders: \n%sc% for selected color, %path% for path, %image% for image/video thumb path")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight
                         }
+
                         ToolButton {
-                            icon.name: "list-add-symbolic"
+                            icon.name: "list-add"
                             text: qsTr("Add")
                             ToolTip.visible: hovered
                             ToolTip.text: qsTr("Add new command")
