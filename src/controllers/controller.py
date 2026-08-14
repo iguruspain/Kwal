@@ -1361,14 +1361,7 @@ class Controller(QObject):
                 pass
 
             # Create backup of fastfetch config before modifying
-            cfg_path = Path.home() / ".config" / "fastfetch" / "config.jsonc"
-            bak_path = cfg_path.with_name(cfg_path.name + ".bak")
-            if cfg_path.exists():
-                try:
-                    shutil.copy2(cfg_path, bak_path)
-                    self.fastfetchBackupExistsChanged.emit()
-                except Exception:
-                    self._logger.warning("Failed to create fastfetch backup")
+            self._backup_fastfetch_config()
 
             # Update fastfetch config with the tinted image path
             ok = file_utils.set_fastfetch_source_inplace(None, str(tinted_path))
@@ -1389,6 +1382,70 @@ class Controller(QObject):
             self.fastfetchApplyResult.emit(False, "Unexpected error.")
             self._show_result_dialog("Unexpected error while applying tinted image.")
 
+    def _backup_fastfetch_config(self) -> None:
+        """Create a backup of the fastfetch config before modifying it.
+
+        Uses the XDG config location so it stays consistent with the writer.
+        """
+        cfg_path = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc"
+        bak_path = cfg_path.with_name(cfg_path.name + ".bak")
+        if cfg_path.exists():
+            try:
+                shutil.copy2(cfg_path, bak_path)
+                self.fastfetchBackupExistsChanged.emit()
+            except Exception:
+                self._logger.warning("Failed to create fastfetch backup")
+
+    @Slot(result=bool)
+    def applyOriginalImage(self) -> bool:
+        """Apply the selected image directly to the fastfetch config, without tinting."""
+        if not self._selected_file:
+            self._show_result_dialog("No image selected.")
+            return False
+
+        src = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
+
+        thr = threading.Thread(
+            target=self._apply_original_task,
+            args=(src,),
+            daemon=True
+        )
+        thr.start()
+        self._apply_thread = thr
+        return True
+
+    def _apply_original_task(self, src: str) -> None:
+        """Update the fastfetch config to point at the selected image, without tinting."""
+        try:
+            src_path = Path(src)
+            if not src_path.exists() or not src_path.is_file():
+                msg = "The selected image no longer exists."
+                self.fastfetchApplyResult.emit(False, msg)
+                self._show_result_dialog(msg)
+                return
+
+            # Create backup of fastfetch config before modifying
+            self._backup_fastfetch_config()
+
+            # Update fastfetch config with the original image path
+            ok = file_utils.set_fastfetch_source_inplace(None, str(src_path))
+
+            if not ok:
+                msg = "Failed to update fastfetch config with the selected image."
+                self.fastfetchApplyResult.emit(False, msg)
+                self._show_result_dialog(msg)
+            else:
+                self._on_apply_success(str(src_path))
+
+        except FileNotFoundError as exc:
+            self._logger.error("applyOriginalImage task: %s", exc)
+            self.fastfetchApplyResult.emit(False, str(exc))
+            self._show_result_dialog(str(exc))
+        except Exception:
+            self._logger.exception("applyOriginalImage task failed")
+            self.fastfetchApplyResult.emit(False, "Unexpected error.")
+            self._show_result_dialog("Unexpected error while applying the image.")
+
     def _on_apply_success(self, dst_path: str) -> None:
         """Handle successful apply."""
         self.fastfetchTintedPreviewChanged.emit()
@@ -1398,7 +1455,7 @@ class Controller(QObject):
         except Exception:
             self._logger.warning("Failed clearing fastfetch cache")
 
-        msg = f"Applied tinted image to {dst_path}"
+        msg = f"Applied image to {dst_path}"
         self._set_fastfetch_config_image("file://" + dst_path)
         self.fastfetchBackupExistsChanged.emit()
         self.fastfetchApplyResult.emit(True, msg)

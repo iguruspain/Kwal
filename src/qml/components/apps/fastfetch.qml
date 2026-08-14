@@ -272,6 +272,30 @@ Kirigami.Page {
                         }
                     }
                     ToolButton {
+                        id: applyOriginalButton
+                        icon.name: "document-save"
+                        ToolTip.text: qsTr("Apply the selected image directly to fastfetch config (no tint)")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                        enabled: controller && controller.selectedFile && controller.selectedFile !== ""
+
+                        onClicked: {
+                            if (!controller) return;
+
+                            if (!controller.selectedFile || controller.selectedFile === "") {
+                                controller.resultDialogText = qsTr("No image selected.");
+                                controller.resultDialogVisible = true;
+                                return;
+                            }
+
+                            var started = controller.applyOriginalImage();
+                            if (!started) {
+                                controller.resultDialogText = qsTr("Failed to start apply operation.");
+                                controller.resultDialogVisible = true;
+                            }
+                        }
+                    }
+                    ToolButton {
                         id: restoreBackupButton
                         icon.name: "document-revert"
                         ToolTip.text: (controller && controller.hasFastfetchBackup) ? qsTr("Restore the fastfetch config from the last backup") : qsTr("No backup available to restore")
