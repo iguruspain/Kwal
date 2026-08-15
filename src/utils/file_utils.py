@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
 import tomlkit
@@ -13,12 +12,14 @@ from typing import Any
 
 import json5
 
+from .xdg_paths import fastfetch_config_path, xdg_cache_home, xdg_config_home
+
 logger = logging.getLogger(__name__)
 
 
 def read_config_fastfetch(key: str, default: Any = None) -> tuple[Any, str]:
     """Read a value from ~/.config/fastfetch/config.jsonc safely."""
-    config_path = Path.home() / ".config" / "fastfetch" / "config.jsonc"
+    config_path = fastfetch_config_path()
     
     # helper for logging path
     try:
@@ -69,29 +70,9 @@ def read_config_fastfetch(key: str, default: Any = None) -> tuple[Any, str]:
         return default, display_path
 
 
-def list_template_images(folder: str | Path) -> list[str]:
-    """Return list of absolute file paths for template images in `folder`."""
-    try:
-        p = Path(folder)
-        if not p.is_dir():
-            return []
-            
-        exts = {".png", ".jpg", ".jpeg", ".bmp", ".svg"}
-        files: list[str] = []
-        
-        # Sorted mainly for UI stability
-        for f in sorted(p.iterdir()):
-            if f.is_file() and f.suffix.lower() in exts:
-                files.append(str(f.resolve()))
-        return files
-    except Exception:
-        logger.exception("Error listing images in %s", folder)
-        return []
-
-
 def ensure_fastfetch_config_dir() -> Path:
     """Ensure and return the user's fastfetch config directory."""
-    cfg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch"
+    cfg = xdg_config_home() / "fastfetch"
     try:
         cfg.mkdir(parents=True, exist_ok=True)
     except Exception:
@@ -101,7 +82,7 @@ def ensure_fastfetch_config_dir() -> Path:
 
 def set_fastfetch_source_inplace(config_path: str | None, new_source: str) -> bool:
     """Replace the `source` key value in config.jsonc textually."""
-    cfg = Path(config_path).expanduser() if config_path else (Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc")
+    cfg = Path(config_path).expanduser() if config_path else fastfetch_config_path()
     
     if not cfg.is_file():
         return False
@@ -173,9 +154,28 @@ def _write_config_atomic(cfg_path: Path, content: str) -> bool:
         return False
 
 
+def backup_config_file(path: Path) -> Path | None:
+    """Create a ``.bak`` backup of ``path`` if it exists.
+
+    Returns the backup path on success, or ``None`` if the source file does
+    not exist or the copy failed.
+    """
+    src = Path(path)
+    if not src.is_file():
+        return None
+    bak = src.with_name(src.name + ".bak")
+    try:
+        shutil.copy2(src, bak)
+        logger.info("Created backup %s", bak)
+        return bak
+    except Exception:
+        logger.exception("Failed creating backup for %s", src)
+        return None
+
+
 def restore_fastfetch_config_backup(config_path: str | None = None) -> bool:
     """Restore config.jsonc.bak."""
-    cfg = Path(config_path).expanduser() if config_path else (Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc")
+    cfg = Path(config_path).expanduser() if config_path else fastfetch_config_path()
     bak = cfg.with_name(cfg.name + ".bak")
     
     if not bak.is_file():
@@ -193,7 +193,7 @@ def restore_fastfetch_config_backup(config_path: str | None = None) -> bool:
 def clear_fastfetch_cache() -> None:
     """Remove standard fastfetch cache."""
     try:
-        cache_base = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+        cache_base = xdg_cache_home()
         target = cache_base / "fastfetch"
         if target.exists():
             shutil.rmtree(target)
@@ -313,54 +313,6 @@ def restore_starship_config_backup(config_path: str | None = None) -> bool:
     except Exception:
         logger.exception("Failed restoring starship backup")
         return False
-
-def apply_starship_palette_surgical(
-    config_path: str, palette_name: str, palette_data: dict[str, str]
-) -> bool:
-    """Apply a palette to starship.toml using tomlkit to preserve formatted comments.
-
-    1. Updates `palette = "palette_name"` at root level.
-    2. Updates or creates `[palettes.palette_name]` block.
-    """
-    path = Path(config_path)
-    if not path.exists():
-        return False
-        
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            doc = tomlkit.parse(f.read())
-        
-        # 1. Update root 'palette' reference
-        doc["palette"] = palette_name
-        
-        # 2. Ensure 'palettes' table exists
-        if "palettes" not in doc:
-            doc.add("palettes", tomlkit.table())
-            
-        palettes: Any = doc["palettes"]
-        
-        # 3. Update the specific palette
-        # We replace the content to ensure it matches our data, but keep the key
-        
-        # Sanitize colors: ensure #RRGGBB format (strip alpha from #AARRGGBB)
-        cleaned_data = {}
-        for k, v in palette_data.items():
-            if isinstance(v, str) and v.startswith("#") and len(v) == 9:
-                 # Qt color.toString() returns #AARRGGBB. Starship generally needs #RRGGBB
-                 # We strip the first 2 chars of the hex component (Alpha)
-                 cleaned_data[k] = "#" + v[3:]
-            else:
-                 cleaned_data[k] = v
-                 
-        palettes[palette_name] = cleaned_data
-
-        # 4. Write back preserving structure
-        return _write_config_atomic(path, doc.as_string())
-
-    except Exception:
-        logger.exception("Failed surgical update of starship config")
-        return False
-
 
 def apply_starship_palettes_atomic(
     config_path: str, palettes: list[tuple[str, dict[str, str]]], active_palette: str | None = None

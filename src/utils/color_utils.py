@@ -21,6 +21,7 @@ from PIL import Image, ImageColor
 from PySide6.QtGui import QColor
 
 from .file_utils import check_binary
+from .xdg_paths import kwal_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ def tint_image(src: str, tint_hex: str, strength: float = 0.8) -> str:
             return ""
 
         # Setup cache
-        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "fastfetch_tinted"
+        cache_root = kwal_cache_dir() / "fastfetch_tinted"
         cache_root.mkdir(parents=True, exist_ok=True)
 
         # Deterministic name
@@ -133,7 +134,7 @@ def tint_image(src: str, tint_hex: str, strength: float = 0.8) -> str:
 def clear_fastfetch_tinted_cache() -> None:
     """Remove the fastfetch_tinted cache directory entirely."""
     try:
-        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "fastfetch_tinted"
+        cache_root = kwal_cache_dir() / "fastfetch_tinted"
         if cache_root.exists():
             shutil.rmtree(cache_root)
             logger.info("Cleared fastfetch tinted cache %s", cache_root)
@@ -251,7 +252,7 @@ def _extract_pywal16(path: Path, **kwargs) -> PaletteData:
         raise ImportError("pywal16 (pywal module) is not installed.")
 
     # pywal needs a valid cache_dir
-    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "pywal"
+    cache = kwal_cache_dir() / "pywal"
     cache.mkdir(parents=True, exist_ok=True)
     
     # Get parameters from kwargs

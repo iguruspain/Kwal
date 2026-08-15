@@ -5,11 +5,12 @@ Uses ffmpeg for frame extraction and PIL for image handling.
 
 import hashlib
 import logging
-import os
 import subprocess
 from pathlib import Path
 
 from PIL import Image
+
+from .xdg_paths import kwal_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".m4v", ".w
 
 def get_video_cache_dir() -> Path:
     """Get the cache directory for extracted video frames."""
-    cache_dir = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "video_frames"
+    cache_dir = kwal_cache_dir() / "video_frames"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

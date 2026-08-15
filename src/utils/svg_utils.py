@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 from xml.dom import minidom
+
+from .xdg_paths import kwal_cache_dir
 
 if TYPE_CHECKING:
     from xml.dom.minidom import Document, Element
@@ -280,7 +281,7 @@ def recolor_svg_file(
 
 def get_svg_preview_cache_dir() -> Path:
     """Return (and create) the SVG preview cache directory under ~/.cache/kwal/svg_preview/."""
-    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "svg_preview"
+    cache_root = kwal_cache_dir() / "svg_preview"
     cache_root.mkdir(parents=True, exist_ok=True)
     return cache_root
 
@@ -288,7 +289,7 @@ def get_svg_preview_cache_dir() -> Path:
 def clear_svg_preview_cache() -> None:
     """Remove the SVG preview cache directory entirely."""
     try:
-        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "svg_preview"
+        cache_root = kwal_cache_dir() / "svg_preview"
         if cache_root.exists():
             shutil.rmtree(cache_root)
             logger.info("Cleared SVG preview cache %s", cache_root)

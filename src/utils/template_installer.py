@@ -2,7 +2,8 @@ from importlib import resources
 from pathlib import Path
 import shutil
 import sys
-from typing import Optional
+
+from .xdg_paths import xdg_config_home
 
 
 def _copy_tree(src: Path, dst: Path, force: bool = False) -> None:
@@ -19,7 +20,7 @@ def _copy_tree(src: Path, dst: Path, force: bool = False) -> None:
         shutil.copy2(p, target)
 
 
-def install_templates_to_user(xdg_config_home: Optional[Path] = None, force: bool = False) -> None:
+def install_templates_to_user(config_home: Path | None = None, force: bool = False) -> None:
     """Install packaged templates to the user's XDG config directory.
 
     The function searches for templates in several candidate locations:
@@ -29,7 +30,7 @@ def install_templates_to_user(xdg_config_home: Optional[Path] = None, force: boo
 
     The directory structure is copied recursively into `XDG_CONFIG_HOME/kwal/templates`.
     """
-    dest = Path(xdg_config_home or Path.home() / ".config") / "kwal" / "templates"
+    dest = (config_home or xdg_config_home()) / "kwal" / "templates"
     dest.mkdir(parents=True, exist_ok=True)
 
     # Candidate sources in order of preference

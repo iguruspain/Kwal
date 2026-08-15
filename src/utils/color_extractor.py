@@ -1,9 +1,10 @@
 import json
 import logging
-import os
 from pathlib import Path
 
 from materialyoucolor.hct import Hct
+
+from .xdg_paths import kwal_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 MAX_CATEGORIES = 5
 
 def get_cache_path() -> Path:
-    return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "wallpapers_colors.json"
+    return kwal_cache_dir() / "wallpapers_colors.json"
 
 def load_color_cache() -> dict:
     """Load the JSON color cache from disk."""

@@ -1,12 +1,13 @@
 import hashlib
 import logging
-import os
 from pathlib import Path
 from urllib.parse import quote
 
 from PySide6.QtCore import QSize, Qt, QRunnable, QThreadPool
 from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickAsyncImageProvider, QQuickImageResponse, QQuickTextureFactory
+
+from ..utils.xdg_paths import xdg_cache_home
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class ThumbnailRunnable(QRunnable):
     def run(self):
         try:
             # FreeDesktop Standard Cache Directory
-            cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "thumbnails" / "large"
+            cache_root = xdg_cache_home() / "thumbnails" / "large"
             cache_root.mkdir(parents=True, exist_ok=True)
 
             # File URI formatting and MD5 hashing per FreeDesktop standard

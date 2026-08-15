@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shlex
 import shutil
 import subprocess
 import threading
@@ -41,6 +40,7 @@ from ..models.models import (
 )
 from ..utils import color_utils, file_utils
 from ..utils.svg_utils import get_svg_preview_cache_dir
+from ..utils.xdg_paths import fastfetch_config_path, kwal_config_dir
 
 
 class SvgImageProvider(QQuickImageProvider):
@@ -260,7 +260,7 @@ class Controller(QObject):
         # Starship model
         try:
             # Default template folder similar to fastfetch
-            default_starship_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "starship")
+            default_starship_templates = str(kwal_config_dir() / "templates" / "starship")
             self._starship_model = StarshipModel(template_folder=default_starship_templates)
             self._starship_template_model = StarshipTemplateModel()
             self._starship_template_model.refresh(default_starship_templates)
@@ -274,7 +274,7 @@ class Controller(QObject):
 
         # Ulauncher model
         try:
-            default_ulauncher_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "ulauncher")
+            default_ulauncher_templates = str(kwal_config_dir() / "templates" / "ulauncher")
             self._ulauncher_model = UlauncherModel(template_folder=default_ulauncher_templates)
             self._ulauncher_template_model = UlauncherTemplateModel()
             self._ulauncher_template_model.refresh(default_ulauncher_templates)
@@ -318,7 +318,7 @@ class Controller(QObject):
         self._restore_folder_selection(last_selected)
 
     def _get_config_path_file(self) -> Path:
-        cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal"
+        cfg_dir = kwal_config_dir()
         cfg_dir.mkdir(parents=True, exist_ok=True)
         return cfg_dir / "folders.json"
 
@@ -499,7 +499,7 @@ class Controller(QObject):
     resultDialogText = Property(str, _get_result_dialog_text, _set_result_dialog_text, notify=resultDialogTextChanged)
 
     def _get_fastfetch_backup_exists(self) -> bool:
-        cfg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc"
+        cfg = fastfetch_config_path()
         bak = cfg.with_name(cfg.name + ".bak")
         return bak.exists() and bak.is_file()
 
@@ -610,7 +610,6 @@ class Controller(QObject):
                 self._logger.info("Detected '%s' installed, enabling tab", binary_name)
             else:
                 self._logger.info("'%s' not found in PATH, tab hidden", binary_name)
-        #apps.append(SettingsApp(app_name="SVG Recolor", section="Apps", qml_page="apps/svgrecolor.qml", title="SVG Recolor"))
         return apps
 
     # --- Draft Properties ---
@@ -696,14 +695,6 @@ class Controller(QObject):
         except Exception:
             return False
 
-    @Slot(str, result=str)
-    def getTintedPath(self, src: str) -> str:
-        """Return the tinted path for a given source path."""
-        try:
-            return str(self._get_tinted_path(src))
-        except Exception:
-            return ""
-
     def _get_tinted_path(self, src: str) -> Path:
         """Calculate the tinted image path next to the source image.
         
@@ -763,28 +754,13 @@ class Controller(QObject):
 
     # --- Slots & Logic ---
 
-    @Slot(result=str)
-    def longestSettingsTitle(self) -> str:
-        """Return the longest settings app title."""
-        try:
-            apps = getattr(self._settings_app_model, "_apps", []) or []
-            longest = ""
-            for a in apps:
-                t = getattr(a, "title", "") or ""
-                if len(t) > len(longest):
-                    longest = t
-            return longest
-        except Exception:
-            self._logger.exception("Error computing longest settings title")
-            return ""
-
     @Slot(result=bool)
     def templatesInstalled(self) -> bool:
         return self._templates_installed
 
     @Slot(result=bool)
     def _check_templates_installed(self) -> bool:
-        cfg_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates"
+        cfg_dir = kwal_config_dir() / "templates"
         try:
             return cfg_dir.exists() and any(cfg_dir.iterdir())
         except Exception:
@@ -853,7 +829,7 @@ class Controller(QObject):
             self._logger.exception("Background tint failed for %s", src)
             self.tintResult.emit("")
 
-    @Slot(str)
+    @Slot()
     def _on_tint_done(self, dst: str) -> None:
         """Handle tint completion."""
         try:
@@ -1387,14 +1363,8 @@ class Controller(QObject):
 
         Uses the XDG config location so it stays consistent with the writer.
         """
-        cfg_path = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "fastfetch" / "config.jsonc"
-        bak_path = cfg_path.with_name(cfg_path.name + ".bak")
-        if cfg_path.exists():
-            try:
-                shutil.copy2(cfg_path, bak_path)
-                self.fastfetchBackupExistsChanged.emit()
-            except Exception:
-                self._logger.warning("Failed to create fastfetch backup")
+        if file_utils.backup_config_file(fastfetch_config_path()) is not None:
+            self.fastfetchBackupExistsChanged.emit()
 
     @Slot(result=bool)
     def applyOriginalImage(self) -> bool:
@@ -1464,17 +1434,6 @@ class Controller(QObject):
     def _show_result_dialog(self, text: str) -> None:
         self._set_result_dialog_text(text)
         self._set_result_dialog_visible(True)
-
-    @Slot(str, result=bool)
-    def fastfetchDestinationExists(self, dest_name: str) -> bool:
-        try:
-            if not dest_name:
-                return False
-            cfg_dir = file_utils.ensure_fastfetch_config_dir()
-            dst = cfg_dir / dest_name
-            return dst.exists()
-        except Exception:
-            return False
 
     @Property("QVariantMap", notify=currentPaletteDataChanged)
     def currentPaletteData(self) -> dict[str, Any]:
@@ -1718,13 +1677,8 @@ class Controller(QObject):
             should_copy_to_dest = (not dest_path.exists()) or is_template_selection
 
             # Create Backup of existing config (do this before any filesystem changes)
-            bak_path = dest_path.with_name(dest_path.name + ".bak")
-            if dest_path.exists():
-                try:
-                    shutil.copyfile(dest_path, bak_path)
-                    self.starshipBackupExistsChanged.emit()
-                except Exception:
-                    self._logger.warning("Failed creating starship backup")
+            if file_utils.backup_config_file(dest_path) is not None:
+                self.starshipBackupExistsChanged.emit()
 
             # Ensure destination directory exists (after attempting backup)
             try:
@@ -1772,7 +1726,7 @@ class Controller(QObject):
                     else:
                          for k, v in zip(pkeys, pvals):
                              palette_dict[k] = v
-                    palettes_to_save.append((pname, palette_dict))
+                    palettes_to_save.append(( pname, palette_dict))
 
             # 5. Apply Updates atomically in a single write to avoid multiple
             # overwrites and duplicated log entries. Move first palette to the end
@@ -2009,165 +1963,6 @@ class Controller(QObject):
     @Slot()
     def applyUlauncherConfig(self) -> None:
         self.ulauncherApplyTheme()
-
-    def _deprecated_applyUlauncherConfig(self) -> None:
-        """Apply Ulauncher configuration.
-        
-        If a template is selected:
-        1. Copy template to user-themes with NEW name.
-        2. update manifest.json metadata with NEW name.
-        3. updates settings.json to use that theme.
-        4. Saves current palette modifications to the new theme files.
-        
-        If an existing theme is selected:
-        1. Just saves palette modifications (performed by model.apply()).
-        """
-        try:
-            import json
-            
-            # 1. Determine Intent
-            is_template_entry = False
-            source_info = {}
-            if self.ulauncherTemplateIndex >= 0:
-                source_info = self._ulauncher_template_model.get(self.ulauncherTemplateIndex)
-                is_template_entry = source_info.get("isTemplate", False)
-            
-            target_theme_path = ""
-            theme_name = ""
-            
-            if is_template_entry:
-                # NEW THEME FROM TEMPLATE FLOW
-                theme_name = self.ulauncherNewThemeName.strip()
-                if not theme_name:
-                    self._show_result_dialog("Please provide a name for the new theme.")
-                    return
-                
-                # Validation: Ensure all mandatory colors (placeholders) are set
-                if not self._ulauncher_model.allColorsFilled:
-                    self._show_result_dialog("Please fill all mandatory colors before creating the theme.\n(Empty color boxes must be assigned a value).")
-                    return
-                
-                source_path = source_info.get("filePath")
-                if not source_path or not os.path.exists(source_path):
-                    self._show_result_dialog("Invalid template source path.")
-                    return
-
-                # Determine Destination
-                dest_root = Path.home() / ".config" / "ulauncher" / "user-themes"
-                dest_root.mkdir(parents=True, exist_ok=True)
-                target_theme_path = str(dest_root / theme_name)
-                
-                # Copy Template
-                if os.path.exists(target_theme_path):
-                    # We could auto-increment or warn. User spec says "skip backup" for new,
-                    # but if it exists, let's just overwrite for now.
-                    try:
-                        shutil.rmtree(target_theme_path)
-                    except Exception:
-                        pass
-                
-                try:
-                    shutil.copytree(source_path, target_theme_path)
-                except Exception as e:
-                    self._show_result_dialog(f"Failed creating theme directory: {e}")
-                    return
-
-                # Update manifest.json metadata (name and display_name)
-                manifest_path = Path(target_theme_path) / "manifest.json"
-                if manifest_path.exists():
-                    try:
-                        with manifest_path.open("r", encoding="utf-8") as f:
-                            import json5 # using json5 for manifests as they often have comments
-                            mdata = json5.load(f)
-                        mdata["name"] = theme_name
-                        mdata["display_name"] = theme_name
-                        with manifest_path.open("w", encoding="utf-8") as f:
-                            json.dump(mdata, f, indent=4, ensure_ascii=False)
-                    except Exception as e:
-                        self._logger.warning("Failed updating manifest metadata: %s", e)
-
-                # Update settings.json (No backup for NEW theme creation per spec)
-                settings_path = Path.home() / ".config" / "ulauncher" / "settings.json"
-                settings_data = {}
-                if settings_path.exists():
-                     try:
-                         with settings_path.open("r", encoding="utf-8") as f:
-                             settings_data = json.load(f)
-                     except Exception:
-                         pass
-                
-                settings_data["theme_name"] = theme_name
-                try:
-                    with settings_path.open("w", encoding="utf-8") as f:
-                        json.dump(settings_data, f, indent=4)
-                except Exception as e:
-                    self._show_result_dialog(f"Failed updating settings.json: {e}")
-                    return
-                
-                # Update model's config path to point to the new location so apply() works on it
-                # We also need to refresh the template model so it shows the new theme in the list
-                self._ulauncher_model._set_config_path(target_theme_path)
-
-            else:
-                # EDITING EXISTING THEME FLOW
-                if self.ulauncherTemplateIndex >= 0:
-                    # Chose an existing theme from user-themes or system themes
-                    theme_name = source_info.get("fileName")
-                    target_theme_path = source_info.get("filePath")
-                    
-                    # If it's a system theme, we should probably copy it to user-themes first 
-                    # before editing, but for now let's follow plan: "apply directly with backup"
-                    # Wait, if it's system theme, we CANT apply directly.
-                    if target_theme_path.startswith("/usr/share"):
-                        self._show_result_dialog("System themes cannot be edited directly. Please use them as templates.")
-                        return
-                    
-                    # Update settings.json to ensure it matches selection
-                    settings_path = Path.home() / ".config" / "ulauncher" / "settings.json"
-                    settings_data = {}
-                    if settings_path.exists():
-                        try:
-                            with settings_path.open("r", encoding="utf-8") as f:
-                                settings_data = json.load(f)
-                        except Exception:
-                            pass
-                    
-                    if settings_data.get("theme_name") != theme_name:
-                        settings_data["theme_name"] = theme_name
-                        try:
-                            with settings_path.open("w", encoding="utf-8") as f:
-                                json.dump(settings_data, f, indent=4)
-                        except Exception:
-                            pass
-                    
-                    self._ulauncher_model._set_config_path(target_theme_path)
-                else:
-                    # Current config (already loaded in model)
-                    if not self._ulauncher_model.configPath:
-                         self._show_result_dialog("No active theme found to edit.")
-                         return
-
-            # 2. Apply Palette Changes (Handles theme.css / manifest.json with backups if not template)
-            # Apply if colors were modified OR if we are creating a new theme from a template
-            if self._ulauncher_model.isModified or is_template_entry:
-                success = self._ulauncher_model.apply(skip_backup=is_template_entry)
-            else:
-                self._logger.info("No color changes detected for Ulauncher, skipping theme file writes.")
-                success = True # Settings update was already done above
-            
-            if success:
-                self._show_result_dialog("Ulauncher configuration applied.")
-                # Refresh everything
-                self._ulauncher_model.refresh()
-                self._ulauncher_template_model.refresh()
-                # Clear new theme name after success
-                self.ulauncherNewThemeName = ""
-            else:
-                self._show_result_dialog("Failed applying palette changes.")
-
-        except Exception as e:
-            self._logger.exception("Failed applying Ulauncher config")
-            self._show_result_dialog(f"Error: {e}")
 
     # --- SVG Recolor Properties ---
 

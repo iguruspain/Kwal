@@ -6,7 +6,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -16,14 +16,15 @@ from PySide6.QtCore import (
     Property,
     Qt,
     QThread,
-    QTimer,
     Signal,
     Slot,
 )
-from PySide6.QtGui import QImage
 import shiboken6 as shiboken
 
 from ..utils import starship_preview
+from ..utils.xdg_paths import kwal_cache_dir, kwal_config_dir
+from ..utils.worker_thread import start_worker_thread
+from .preview_base import PreviewModelBase
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ class WallpaperFolderModel(QAbstractListModel):
 
     def _clear_cache_for_folder(self, folder_path: str) -> None:
         p = Path(folder_path)
-        cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "kwal" / "thumbnails"
+        cache_root = kwal_cache_dir() / "thumbnails"
         folder_digest = hashlib.sha1(str(p).encode("utf-8")).hexdigest()
         folder_cache = cache_root / folder_digest
         
@@ -227,51 +228,6 @@ class ColorScannerWorker(QObject):
             logger.exception("ColorScannerWorker failed")
         finally:
             self.finished.emit()
-
-
-class FastfetchTintWorker(QObject):
-    """Worker to generate a tinted image off the main thread."""
-    finished = Signal(str)
-
-    def __init__(self, src: str, tint_hex: str, strength: float = 0.8, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self.src = src
-        self.tint_hex = tint_hex
-        self.strength = strength
-
-    @Slot()
-    def process(self) -> None:
-        try:
-            from ..utils import color_utils
-            dst = color_utils.tint_image(self.src, self.tint_hex, float(self.strength))
-            self.finished.emit(str(dst) if dst else "")
-        except Exception:
-            logger.exception("FastfetchTintWorker failed for %s", self.src)
-            self.finished.emit("")
-
-
-class HtmlPreviewWorker(QObject):
-    """Worker to generate HTML previews in a background thread."""
-    finished = Signal(str, str)  # (html, target_property_name)
-
-    def __init__(self, renderer_func, args, target_name: str, parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self.renderer_func = renderer_func
-        self.args = args
-        self.target_name = target_name
-
-    @Slot()
-    def process(self) -> None:
-        try:
-            # Check if args is a list/tuple or dict
-            if isinstance(self.args, dict):
-                html = self.renderer_func(**self.args)
-            else:
-                html = self.renderer_func(*self.args)
-            self.finished.emit(html, self.target_name)
-        except Exception:
-            logger.exception("HtmlPreviewWorker failed for %s", self.target_name)
-            self.finished.emit("", self.target_name)
 
 
 class ImageModel(QAbstractListModel):
@@ -449,21 +405,12 @@ class ImageModel(QAbstractListModel):
             self.loadingChanged.emit()
             return
 
-        thread = QThread()
         worker = ImageScannerWorker(folder_path)
-        worker.moveToThread(thread)
-        
-        # Connect signals
-        thread.started.connect(worker.process)
         worker.finished.connect(self._on_worker_done)
-        worker.finished.connect(thread.quit)
-        # Clean up
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        
+        thread = start_worker_thread(worker)
+
         self._worker = worker
         self._worker_thread = thread
-        thread.start()
 
     @Slot(list)
     def _on_worker_done(self, files: list[str]) -> None:
@@ -489,20 +436,13 @@ class ImageModel(QAbstractListModel):
             
         self._cleanup_color_worker()
         
-        thread = QThread()
         worker = ColorScannerWorker(self._all_files)
-        worker.moveToThread(thread)
-        
-        thread.started.connect(worker.process)
         worker.progress.connect(self._on_color_progress)
         worker.finished.connect(self._on_color_done)
-        worker.finished.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        
+        thread = start_worker_thread(worker)
+
         self._color_worker = worker
         self._color_worker_thread = thread
-        thread.start()
 
     @Slot(str, list, list)
     def _on_color_progress(self, path: str, colors: list, categories: list) -> None:
@@ -677,7 +617,7 @@ class StarshipTemplateModel(QAbstractListModel):
         return {}
 
 
-class StarshipModel(QObject):
+class StarshipModel(PreviewModelBase):
     """Lightweight QObject model exposing Starship config info for QML.
 
     Provides:
@@ -692,40 +632,22 @@ class StarshipModel(QObject):
     paletteNamesChanged = Signal()
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
-    previewChanged = Signal()
-    currentConfigPreviewChanged = Signal()
-    previewScaleChanged = Signal()
-    previewWidthChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
-        super().__init__(parent)
+        super().__init__(default_scale=1.0, default_width=800, render_interval_ms=100, parent=parent)
         from pathlib import Path
-        import os
 
         default_cfg = str(Path.home() / ".config" / "starship.toml")
-        default_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "starship")
+        default_templates = str(kwal_config_dir() / "templates" / "starship")
 
         self._config_path: str = config_path or default_cfg
         self._template_folder: str = template_folder or default_templates
         self._palette_names: list[str] = []
         self._palette_values: list[list[str]] = []
         self._palette_keys: list[list[str]] = []
-        self._preview_html: str = ""
-        self._current_config_preview_html: str = ""
         self._full_config_data: dict[str, Any] = {}
-        self._preview_scale: float = 1.0
-        self._preview_width: int = 800
 
-        # Rendering state
-        self._worker: HtmlPreviewWorker | None = None
-        self._worker_thread: QThread | None = None
-        self._current_worker: HtmlPreviewWorker | None = None
-        self._current_worker_thread: QThread | None = None
-        
-        # Debounce timer
-        self._render_timer = QTimer()
-        self._render_timer.setSingleShot(True)
-        self._render_timer.setInterval(100) # 100ms
+        # Debounce timer renders the editable preview on palette/scale/width changes
         self._render_timer.timeout.connect(self._regenerate_preview_task)
 
     def _get_config_path(self) -> str:
@@ -755,41 +677,15 @@ class StarshipModel(QObject):
     def _get_palette_keys(self) -> list[list[str]]:
         return [list(x) for x in self._palette_keys]
 
-    def _get_preview_html(self) -> str:
-        return str(self._preview_html)
-
-    def _get_current_config_preview_html(self) -> str:
-        return str(self._current_config_preview_html)
-
-    def _get_preview_scale(self) -> float:
-        return self._preview_scale
-
-    def _set_preview_scale(self, val: float) -> None:
-        if self._preview_scale != val:
-            self._preview_scale = float(val)
-            self._render_timer.start()
-            self.reloadCurrentConfigPreview()
-            self.previewScaleChanged.emit()
-
-    def _get_preview_width(self) -> int:
-        return self._preview_width
-
-    def _set_preview_width(self, val: int) -> None:
-        if self._preview_width != val:
-            self._preview_width = int(val)
-            self._render_timer.start()
-            self.reloadCurrentConfigPreview()
-            self.previewWidthChanged.emit()
+    def _on_preview_params_changed(self) -> None:
+        # Resizing the preview also requires re-reading the on-disk config preview
+        self.reloadCurrentConfigPreview()
 
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
     paletteNames = Property('QVariantList', _get_palette_names, notify=paletteNamesChanged)
     paletteValues = Property('QVariantList', _get_palette_values, notify=paletteValuesChanged)
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
-    previewHtml = Property(str, _get_preview_html, notify=previewChanged)
-    currentConfigPreviewHtml = Property(str, _get_current_config_preview_html, notify=currentConfigPreviewChanged)
-    previewScale = Property(float, _get_preview_scale, _set_preview_scale, notify=previewScaleChanged)
-    previewWidth = Property(int, _get_preview_width, _set_preview_width, notify=previewWidthChanged)
 
     @Slot()
     def reloadCurrentConfigPreview(self) -> None:
@@ -840,49 +736,6 @@ class StarshipModel(QObject):
         except Exception:
             logger.exception("Failed setting palette color")
 
-    def _regenerate_preview(self, palette_index: int | None = None) -> None:
-        """Deprecated: use timer + _regenerate_preview_task instead."""
-        self._render_timer.start()
-
-    def _cleanup_worker(self, current: bool = False) -> None:
-        t_attr = "_current_worker_thread" if current else "_worker_thread"
-        w_attr = "_current_worker" if current else "_worker"
-        
-        thread = getattr(self, t_attr)
-        if thread:
-            try:
-                if shiboken.isValid(thread) and thread.isRunning():
-                    thread.quit()
-                    thread.wait(500)
-            except RuntimeError:
-                pass
-            finally:
-                setattr(self, t_attr, None)
-        setattr(self, w_attr, None)
-
-    def _start_worker(self, func, args, target_name) -> None:
-        """Helper to start a background worker thread."""
-        is_current = (target_name == "currentConfigPreviewHtml")
-        self._cleanup_worker(current=is_current)
-        
-        thread = QThread()
-        if is_current:
-            self._current_worker_thread = thread
-            self._current_worker = HtmlPreviewWorker(func, args, target_name)
-            worker = self._current_worker
-        else:
-            self._worker_thread = thread
-            self._worker = HtmlPreviewWorker(func, args, target_name)
-            worker = self._worker
-
-        worker.moveToThread(thread)
-        thread.started.connect(worker.process)
-        worker.finished.connect(self._on_worker_done)
-        worker.finished.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
-
     def _regenerate_preview_task(self) -> None:
         """Build a minimal data structure from current palette arrays and start background worker."""
         try:
@@ -913,15 +766,6 @@ class StarshipModel(QObject):
             )
         except Exception:
             logger.exception("Failed starting Starship background preview task")
-
-    @Slot(str, str)
-    def _on_worker_done(self, html: str, target: str) -> None:
-        if target == "previewHtml":
-            self._preview_html = html
-            self.previewChanged.emit()
-        elif target == "currentConfigPreviewHtml":
-            self._current_config_preview_html = html
-            self.currentConfigPreviewChanged.emit()
 
     @Slot(int)
     def setPreviewPaletteIndex(self, idx: int) -> None:
@@ -1118,7 +962,7 @@ class UlauncherTemplateModel(QAbstractListModel):
 
 
 
-class UlauncherModel(QObject):
+class UlauncherModel(PreviewModelBase):
     """QObject model exposing Ulauncher theme info for QML.
 
     Provides:
@@ -1135,45 +979,27 @@ class UlauncherModel(QObject):
     paletteNamesChanged = Signal()
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
-    previewScaleChanged = Signal()
-    previewWidthChanged = Signal()
-    previewChanged = Signal()
-    currentConfigPreviewChanged = Signal()
 
     def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
-        super().__init__(parent)
+        super().__init__(default_scale=0.4, default_width=650, render_interval_ms=50, parent=parent)
         from pathlib import Path
-        import os
 
         # Ulauncher config default
         self._config_file = Path.home() / ".config" / "ulauncher" / "settings.json"
-        
-        default_templates = str(Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "kwal" / "templates" / "ulauncher")
+
+        default_templates = str(kwal_config_dir() / "templates" / "ulauncher")
 
         self._current_theme_path: str = config_path or ""
         self._template_folder: str = template_folder or default_templates
         self._palette_names: list[str] = []
         self._palette_values: list[list[str]] = []
         self._palette_keys: list[list[str]] = []
-        
+
         # Internal storage of full extracted data
         self._full_data: dict[str, Any] = {}
         self._original_palette_values: list[list[str]] = []
-        self._preview_html: str = ""
-        self._current_config_preview_html: str = ""
-        self._preview_scale: float = 0.4
-        self._preview_width: int = 650
-
-        # Rendering state
-        self._worker: HtmlPreviewWorker | None = None
-        self._worker_thread: QThread | None = None
-        self._current_worker: HtmlPreviewWorker | None = None
-        self._current_worker_thread: QThread | None = None
 
         # Debounce timer to avoid lag during resizing/editing
-        self._render_timer = QTimer()
-        self._render_timer.setSingleShot(True)
-        self._render_timer.setInterval(50) # 50ms delay
         self._render_timer.timeout.connect(self._refresh_previews)
 
     def _get_config_path(self) -> str:
@@ -1312,69 +1138,6 @@ class UlauncherModel(QObject):
                     return False
         return True
 
-    def _get_preview_scale(self) -> float:
-        return self._preview_scale
-
-    def _set_preview_scale(self, val: float) -> None:
-        if self._preview_scale != val:
-            self._preview_scale = float(val)
-            self._render_timer.start() # Trigger non-blocking re-render
-            self.previewScaleChanged.emit()
-
-    def _get_preview_width(self) -> int:
-        return self._preview_width
-
-    def _set_preview_width(self, val: int) -> None:
-        if self._preview_width != val:
-            self._preview_width = int(val)
-            self._render_timer.start() # Trigger non-blocking re-render
-            self.previewWidthChanged.emit()
-
-    def _get_preview_html(self) -> str:
-        return self._preview_html
-
-    def _get_current_config_preview_html(self) -> str:
-        return self._current_config_preview_html
-
-    def _cleanup_worker(self, current: bool = False) -> None:
-        t_attr = "_current_worker_thread" if current else "_worker_thread"
-        w_attr = "_current_worker" if current else "_worker"
-        
-        thread = getattr(self, t_attr)
-        if thread:
-            try:
-                if shiboken.isValid(thread) and thread.isRunning():
-                    thread.quit()
-                    thread.wait(500)
-            except RuntimeError:
-                pass
-            finally:
-                setattr(self, t_attr, None)
-        setattr(self, w_attr, None)
-
-    def _start_worker(self, func, args, target_name) -> None:
-        """Helper to start a background worker thread."""
-        is_current = (target_name == "currentConfigPreviewHtml")
-        self._cleanup_worker(current=is_current)
-        
-        thread = QThread()
-        if is_current:
-            self._current_worker_thread = thread
-            self._current_worker = HtmlPreviewWorker(func, args, target_name)
-            worker = self._current_worker
-        else:
-            self._worker_thread = thread
-            self._worker = HtmlPreviewWorker(func, args, target_name)
-            worker = self._worker
-
-        worker.moveToThread(thread)
-        thread.started.connect(worker.process)
-        worker.finished.connect(self._on_worker_done)
-        worker.finished.connect(thread.quit)
-        thread.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
-
     def _refresh_previews(self) -> None:
         """Internal helper to start background tasks for HTML generation."""
         try:
@@ -1412,15 +1175,6 @@ class UlauncherModel(QObject):
         except Exception:
             logger.exception("Failed starting Ulauncher background preview task")
 
-    @Slot(str, str)
-    def _on_worker_done(self, html: str, target: str) -> None:
-        if target == "previewHtml":
-            self._preview_html = html
-            self.previewChanged.emit()
-        elif target == "currentConfigPreviewHtml":
-            self._current_config_preview_html = html
-            self.currentConfigPreviewChanged.emit()
-
     configPath = Property(str, _get_config_path, _set_config_path, notify=configPathChanged)
     actualConfigPath = Property(str, _resolve_current_theme_path, notify=actualConfigPathChanged)
     templateFolder = Property(str, _get_template_folder, _set_template_folder, notify=templateFolderChanged)
@@ -1429,11 +1183,6 @@ class UlauncherModel(QObject):
     paletteKeys = Property('QVariantList', _get_palette_keys, notify=paletteKeysChanged)
     isModified = Property(bool, _get_is_modified, notify=paletteValuesChanged)
     allColorsFilled = Property(bool, _get_all_colors_filled, notify=paletteValuesChanged)
-    previewHtml = Property(str, _get_preview_html, notify=previewChanged)
-    currentConfigPreviewHtml = Property(str, _get_current_config_preview_html, notify=currentConfigPreviewChanged)
-    previewScale = Property(float, _get_preview_scale, _set_preview_scale, notify=previewScaleChanged)
-    previewWidth = Property(int, _get_preview_width, _set_preview_width, notify=previewWidthChanged)
-
 
     @Slot(result="QVariantMap")
     @Slot(str, result="QVariantMap")
