@@ -1870,12 +1870,25 @@ Kirigami.Page {
                                             }
 
                                             HoverHandler { id: lbAddChipHover }
-                                            TapHandler {
-                                                onTapped: lbAddCategoryMenu.popup()
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                acceptedButtons: Qt.LeftButton
+                                                hoverEnabled: true
+                                                propagateComposedEvents: false
+                                                preventStealing: true
+                                                onPressed: (mouse) => {
+                                                    mouse.accepted = true
+                                                }
+                                                onClicked: (mouse) => {
+                                                    mouse.accepted = true
+                                                    lbAddCategoryMenu.popup()
+                                                }
                                             }
 
                                             Menu {
                                                 id: lbAddCategoryMenu
+                                                modal: true
+                                                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                                                 Repeater {
                                                     model: wallpaperPage.categoryColorModel.filter(function (c) {
                                                         return (lightboxPopup.categories || []).indexOf(c.name) === -1
@@ -2568,12 +2581,25 @@ Kirigami.Page {
                                             }
 
                                             HoverHandler { id: addChipHover }
-                                            TapHandler {
-                                                onTapped: addCategoryMenu.popup()
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                acceptedButtons: Qt.LeftButton
+                                                hoverEnabled: true
+                                                propagateComposedEvents: false
+                                                preventStealing: true
+                                                onPressed: (mouse) => {
+                                                    mouse.accepted = true
+                                                }
+                                                onClicked: (mouse) => {
+                                                    mouse.accepted = true
+                                                    addCategoryMenu.popup()
+                                                }
                                             }
 
                                             Menu {
                                                 id: addCategoryMenu
+                                                modal: true
+                                                closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
                                                 Repeater {
                                                     model: wallpaperPage.categoryColorModel.filter(function (c) {
                                                         return (entryDelegate.modelData.categories || []).indexOf(c.name) === -1
