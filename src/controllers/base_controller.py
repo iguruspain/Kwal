@@ -176,6 +176,27 @@ class BaseMixin:
             self._save_config()
             self.customCommandsChanged.emit()
 
+    @Slot(int, int)
+    def moveCustomCommand(self, from_index: int, to_index: int) -> None:
+        """Mueve un comando dentro de la lista.
+
+        La posición dentro de la lista determina su prioridad de ejecución.
+        """
+        if not (0 <= from_index < len(self._custom_commands)):
+            return
+
+        if not (0 <= to_index < len(self._custom_commands)):
+            return
+
+        if from_index == to_index:
+            return
+
+        command = self._custom_commands.pop(from_index)
+        self._custom_commands.insert(to_index, command)
+
+        self._save_config()
+        self.customCommandsChanged.emit()
+
     @Slot(int)
     def removeCustomCommand(self, index: int) -> None:
         """Elimina el comando de la lista según su posición."""

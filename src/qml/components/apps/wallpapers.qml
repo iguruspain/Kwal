@@ -832,66 +832,478 @@ Kirigami.Page {
                         }
                     }
 
-                    ColumnLayout {
-                        id: customCommandsLayout
+                    // ColumnLayout {
+                    //     id: customCommandsLayout
+                    //     Layout.fillWidth: true
+                    //     spacing: Kirigami.Units.smallSpacing
+
+                    //     Repeater {
+                    //         model: controller.customCommands
+
+                    //         delegate: RowLayout {
+                    //             id: commandRow
+                    //             required property int index
+                    //             required property var modelData
+                    //             Layout.fillWidth: true
+
+                    //             Switch {
+                    //                 checked: commandRow.modelData.enabled
+                    //                 ToolTip.text: checked ? qsTr("Enabled") : qsTr("Disabled")
+                    //                 ToolTip.visible: hovered
+                    //                 onToggled: controller.setCustomCommandEnabled(commandRow.index, checked)
+                    //             }
+
+                    //             TextField {
+                    //                 id: cmdInput
+                    //                 text: commandRow.modelData.command
+                    //                 placeholderText: qsTr("e.g: notify-send 'Wallpaper changed to %path%'")
+                    //                 placeholderTextColor: Kirigami.Theme.disabledTextColor
+                    //                 Layout.fillWidth: true
+                    //                 opacity: commandRow.modelData.enabled ? 1.0 : 0.5
+                                    
+                    //                 onEditingFinished: {
+                    //                     controller.updateCustomCommand(commandRow.index, cmdInput.text)
+                    //                 }
+                    //             }
+                    //             ToolButton {
+                    //                 icon.name: "edit-clear"
+                    //                 ToolTip.text: qsTr("Remove command")
+                    //                 ToolTip.visible: hovered
+                    //                 onClicked: {
+                    //                     controller.removeCustomCommand(commandRow.index)
+                    //                 }
+                    //             }
+                    //             ToolButton {
+                    //                 id: runCmdButton
+                    //                 icon.name: "media-playback-start"
+                    //                 ToolTip.visible: hovered
+                    //                 ToolTip.text: qsTr("Execute individual command")
+                    //                 onClicked: {
+                    //                     var image = gridContainer.isVideo ? controller.thumbPath : controller.selectedWallpaper
+                    //                     let cmd = cmdInput.text
+
+                    //                     cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                    //                     .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
+                    //                     .replace(/%image%/g, '"' + image + '"')
+                    //                     controller.runCMD(cmd.trim());
+
+                    //                 }
+                    //             }
+                    //         }
+                    //     }
+                    // }
+
+                    ListView {
+                        id: customCommandsList
+
                         Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(
+                            contentHeight,
+                            Kirigami.Units.gridUnit * 18
+                        )
+
+                        clip: true
                         spacing: Kirigami.Units.smallSpacing
 
-                        Repeater {
-                            model: controller.customCommands
+                        model: controller.customCommands
 
-                            delegate: RowLayout {
-                                id: commandRow
-                                required property int index
-                                required property var modelData
-                                Layout.fillWidth: true
+                        delegate: Item {
+                            id: commandDelegate
 
-                                Switch {
-                                    checked: commandRow.modelData.enabled
-                                    ToolTip.text: checked ? qsTr("Enabled") : qsTr("Disabled")
-                                    ToolTip.visible: hovered
-                                    onToggled: controller.setCustomCommandEnabled(commandRow.index, checked)
+                            required property int index
+                            required property var modelData
+
+                            width: customCommandsList.width
+                            height: Kirigami.Units.gridUnit * 3
+
+                            // Drag state
+                            property bool dragging: false
+                            property real dragOffsetY: 0
+                            property real dragStartMouseY: 0
+                            property int dragStartIndex: -1
+                            property int dragTargetIndex: -1
+
+                            transform: Translate {
+                                y: commandDelegate.dragOffsetY
+                            }
+
+                            z: commandDelegate.dragging ? 100 : 0
+
+                            // Background
+                            Rectangle {
+                                anchors.fill: parent
+
+                                radius: Kirigami.Units.smallSpacing
+
+                                color: commandDelegate.dragging
+                                    ? Qt.alpha(
+                                            Kirigami.Theme.highlightColor,
+                                            0.18
+                                        )
+                                    : Qt.alpha(
+                                            Kirigami.Theme.backgroundColor,
+                                            0.35
+                                        )
+
+                                border.color: commandDelegate.dragging
+                                            ? Kirigami.Theme.highlightColor
+                                            : Kirigami.Theme.alternateBackgroundColor
+
+                                border.width: commandDelegate.dragging ? 2 : 1
+                            }
+
+                            // Main content
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Kirigami.Units.smallSpacing
+
+                                spacing: Kirigami.Units.smallSpacing
+
+                                // Priority number
+                                Label {
+                                    Layout.preferredWidth:
+                                        Kirigami.Units.gridUnit * 1.5
+
+                                    Layout.fillHeight: true
+
+                                    text: (commandDelegate.index + 1).toString()
+
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+
+                                    font.bold: true
+
+                                    color:
+                                        commandDelegate.modelData.enabled
+                                        ? Kirigami.Theme.highlightColor
+                                        : Kirigami.Theme.disabledTextColor
                                 }
 
+                                // Drag handle
+                                Item {
+                                    Layout.preferredWidth:
+                                        Kirigami.Units.gridUnit
+
+                                    Layout.fillHeight: true
+
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+
+                                        source: "view-sort"
+
+                                        width: Kirigami.Units.gridUnit
+                                        height: width
+
+                                        color: commandDelegate.dragging
+                                            ? Kirigami.Theme.highlightColor
+                                            : Kirigami.Theme.disabledTextColor
+                                    }
+
+                                    MouseArea {
+                                        id: dragArea
+
+                                        anchors.fill: parent
+
+                                        hoverEnabled: true
+
+                                        cursorShape:
+                                            pressed
+                                            ? Qt.ClosedHandCursor
+                                            : Qt.OpenHandCursor
+
+                                        // Start drag
+                                        onPressed: function(mouse) {
+                                            commandDelegate.dragging = true
+
+                                            commandDelegate.dragStartIndex =
+                                                commandDelegate.index
+
+                                            commandDelegate.dragTargetIndex =
+                                                commandDelegate.index
+
+                                            commandDelegate.dragOffsetY = 0
+
+                                            dragStartMouseY = mouse.y
+                                        }
+
+                                        // Move drag
+                                        onPositionChanged: function(mouse) {
+                                            if (!pressed)
+                                                return
+                                            commandDelegate.dragOffsetY =
+                                                mouse.y - dragStartMouseY
+
+                                            var mousePos = mapToItem(
+                                                customCommandsList,
+                                                mouse.x,
+                                                mouse.y
+                                            )
+
+                                            var mouseY =
+                                                mousePos.y +
+                                                commandDelegate.dragOffsetY
+
+                                            var sourceIndex =
+                                                commandDelegate.dragStartIndex
+
+                                            var targetIndex = sourceIndex
+
+                                            var bestDistance = Number.MAX_VALUE
+
+                                            for (
+                                                var i = 0;
+                                                i < customCommandsList.count;
+                                                i++
+                                            ) {
+                                                if (i === sourceIndex)
+                                                    continue
+
+                                                var item =
+                                                    customCommandsList.itemAtIndex(i)
+
+                                                if (!item)
+                                                    continue
+
+                                                var centerY =
+                                                    item.y +
+                                                    item.height / 2
+
+                                                var distance =
+                                                    Math.abs(mouseY - centerY)
+
+                                                if (distance < bestDistance) {
+                                                    bestDistance = distance
+                                                    targetIndex = i
+                                                }
+                                            }
+
+                                            if (targetIndex !== sourceIndex) {
+                                                var targetItem =
+                                                    customCommandsList.itemAtIndex(
+                                                        targetIndex
+                                                    )
+
+                                                if (targetItem) {
+                                                    var targetCenterY =
+                                                        targetItem.y +
+                                                        targetItem.height / 2
+
+                                                    if (sourceIndex < targetIndex) {
+                                                        // Moving down
+                                                        if (mouseY > targetCenterY) {
+                                                            targetIndex =
+                                                                Math.min(
+                                                                    targetIndex + 1,
+                                                                    customCommandsList.count - 1
+                                                                )
+                                                        }
+                                                    } else {
+                                                        // Moving up
+                                                        if (mouseY < targetCenterY) {
+                                                            targetIndex =
+                                                                Math.max(
+                                                                    targetIndex - 1,
+                                                                    0
+                                                                )
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            var finalIndex = targetIndex
+
+                                            if (sourceIndex < targetIndex)
+                                                finalIndex = targetIndex - 1
+
+                                            finalIndex = Math.max(
+                                                0,
+                                                Math.min(
+                                                    customCommandsList.count - 1,
+                                                    finalIndex
+                                                )
+                                            )
+
+                                            commandDelegate.dragTargetIndex =
+                                                finalIndex
+                                        }
+
+                                        onReleased: function(mouse) {
+                                            var sourceIndex =
+                                                commandDelegate.dragStartIndex
+
+                                            var targetIndex =
+                                                commandDelegate.dragTargetIndex
+
+                                            commandDelegate.dragging = false
+                                            commandDelegate.dragOffsetY = 0
+
+                                            if (
+                                                sourceIndex >= 0 &&
+                                                targetIndex >= 0 &&
+                                                sourceIndex !== targetIndex
+                                            ) {
+                                                controller.moveCustomCommand(
+                                                    sourceIndex,
+                                                    targetIndex
+                                                )
+                                            }
+
+                                            commandDelegate.dragStartIndex = -1
+                                            commandDelegate.dragTargetIndex = -1
+                                        }
+
+                                        onCanceled: {
+                                            commandDelegate.dragging = false
+                                            commandDelegate.dragOffsetY = 0
+
+                                            commandDelegate.dragStartIndex = -1
+                                            commandDelegate.dragTargetIndex = -1
+                                        }
+                                    }
+                                }
+
+                                // Enable / disable
+                                Switch {
+                                    checked: commandDelegate.modelData.enabled
+
+                                    ToolTip.text:
+                                        checked
+                                        ? qsTr("Enabled")
+                                        : qsTr("Disabled")
+
+                                    ToolTip.visible: hovered
+
+                                    onToggled: {
+                                        controller.setCustomCommandEnabled(
+                                            commandDelegate.index,
+                                            checked
+                                        )
+                                    }
+                                }
+
+                                // Command text
                                 TextField {
                                     id: cmdInput
-                                    text: commandRow.modelData.command
-                                    placeholderText: qsTr("e.g: notify-send 'Wallpaper changed to %path%'")
-                                    placeholderTextColor: Kirigami.Theme.disabledTextColor
+
                                     Layout.fillWidth: true
-                                    opacity: commandRow.modelData.enabled ? 1.0 : 0.5
-                                    
+
+                                    text: commandDelegate.modelData.command
+
+                                    placeholderText:
+                                        qsTr(
+                                            "e.g: notify-send 'Wallpaper changed to %path%'"
+                                        )
+
+                                    placeholderTextColor:
+                                        Kirigami.Theme.disabledTextColor
+
+                                    opacity:
+                                        commandDelegate.modelData.enabled
+                                        ? 1.0
+                                        : 0.5
+
                                     onEditingFinished: {
-                                        controller.updateCustomCommand(commandRow.index, cmdInput.text)
+                                        controller.updateCustomCommand(
+                                            commandDelegate.index,
+                                            cmdInput.text
+                                        )
                                     }
                                 }
+
+                                // Remove command
                                 ToolButton {
                                     icon.name: "edit-clear"
-                                    ToolTip.text: qsTr("Remove command")
+
+                                    ToolTip.text:
+                                        qsTr("Remove command")
+
                                     ToolTip.visible: hovered
+
                                     onClicked: {
-                                        controller.removeCustomCommand(commandRow.index)
+                                        controller.removeCustomCommand(
+                                            commandDelegate.index
+                                        )
                                     }
                                 }
+
+                                // Execute individual command
                                 ToolButton {
-                                    id: runCmdButton
                                     icon.name: "media-playback-start"
+
+                                    ToolTip.text:
+                                        qsTr("Execute individual command")
+
                                     ToolTip.visible: hovered
-                                    ToolTip.text: qsTr("Execute individual command")
+
                                     onClicked: {
-                                        var image = gridContainer.isVideo ? controller.thumbPath : controller.selectedWallpaper
-                                        let cmd = cmdInput.text
+                                        var image =
+                                            gridContainer.isVideo
+                                            ? controller.thumbPath
+                                            : controller.selectedWallpaper
 
-                                        cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                        .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
-                                        .replace(/%image%/g, '"' + image + '"')
-                                        controller.runCMD(cmd.trim());
+                                        var cmd = cmdInput.text
 
+                                        cmd = cmd.replace(
+                                            /%sc%/g,
+                                            rightPaneWallpapers
+                                                .selectedScoreColorIndex
+                                                .toString()
+                                        ).replace(
+                                            /%path%/g,
+                                            '"' + controller.selectedWallpaper + '"'
+                                        ).replace(
+                                            /%image%/g,
+                                            '"' + image + '"'
+                                        )
+
+                                        controller.runCMD(cmd.trim())
+                                    }
+                                }
+
+                                // Move up
+                                ToolButton {
+                                    icon.name: "go-up"
+
+                                    enabled:
+                                        commandDelegate.index > 0
+
+                                    ToolTip.text:
+                                        qsTr("Move command up")
+
+                                    ToolTip.visible: hovered
+
+                                    onClicked: {
+                                        controller.moveCustomCommand(
+                                            commandDelegate.index,
+                                            commandDelegate.index - 1
+                                        )
+                                    }
+                                }
+
+                                // Move down
+                                ToolButton {
+                                    icon.name: "go-down"
+
+                                    enabled:
+                                        commandDelegate.index <
+                                        customCommandsList.count - 1
+
+                                    ToolTip.text:
+                                        qsTr("Move command down")
+
+                                    ToolTip.visible: hovered
+
+                                    onClicked: {
+                                        controller.moveCustomCommand(
+                                            commandDelegate.index,
+                                            commandDelegate.index + 1
+                                        )
                                     }
                                 }
                             }
                         }
-                    }
+                    }                
+                
                 }
             }
 
