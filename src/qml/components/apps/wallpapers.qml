@@ -832,73 +832,7 @@ Kirigami.Page {
                         }
                     }
 
-                    // ColumnLayout {
-                    //     id: customCommandsLayout
-                    //     Layout.fillWidth: true
-                    //     spacing: Kirigami.Units.smallSpacing
-
-                    //     Repeater {
-                    //         model: controller.customCommands
-
-                    //         delegate: RowLayout {
-                    //             id: commandRow
-                    //             required property int index
-                    //             required property var modelData
-                    //             Layout.fillWidth: true
-
-                    //             Switch {
-                    //                 checked: commandRow.modelData.enabled
-                    //                 ToolTip.text: checked ? qsTr("Enabled") : qsTr("Disabled")
-                    //                 ToolTip.visible: hovered
-                    //                 onToggled: controller.setCustomCommandEnabled(commandRow.index, checked)
-                    //             }
-
-                    //             TextField {
-                    //                 id: cmdInput
-                    //                 text: commandRow.modelData.command
-                    //                 placeholderText: qsTr("e.g: notify-send 'Wallpaper changed to %path%'")
-                    //                 placeholderTextColor: Kirigami.Theme.disabledTextColor
-                    //                 Layout.fillWidth: true
-                    //                 opacity: commandRow.modelData.enabled ? 1.0 : 0.5
-                                    
-                    //                 onEditingFinished: {
-                    //                     controller.updateCustomCommand(commandRow.index, cmdInput.text)
-                    //                 }
-                    //             }
-                    //             ToolButton {
-                    //                 icon.name: "edit-clear"
-                    //                 ToolTip.text: qsTr("Remove command")
-                    //                 ToolTip.visible: hovered
-                    //                 onClicked: {
-                    //                     controller.removeCustomCommand(commandRow.index)
-                    //                 }
-                    //             }
-                    //             ToolButton {
-                    //                 id: runCmdButton
-                    //                 icon.name: "media-playback-start"
-                    //                 ToolTip.visible: hovered
-                    //                 ToolTip.text: qsTr("Execute individual command")
-                    //                 onClicked: {
-                    //                     var image = gridContainer.isVideo ? controller.thumbPath : controller.selectedWallpaper
-                    //                     let cmd = cmdInput.text
-
-                    //                     cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                    //                     .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
-                    //                     .replace(/%image%/g, '"' + image + '"')
-                    //                     controller.runCMD(cmd.trim());
-
-                    //                 }
-                    //             }
-                    //         }
-                    //     }
-                    // }
-
                     // ── Local proxy model for drag-and-drop ──
-                    // A QML ListModel that mirrors controller.customCommands.
-                    // During a drag, reordering happens here via move(),
-                    // which repositions existing delegates without destroying
-                    // them, so the MouseArea never loses its grab.
-                    // The Python model is updated only once on drop.
                     ListModel {
                         id: commandsProxy
 
@@ -956,6 +890,10 @@ Kirigami.Page {
 
                         model: commandsProxy
 
+                        // Estado del arrastre para el Overlay
+                        property int draggedIndex: -1
+                        property string draggedCommand: ""
+
                         // Animate neighbours sliding out of the way
                         // while a delegate is being dragged past them.
                         displaced: Transition {
@@ -966,10 +904,56 @@ Kirigami.Page {
                             }
                         }
 
+                        // ── Elemento flotante para el arrastre (fuera del layout del ListView) ──
+                        Rectangle {
+                            id: dragOverlay
+                            parent: customCommandsList
+                            width: customCommandsList.width
+                            height: Kirigami.Units.gridUnit * 3
+                            z: 999
+                            visible: customCommandsList.draggedIndex !== -1
+
+                            color: Qt.alpha(Kirigami.Theme.highlightColor, 0.25)
+                            border.color: Kirigami.Theme.highlightColor
+                            border.width: 2
+                            radius: Kirigami.Units.smallSpacing
+
+                            Drag.active: visible
+                            Drag.source: dragOverlay
+                            Drag.hotSpot.x: width / 2
+                            Drag.hotSpot.y: height / 2
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: Kirigami.Units.smallSpacing
+                                spacing: Kirigami.Units.smallSpacing
+
+                                Label {
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.5
+                                    text: (customCommandsList.draggedIndex + 1).toString()
+                                    horizontalAlignment: Text.AlignHCenter
+                                    font.bold: true
+                                    color: Kirigami.Theme.highlightColor
+                                }
+
+                                Kirigami.Icon {
+                                    source: "view-sort"
+                                    width: Kirigami.Units.gridUnit
+                                    height: width
+                                    color: Kirigami.Theme.highlightColor
+                                }
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: customCommandsList.draggedCommand
+                                    elide: Text.ElideRight
+                                    color: Kirigami.Theme.textColor
+                                    font.bold: true
+                                }
+                            }
+                        }
+
                         // ── Auto-scroll while dragging near edges ──
-                        // When the user drags an item close to the top
-                        // or bottom of the visible area, this timer
-                        // nudges contentY so the list scrolls.
                         property Item draggedItem: null
                         property real autoScrollMargin: Kirigami.Units.gridUnit * 2
                         property real autoScrollStep: Kirigami.Units.gridUnit * 0.6
@@ -984,28 +968,19 @@ Kirigami.Page {
                                 var item = customCommandsList.draggedItem
                                 if (!item) return
 
-                                // Map the dragged item's vertical centre
-                                // into the ListView's coordinate space.
-                                var mapped = item.mapToItem(
-                                    customCommandsList,
-                                    0, item.height / 2
-                                )
-                                var yInView = mapped.y
-
+                                var yInView = item.y + item.height / 2
                                 var margin = customCommandsList.autoScrollMargin
                                 var step   = customCommandsList.autoScrollStep
 
                                 if (yInView < margin) {
-                                    // Near top edge → scroll up
                                     customCommandsList.contentY = Math.max(
                                         customCommandsList.originY,
                                         customCommandsList.contentY - step
                                     )
                                 } else if (yInView > customCommandsList.height - margin) {
-                                    // Near bottom edge → scroll down
                                     var maxY = customCommandsList.contentHeight
-                                             - customCommandsList.height
-                                             + customCommandsList.originY
+                                            - customCommandsList.height
+                                            + customCommandsList.originY
                                     customCommandsList.contentY = Math.min(
                                         maxY,
                                         customCommandsList.contentY + step
@@ -1024,51 +999,27 @@ Kirigami.Page {
                             width: customCommandsList.width
                             height: Kirigami.Units.gridUnit * 3
 
-                            // Standard Qt Quick drag & drop: the delegate itself
-                            // is the drag source, positioned by MouseArea's
-                            // drag.target, and every delegate has a DropArea
-                            // that reorders the model when the dragged item
-                            // is hovered over it.
-                            Drag.active: dragArea.drag.active
-                            Drag.source: commandDelegate
-                            Drag.hotSpot.x: width / 2
-                            Drag.hotSpot.y: height / 2
-
-                            z: commandDelegate.Drag.active ? 100 : 0
+                            // El elemento activo se comporta como un hueco transparente en la lista
+                            opacity: commandDelegate.index === customCommandsList.draggedIndex ? 0.3 : 1.0
 
                             // Background
                             Rectangle {
                                 anchors.fill: parent
-
                                 radius: Kirigami.Units.smallSpacing
-
-                                color: commandDelegate.Drag.active
-                                    ? Qt.alpha(
-                                            Kirigami.Theme.highlightColor,
-                                            0.18
-                                        )
-                                    : Qt.alpha(
-                                            Kirigami.Theme.backgroundColor,
-                                            0.35
-                                        )
-
-                                border.color: commandDelegate.Drag.active
-                                            ? Kirigami.Theme.highlightColor
-                                            : Kirigami.Theme.alternateBackgroundColor
-
-                                border.width: commandDelegate.Drag.active ? 2 : 1
+                                color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
+                                border.color: Kirigami.Theme.alternateBackgroundColor
+                                border.width: 1
                             }
 
-                            // Reordering target: while another delegate is
-                            // being dragged over this one, move them in the
-                            // local proxy model (no Python round-trip).
+                            // Reordering target
                             DropArea {
                                 anchors.fill: parent
                                 onEntered: function(drag) {
-                                    var from = drag.source.index
+                                    var from = customCommandsList.draggedIndex
                                     var to   = commandDelegate.index
-                                    if (from !== to) {
+                                    if (from !== -1 && from !== to) {
                                         commandsProxy.move(from, to, 1)
+                                        customCommandsList.draggedIndex = to
                                     }
                                 }
                             }
@@ -1077,54 +1028,36 @@ Kirigami.Page {
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.margins: Kirigami.Units.smallSpacing
-
                                 spacing: Kirigami.Units.smallSpacing
 
                                 // Priority number
                                 Label {
-                                    Layout.preferredWidth:
-                                        Kirigami.Units.gridUnit * 1.5
-
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 1.5
                                     Layout.fillHeight: true
-
                                     text: (commandDelegate.index + 1).toString()
 
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
-
                                     font.bold: true
-
-                                    color:
-                                        commandDelegate.cmdEnabled
-                                        ? Kirigami.Theme.highlightColor
-                                        : Kirigami.Theme.disabledTextColor
+                                    color: commandDelegate.cmdEnabled ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                                 }
 
                                 // Drag handle
                                 Item {
-                                    Layout.preferredWidth:
-                                        Kirigami.Units.gridUnit
-
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit
                                     Layout.fillHeight: true
 
                                     Kirigami.Icon {
                                         anchors.centerIn: parent
-
                                         source: "view-sort"
-
                                         width: Kirigami.Units.gridUnit
                                         height: width
-
-                                        color: commandDelegate.Drag.active
-                                            ? Kirigami.Theme.highlightColor
-                                            : Kirigami.Theme.disabledTextColor
+                                        color: commandDelegate.index === customCommandsList.draggedIndex ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                                     }
 
                                     MouseArea {
                                         id: dragArea
-
                                         anchors.fill: parent
-
                                         hoverEnabled: true
 
                                         cursorShape:
@@ -1132,23 +1065,24 @@ Kirigami.Page {
                                             ? Qt.ClosedHandCursor
                                             : Qt.OpenHandCursor
 
-                                        drag.target: commandDelegate
+                                        drag.target: dragOverlay
                                         drag.axis: Drag.YAxis
 
                                         onPressed: {
                                             commandsProxy.dragging = true
-                                            customCommandsList.draggedItem = commandDelegate
+                                            var mapped = commandDelegate.mapToItem(customCommandsList, 0, 0)
+                                            dragOverlay.y = mapped.y
+                                            customCommandsList.draggedIndex = commandDelegate.index
+                                            customCommandsList.draggedCommand = commandDelegate.command
+                                            customCommandsList.draggedItem = dragOverlay
                                         }
 
                                         onReleased: {
-                                            commandDelegate.Drag.drop()
                                             customCommandsList.draggedItem = null
+                                            customCommandsList.draggedIndex = -1
                                             commandsProxy.dragging = false
                                             // Persist the final order to Python.
                                             commandsProxy.persistToController()
-                                            // Snap the delegate back into its
-                                            // model-driven position.
-                                            customCommandsList.forceLayout()
                                         }
                                     }
                                 }
@@ -1294,7 +1228,6 @@ Kirigami.Page {
                             }
                         }
                     }                
-                
                 }
             }
 
