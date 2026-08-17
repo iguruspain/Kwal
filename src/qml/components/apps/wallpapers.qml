@@ -893,6 +893,55 @@ Kirigami.Page {
                     //     }
                     // }
 
+                    // ── Local proxy model for drag-and-drop ──
+                    // A QML ListModel that mirrors controller.customCommands.
+                    // During a drag, reordering happens here via move(),
+                    // which repositions existing delegates without destroying
+                    // them, so the MouseArea never loses its grab.
+                    // The Python model is updated only once on drop.
+                    ListModel {
+                        id: commandsProxy
+
+                        // true while a drag gesture is in progress;
+                        // blocks sync from Python so the proxy stays stable.
+                        property bool dragging: false
+
+                        function syncFromController() {
+                            if (dragging) return
+                            clear()
+                            var cmds = controller.customCommands
+                            for (var i = 0; i < cmds.length; i++) {
+                                append({
+                                    command: cmds[i].command,
+                                    cmdEnabled: cmds[i].enabled
+                                })
+                            }
+                        }
+
+                        // Push the current proxy order back to the
+                        // Python controller as a single bulk update.
+                        function persistToController() {
+                            var result = []
+                            for (var i = 0; i < count; i++) {
+                                var item = get(i)
+                                result.push({
+                                    command: item.command,
+                                    enabled: item.cmdEnabled
+                                })
+                            }
+                            controller.customCommands = result
+                        }
+
+                        Component.onCompleted: syncFromController()
+                    }
+
+                    Connections {
+                        target: controller
+                        function onCustomCommandsChanged() {
+                            commandsProxy.syncFromController()
+                        }
+                    }
+
                     ListView {
                         id: customCommandsList
 
@@ -905,29 +954,87 @@ Kirigami.Page {
                         clip: true
                         spacing: Kirigami.Units.smallSpacing
 
-                        model: controller.customCommands
+                        model: commandsProxy
+
+                        // Animate neighbours sliding out of the way
+                        // while a delegate is being dragged past them.
+                        displaced: Transition {
+                            NumberAnimation {
+                                properties: "x,y"
+                                duration: 200
+                                easing.type: Easing.OutQuad
+                            }
+                        }
+
+                        // ── Auto-scroll while dragging near edges ──
+                        // When the user drags an item close to the top
+                        // or bottom of the visible area, this timer
+                        // nudges contentY so the list scrolls.
+                        property Item draggedItem: null
+                        property real autoScrollMargin: Kirigami.Units.gridUnit * 2
+                        property real autoScrollStep: Kirigami.Units.gridUnit * 0.6
+
+                        Timer {
+                            id: autoScrollTimer
+                            interval: 30
+                            repeat: true
+                            running: customCommandsList.draggedItem !== null
+
+                            onTriggered: {
+                                var item = customCommandsList.draggedItem
+                                if (!item) return
+
+                                // Map the dragged item's vertical centre
+                                // into the ListView's coordinate space.
+                                var mapped = item.mapToItem(
+                                    customCommandsList,
+                                    0, item.height / 2
+                                )
+                                var yInView = mapped.y
+
+                                var margin = customCommandsList.autoScrollMargin
+                                var step   = customCommandsList.autoScrollStep
+
+                                if (yInView < margin) {
+                                    // Near top edge → scroll up
+                                    customCommandsList.contentY = Math.max(
+                                        customCommandsList.originY,
+                                        customCommandsList.contentY - step
+                                    )
+                                } else if (yInView > customCommandsList.height - margin) {
+                                    // Near bottom edge → scroll down
+                                    var maxY = customCommandsList.contentHeight
+                                             - customCommandsList.height
+                                             + customCommandsList.originY
+                                    customCommandsList.contentY = Math.min(
+                                        maxY,
+                                        customCommandsList.contentY + step
+                                    )
+                                }
+                            }
+                        }
 
                         delegate: Item {
                             id: commandDelegate
 
                             required property int index
-                            required property var modelData
+                            required property string command
+                            required property bool cmdEnabled
 
                             width: customCommandsList.width
                             height: Kirigami.Units.gridUnit * 3
 
-                            // Drag state
-                            property bool dragging: false
-                            property real dragOffsetY: 0
-                            property real dragStartMouseY: 0
-                            property int dragStartIndex: -1
-                            property int dragTargetIndex: -1
+                            // Standard Qt Quick drag & drop: the delegate itself
+                            // is the drag source, positioned by MouseArea's
+                            // drag.target, and every delegate has a DropArea
+                            // that reorders the model when the dragged item
+                            // is hovered over it.
+                            Drag.active: dragArea.drag.active
+                            Drag.source: commandDelegate
+                            Drag.hotSpot.x: width / 2
+                            Drag.hotSpot.y: height / 2
 
-                            transform: Translate {
-                                y: commandDelegate.dragOffsetY
-                            }
-
-                            z: commandDelegate.dragging ? 100 : 0
+                            z: commandDelegate.Drag.active ? 100 : 0
 
                             // Background
                             Rectangle {
@@ -935,7 +1042,7 @@ Kirigami.Page {
 
                                 radius: Kirigami.Units.smallSpacing
 
-                                color: commandDelegate.dragging
+                                color: commandDelegate.Drag.active
                                     ? Qt.alpha(
                                             Kirigami.Theme.highlightColor,
                                             0.18
@@ -945,11 +1052,25 @@ Kirigami.Page {
                                             0.35
                                         )
 
-                                border.color: commandDelegate.dragging
+                                border.color: commandDelegate.Drag.active
                                             ? Kirigami.Theme.highlightColor
                                             : Kirigami.Theme.alternateBackgroundColor
 
-                                border.width: commandDelegate.dragging ? 2 : 1
+                                border.width: commandDelegate.Drag.active ? 2 : 1
+                            }
+
+                            // Reordering target: while another delegate is
+                            // being dragged over this one, move them in the
+                            // local proxy model (no Python round-trip).
+                            DropArea {
+                                anchors.fill: parent
+                                onEntered: function(drag) {
+                                    var from = drag.source.index
+                                    var to   = commandDelegate.index
+                                    if (from !== to) {
+                                        commandsProxy.move(from, to, 1)
+                                    }
+                                }
                             }
 
                             // Main content
@@ -974,7 +1095,7 @@ Kirigami.Page {
                                     font.bold: true
 
                                     color:
-                                        commandDelegate.modelData.enabled
+                                        commandDelegate.cmdEnabled
                                         ? Kirigami.Theme.highlightColor
                                         : Kirigami.Theme.disabledTextColor
                                 }
@@ -994,7 +1115,7 @@ Kirigami.Page {
                                         width: Kirigami.Units.gridUnit
                                         height: width
 
-                                        color: commandDelegate.dragging
+                                        color: commandDelegate.Drag.active
                                             ? Kirigami.Theme.highlightColor
                                             : Kirigami.Theme.disabledTextColor
                                     }
@@ -1011,160 +1132,30 @@ Kirigami.Page {
                                             ? Qt.ClosedHandCursor
                                             : Qt.OpenHandCursor
 
-                                        // Start drag
-                                        onPressed: function(mouse) {
-                                            commandDelegate.dragging = true
+                                        drag.target: commandDelegate
+                                        drag.axis: Drag.YAxis
 
-                                            commandDelegate.dragStartIndex =
-                                                commandDelegate.index
-
-                                            commandDelegate.dragTargetIndex =
-                                                commandDelegate.index
-
-                                            commandDelegate.dragOffsetY = 0
-
-                                            dragStartMouseY = mouse.y
+                                        onPressed: {
+                                            commandsProxy.dragging = true
+                                            customCommandsList.draggedItem = commandDelegate
                                         }
 
-                                        // Move drag
-                                        onPositionChanged: function(mouse) {
-                                            if (!pressed)
-                                                return
-                                            commandDelegate.dragOffsetY =
-                                                mouse.y - dragStartMouseY
-
-                                            var mousePos = mapToItem(
-                                                customCommandsList,
-                                                mouse.x,
-                                                mouse.y
-                                            )
-
-                                            var mouseY =
-                                                mousePos.y +
-                                                commandDelegate.dragOffsetY
-
-                                            var sourceIndex =
-                                                commandDelegate.dragStartIndex
-
-                                            var targetIndex = sourceIndex
-
-                                            var bestDistance = Number.MAX_VALUE
-
-                                            for (
-                                                var i = 0;
-                                                i < customCommandsList.count;
-                                                i++
-                                            ) {
-                                                if (i === sourceIndex)
-                                                    continue
-
-                                                var item =
-                                                    customCommandsList.itemAtIndex(i)
-
-                                                if (!item)
-                                                    continue
-
-                                                var centerY =
-                                                    item.y +
-                                                    item.height / 2
-
-                                                var distance =
-                                                    Math.abs(mouseY - centerY)
-
-                                                if (distance < bestDistance) {
-                                                    bestDistance = distance
-                                                    targetIndex = i
-                                                }
-                                            }
-
-                                            if (targetIndex !== sourceIndex) {
-                                                var targetItem =
-                                                    customCommandsList.itemAtIndex(
-                                                        targetIndex
-                                                    )
-
-                                                if (targetItem) {
-                                                    var targetCenterY =
-                                                        targetItem.y +
-                                                        targetItem.height / 2
-
-                                                    if (sourceIndex < targetIndex) {
-                                                        // Moving down
-                                                        if (mouseY > targetCenterY) {
-                                                            targetIndex =
-                                                                Math.min(
-                                                                    targetIndex + 1,
-                                                                    customCommandsList.count - 1
-                                                                )
-                                                        }
-                                                    } else {
-                                                        // Moving up
-                                                        if (mouseY < targetCenterY) {
-                                                            targetIndex =
-                                                                Math.max(
-                                                                    targetIndex - 1,
-                                                                    0
-                                                                )
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            var finalIndex = targetIndex
-
-                                            if (sourceIndex < targetIndex)
-                                                finalIndex = targetIndex - 1
-
-                                            finalIndex = Math.max(
-                                                0,
-                                                Math.min(
-                                                    customCommandsList.count - 1,
-                                                    finalIndex
-                                                )
-                                            )
-
-                                            commandDelegate.dragTargetIndex =
-                                                finalIndex
-                                        }
-
-                                        onReleased: function(mouse) {
-                                            var sourceIndex =
-                                                commandDelegate.dragStartIndex
-
-                                            var targetIndex =
-                                                commandDelegate.dragTargetIndex
-
-                                            commandDelegate.dragging = false
-                                            commandDelegate.dragOffsetY = 0
-
-                                            if (
-                                                sourceIndex >= 0 &&
-                                                targetIndex >= 0 &&
-                                                sourceIndex !== targetIndex
-                                            ) {
-                                                controller.moveCustomCommand(
-                                                    sourceIndex,
-                                                    targetIndex
-                                                )
-                                            }
-
-                                            commandDelegate.dragStartIndex = -1
-                                            commandDelegate.dragTargetIndex = -1
-                                        }
-
-                                        onCanceled: {
-                                            commandDelegate.dragging = false
-                                            commandDelegate.dragOffsetY = 0
-
-                                            commandDelegate.dragStartIndex = -1
-                                            commandDelegate.dragTargetIndex = -1
+                                        onReleased: {
+                                            commandDelegate.Drag.drop()
+                                            customCommandsList.draggedItem = null
+                                            commandsProxy.dragging = false
+                                            // Persist the final order to Python.
+                                            commandsProxy.persistToController()
+                                            // Snap the delegate back into its
+                                            // model-driven position.
+                                            customCommandsList.forceLayout()
                                         }
                                     }
                                 }
 
                                 // Enable / disable
                                 Switch {
-                                    checked: commandDelegate.modelData.enabled
+                                    checked: commandDelegate.cmdEnabled
 
                                     ToolTip.text:
                                         checked
@@ -1187,7 +1178,7 @@ Kirigami.Page {
 
                                     Layout.fillWidth: true
 
-                                    text: commandDelegate.modelData.command
+                                    text: commandDelegate.command
 
                                     placeholderText:
                                         qsTr(
@@ -1198,7 +1189,7 @@ Kirigami.Page {
                                         Kirigami.Theme.disabledTextColor
 
                                     opacity:
-                                        commandDelegate.modelData.enabled
+                                        commandDelegate.cmdEnabled
                                         ? 1.0
                                         : 0.5
 
