@@ -832,6 +832,16 @@ Kirigami.Page {
                         }
                     }
 
+                    Timer {
+                        id: reorderPersistTimer
+                        interval: 260
+                        repeat: false
+                        onTriggered: {
+                            commandsProxy.dragging = false
+                            commandsProxy.persistToController()
+                        }
+                    }
+
                     // ── Local proxy model for drag-and-drop ──
                     ListModel {
                         id: commandsProxy
@@ -894,13 +904,41 @@ Kirigami.Page {
                         property int draggedIndex: -1
                         property string draggedCommand: ""
 
+                        // Animate item movement naturally when the list is reordered
+                        // through the buttons or drag interactions.
+                        move: Transition {
+                            ParallelAnimation {
+                                NumberAnimation {
+                                    properties: "x,y"
+                                    duration: 320
+                                    easing.type: Easing.OutCubic
+                                }
+                                NumberAnimation {
+                                    property: "scale"
+                                    from: 0.94
+                                    to: 1.0
+                                    duration: 260
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+                        }
+
                         // Animate neighbours sliding out of the way
                         // while a delegate is being dragged past them.
                         displaced: Transition {
-                            NumberAnimation {
-                                properties: "x,y"
-                                duration: 200
-                                easing.type: Easing.OutQuad
+                            ParallelAnimation {
+                                NumberAnimation {
+                                    properties: "x,y"
+                                    duration: 260
+                                    easing.type: Easing.OutCubic
+                                }
+                                NumberAnimation {
+                                    property: "scale"
+                                    from: 0.97
+                                    to: 1.0
+                                    duration: 220
+                                    easing.type: Easing.OutCubic
+                                }
                             }
                         }
 
@@ -999,16 +1037,42 @@ Kirigami.Page {
                             width: customCommandsList.width
                             height: Kirigami.Units.gridUnit * 3
 
+                            property bool flashHighlight: false
+
                             // El elemento activo se comporta como un hueco transparente en la lista
                             opacity: commandDelegate.index === customCommandsList.draggedIndex ? 0.3 : 1.0
+
+                            function triggerHighlight() {
+                                flashHighlight = true
+                                flashTimer.restart()
+                            }
+
+                            Timer {
+                                id: flashTimer
+                                interval: 420
+                                repeat: false
+                                onTriggered: commandDelegate.flashHighlight = false
+                            }
 
                             // Background
                             Rectangle {
                                 anchors.fill: parent
                                 radius: Kirigami.Units.smallSpacing
                                 color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
-                                border.color: Kirigami.Theme.alternateBackgroundColor
-                                border.width: 1
+                                border.color: commandDelegate.flashHighlight ? Qt.lighter(Kirigami.Theme.highlightColor, 1.35) : Kirigami.Theme.alternateBackgroundColor
+                                border.width: commandDelegate.flashHighlight ? 3 : 1
+                                Behavior on border.color {
+                                    ColorAnimation {
+                                        duration: 220
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                                Behavior on border.width {
+                                    NumberAnimation {
+                                        duration: 220
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
                             }
 
                             // Reordering target
@@ -1020,6 +1084,7 @@ Kirigami.Page {
                                     if (from !== -1 && from !== to) {
                                         commandsProxy.move(from, to, 1)
                                         customCommandsList.draggedIndex = to
+                                        commandDelegate.triggerHighlight()
                                     }
                                 }
                             }
@@ -1080,9 +1145,8 @@ Kirigami.Page {
                                         onReleased: {
                                             customCommandsList.draggedItem = null
                                             customCommandsList.draggedIndex = -1
-                                            commandsProxy.dragging = false
-                                            // Persist the final order to Python.
-                                            commandsProxy.persistToController()
+                                            commandDelegate.triggerHighlight()
+                                            reorderPersistTimer.restart()
                                         }
                                     }
                                 }
@@ -1198,10 +1262,14 @@ Kirigami.Page {
                                     ToolTip.visible: hovered
 
                                     onClicked: {
-                                        controller.moveCustomCommand(
-                                            commandDelegate.index,
-                                            commandDelegate.index - 1
-                                        )
+                                        var from = commandDelegate.index
+                                        var to = from - 1
+                                        if (from > 0) {
+                                            commandsProxy.dragging = true
+                                            commandsProxy.move(from, to, 1)
+                                            commandDelegate.triggerHighlight()
+                                            reorderPersistTimer.restart()
+                                        }
                                     }
                                 }
 
@@ -1219,10 +1287,14 @@ Kirigami.Page {
                                     ToolTip.visible: hovered
 
                                     onClicked: {
-                                        controller.moveCustomCommand(
-                                            commandDelegate.index,
-                                            commandDelegate.index + 1
-                                        )
+                                        var from = commandDelegate.index
+                                        var to = from + 1
+                                        if (from < customCommandsList.count - 1) {
+                                            commandsProxy.dragging = true
+                                            commandsProxy.move(from, to, 1)
+                                            commandDelegate.triggerHighlight()
+                                            reorderPersistTimer.restart()
+                                        }
                                     }
                                 }
                             }
