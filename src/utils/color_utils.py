@@ -12,11 +12,9 @@ import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, cast, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from ..models.models import PaletteData
+from typing import Optional, cast
 from PIL import Image, ImageColor
 from PySide6.QtGui import QColor
 
@@ -24,6 +22,15 @@ from .file_utils import check_binary
 from .xdg_paths import kwal_cache_dir
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PaletteData:
+    colors: list[str]      # 16 Base colors
+    accents: list[str]     # Accent colors
+    backend_used: str      # 'pywal16', 'material-you', 'imagemagick'
+    source_path: str       # Source image path
+    seed: str = ""         # Seed color used (hex)
 
 
 @contextmanager
@@ -262,7 +269,6 @@ def _extract_pywal16(path: Path, **kwargs) -> PaletteData:
     
     # Try with 'wal' backend first
     try:
-        from ..models.models import PaletteData
         data = pywal_colors.get(
             str(path), 
             light=light_mode,
@@ -322,7 +328,6 @@ def _extract_material_you_kwal(path: Path, **kwargs) -> PaletteData:
     Preserves image color variety by using ranked colors directly,
     with scheme-specific adjustments for colorfulness.
     """
-    from ..models.models import PaletteData
     try:
         from materialyoucolor.quantize import QuantizeCelebi
         from materialyoucolor.score.score import Score, ScoreOptions
@@ -579,7 +584,6 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     Standard Material You implementation following Google's specification.
     Uses only primary/secondary/tertiary palettes from a single seed color.
     """
-    from ..models.models import PaletteData
     try:
         from materialyoucolor.quantize import QuantizeCelebi
         from materialyoucolor.score.score import Score, ScoreOptions
@@ -757,7 +761,6 @@ def _extract_material_you(path: Path, **kwargs) -> PaletteData:
     )
 
 def _extract_imagemagick(path: Path) -> PaletteData:
-    from ..models.models import PaletteData
     im_exe = shutil.which("magick") or shutil.which("convert")
     if not im_exe:
         raise OSError("ImageMagick not found")
