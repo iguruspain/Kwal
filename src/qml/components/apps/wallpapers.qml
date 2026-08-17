@@ -833,6 +833,7 @@ Kirigami.Page {
                     }
 
                     ColumnLayout {
+                        id: customCommandsLayout
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
@@ -856,6 +857,7 @@ Kirigami.Page {
                                     id: cmdInput
                                     text: commandRow.modelData.command
                                     placeholderText: qsTr("e.g: notify-send 'Wallpaper changed to %path%'")
+                                    placeholderTextColor: Kirigami.Theme.disabledTextColor
                                     Layout.fillWidth: true
                                     opacity: commandRow.modelData.enabled ? 1.0 : 0.5
                                     
