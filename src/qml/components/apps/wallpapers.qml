@@ -508,6 +508,42 @@ Kirigami.Page {
                                     z: 11
                                     antialiasing: true
 
+                                    // ── Comet parameters ─────────────────────────────────
+                                    // All the knobs to tune the effect live here.
+
+                                    // Speed: seconds for one full revolution around
+                                    // the perimeter.
+                                    property real revolutionDuration: 3.0//4.8
+
+                                    // Tail: length as a fraction of the perimeter
+                                    // (0.30 = 30%).
+                                    property real tailFraction: 0.30
+                                    // Tail: number of segments (higher = smoother,
+                                    // slightly slower).
+                                    property int tailSegments: 64
+                                    // Tail: fade curve. Higher = steeper fade
+                                    // (shorter visible tail).
+                                    property real tailFadeExponent: 1.6
+                                    // Tail: core line width in px.
+                                    property real coreWidth: 3.0
+                                    // Tail: color.
+                                    property color tailColor: Kirigami.Theme.positiveTextColor
+
+                                    // Glow: width (px) and opacity of the wide faint
+                                    // halo drawn under the core.
+                                    property real glowWidth: 6.0
+                                    property real glowOpacity: 0.22
+
+                                    // Head: radius (px) of the soft radial tip.
+                                    property real headRadius: 2.0
+                                    // Head: hardness, 0..1. 0 = soft (fades
+                                    // immediately), 1 = hard (stays opaque until the
+                                    // edge).
+                                    property real headHardness: 0.6//0.3
+                                    // Head: color (lightened so the tip reads brighter
+                                    // than the tail).
+                                    property color headColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.6)//, 1.4)
+
                                     // Head position along the perimeter, 0..1 (loops).
                                     property real head: 0.0
 
@@ -561,9 +597,9 @@ Kirigami.Page {
                                             return { x: inset + r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
                                         }
 
-                                        const tailLen = perimeter * 0.30
-                                        const steps = 64
-                                        const color = Kirigami.Theme.positiveTextColor
+                                        const tailLen = perimeter * tailFraction
+                                        const steps = tailSegments
+                                        const color = tailColor
 
                                         // Round caps: adjacent segments overlap in small
                                         // semicircles. Because the per-segment gradients
@@ -583,8 +619,8 @@ Kirigami.Page {
                                                 const t1 = (i + 1) / steps
                                                 const p0 = pointAt(head * perimeter - t0 * tailLen)
                                                 const p1 = pointAt(head * perimeter - t1 * tailLen)
-                                                const a0 = Math.pow(1.0 - t0, 1.6) * alphaScale
-                                                const a1 = Math.pow(1.0 - t1, 1.6) * alphaScale
+                                                const a0 = Math.pow(1.0 - t0, tailFadeExponent) * alphaScale
+                                                const a1 = Math.pow(1.0 - t1, tailFadeExponent) * alphaScale
                                                 const grad = ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y)
                                                 grad.addColorStop(0, Qt.rgba(color.r, color.g, color.b, a0))
                                                 grad.addColorStop(1, Qt.rgba(color.r, color.g, color.b, a1))
@@ -597,29 +633,32 @@ Kirigami.Page {
                                         }
 
                                         // Wide faint glow underneath, then the bright core.
-                                        drawPass(6, 0.22)
-                                        drawPass(3, 1.0)
+                                        drawPass(glowWidth, glowOpacity)
+                                        drawPass(coreWidth, 1.0)
 
-                                        // Soft radial head so the tip blends into the tail.
+                                        // Radial head: fully opaque up to headHardness,
+                                        // then fades to transparent at the edge.
                                         const hp = pointAt(head * perimeter)
-                                        const headGlow = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, 5)
-                                        headGlow.addColorStop(0, Qt.rgba(color.r, color.g, color.b, 1.0))
-                                        headGlow.addColorStop(1, Qt.rgba(color.r, color.g, color.b, 0.0))
+                                        const headGlow = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, headRadius)
+                                        headGlow.addColorStop(0, Qt.rgba(headColor.r, headColor.g, headColor.b, 1.0))
+                                        headGlow.addColorStop(headHardness, Qt.rgba(headColor.r, headColor.g, headColor.b, 1.0))
+                                        headGlow.addColorStop(1, Qt.rgba(headColor.r, headColor.g, headColor.b, 0.0))
                                         ctx.fillStyle = headGlow
                                         ctx.beginPath()
-                                        ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2)
+                                        ctx.arc(hp.x, hp.y, headRadius, 0, Math.PI * 2)
                                         ctx.fill()
                                     }
 
                                     // Advance the head with a timer so the loop is
-                                    // perfectly continuous (no restart seam).
-                                    // ~5 s per full revolution at 60 fps.
+                                    // perfectly continuous (no restart seam). The step
+                                    // per tick is derived from revolutionDuration.
                                     Timer {
                                         interval: 16
                                         running: shimmerCanvas.visible
                                         repeat: true
                                         onTriggered: {
-                                            shimmerCanvas.head = (shimmerCanvas.head + 1.0 / 300.0) % 1.0
+                                            const step = interval / (shimmerCanvas.revolutionDuration * 1000.0)
+                                            shimmerCanvas.head = (shimmerCanvas.head + step) % 1.0
                                         }
                                     }
                                 }
