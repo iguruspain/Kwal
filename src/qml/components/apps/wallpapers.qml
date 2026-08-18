@@ -397,10 +397,31 @@ Kirigami.Page {
                         
                             model: imageModel
 
+                            // ── Grid transitions (matching the custom-commands feel) ──
+                            // Note: GridView only supports "move" and "displaced"
+                            // transitions (unlike ListView, which also has enter/exit).
+                            // Animate an item sliding to its new cell when the model reorders.
+                            move: Transition {
+                                PropertyAnimation { property: "x"; duration: 300; easing.type: Easing.OutCubic }
+                                PropertyAnimation { property: "y"; duration: 300; easing.type: Easing.OutCubic }
+                                PropertyAnimation { property: "scale"; from: 0.94; to: 1.0; duration: 260; easing.type: Easing.OutCubic }
+                            }
+
+                            // Animate neighbours sliding out of the way while another item moves.
+                            displaced: Transition {
+                                PropertyAnimation { property: "x"; duration: 260; easing.type: Easing.OutCubic }
+                                PropertyAnimation { property: "y"; duration: 260; easing.type: Easing.OutCubic }
+                                PropertyAnimation { property: "scale"; from: 0.97; to: 1.0; duration: 220; easing.type: Easing.OutCubic }
+                            }
+
                             delegate: Item {
+                                id: thumbDelegate
                                 width: thumbnailGrid.cellWidth
                                 height: thumbnailGrid.cellHeight
-                            
+                                // Center the scale origin so the move/displaced
+                                // scale animations grow from the middle of the cell.
+                                transformOrigin: Item.Center
+
                                 required property string filePath
                                 required property string fileName
                                 required property string thumbPath
@@ -412,17 +433,63 @@ Kirigami.Page {
                                 property bool isSelected: filePath === controller.selectedWallpaper
                                 property bool isHovered: hoverHandler.hovered
 
+                                // Border flash, mirroring the custom-commands
+                                // "flashHighlight": a short bright pulse fired on
+                                // hover-enter and on selection.
+                                property bool flashHighlight: false
+
+                                function triggerFlash() {
+                                    flashHighlight = true
+                                    flashTimer.restart()
+                                }
+
+                                Timer {
+                                    id: flashTimer
+                                    interval: 420
+                                    repeat: false
+                                    onTriggered: thumbDelegate.flashHighlight = false
+                                }
+
+                                // Fire the flash when the pointer enters the cell.
+                                HoverHandler {
+                                    id: hoverHandler
+                                    onHoveredChanged: {
+                                        if (hovered) thumbDelegate.triggerFlash()
+                                    }
+                                }
+
+                                // Fire the flash when this cell becomes selected.
+                                onIsSelectedChanged: {
+                                    if (isSelected) thumbDelegate.triggerFlash()
+                                }
+
                                 // Border drawn outside the clipped area so it's always visible
                                 Rectangle {
                                     id: borderRect
                                     anchors.fill: parent
                                     anchors.margins: 2
                                     color: "transparent"
-                                    border.color: isSelected ? Kirigami.Theme.positiveTextColor : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)) //Kirigami.Theme.textColor) 
-                                    //border.width: isSelected ? 3 : (isHovered ? 2 : 1)
-                                    border.width: isSelected ? 3 : 2
+                                    border.color: thumbDelegate.flashHighlight
+                                        ? Qt.lighter(Kirigami.Theme.highlightColor, 1.35)
+                                        : (isSelected ? Kirigami.Theme.positiveTextColor : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)))
+                                    border.width: thumbDelegate.flashHighlight ? 4 : (isSelected ? 3 : 2)
                                     radius: Kirigami.Units.smallSpacing
                                     z: 10
+
+                                    // Smooth border transitions on hover/selection,
+                                    // matching the custom-commands flash feel.
+                                    Behavior on border.color {
+                                        ColorAnimation {
+                                            duration: 220
+                                            easing.type: Easing.OutCubic
+                                        }
+                                    }
+                                    Behavior on border.width {
+                                        NumberAnimation {
+                                            duration: 220
+                                            easing.type: Easing.OutCubic
+                                        }
+                                    }
                                 }
 
                                 Rectangle {
@@ -457,9 +524,17 @@ Kirigami.Page {
                                         asynchronous: true
                                         smooth: true
                                     
-                                        scale: isHovered ? 1.05 : 1.0
-                                        Behavior on scale { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
-                                    
+                                        // More dramatic zoom: a clear lift on hover plus a
+                                        // subtle resting scale for the selected cell.
+                                        scale: isHovered ? 1.14 : (isSelected ? 1.06 : 1.0)
+                                        Behavior on scale {
+                                            SpringAnimation {
+                                                spring: 8.0
+                                                damping: 0.55
+                                                mass: 1.0
+                                            }
+                                        }
+
                                         opacity: status === Image.Ready ? 1.0 : 0.0
                                         Behavior on opacity { NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.InOutQuad } }
                                     }
@@ -607,9 +682,7 @@ Kirigami.Page {
                                         ToolTip.text: qsTr("Set as Wallpaper")
                                         ToolTip.visible: hovered
                                     }
-                                
-                                    HoverHandler { id: hoverHandler }
-                                
+
                                     ToolTip.text: fileName
                                     ToolTip.visible: hoverHandler.hovered
                                     ToolTip.delay: Kirigami.Units.toolTipDelay
