@@ -469,9 +469,13 @@ Kirigami.Page {
                                     anchors.fill: parent
                                     anchors.margins: 2
                                     color: "transparent"
+                                    // Selected cells keep the subtle neutral border so
+                                    // the shimmer comet stays the clear focus; the
+                                    // highlight color is reserved for hover only.
                                     border.color: thumbDelegate.flashHighlight
                                         ? Qt.lighter(Kirigami.Theme.highlightColor, 1.35)
-                                        : (isSelected ? Kirigami.Theme.positiveTextColor : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)))
+                                        : (isSelected ? Qt.alpha(Kirigami.Theme.textColor, 0.30)
+                                                      : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)))
                                     border.width: thumbDelegate.flashHighlight ? 4 : (isSelected ? 3 : 2)
                                     radius: Kirigami.Units.smallSpacing
                                     z: 10
@@ -488,6 +492,134 @@ Kirigami.Page {
                                         NumberAnimation {
                                             duration: 220
                                             easing.type: Easing.OutCubic
+                                        }
+                                    }
+                                }
+
+                                // Shimmer border: a comet of light that travels around
+                                // the full perimeter of the cell while it is selected,
+                                // signalling the active state. The fixed border stays
+                                // in the subtle neutral color.
+                                Canvas {
+                                    id: shimmerCanvas
+                                    anchors.fill: parent
+                                    anchors.margins: 2
+                                    visible: isSelected
+                                    z: 11
+                                    antialiasing: true
+
+                                    // Head position along the perimeter, 0..1 (loops).
+                                    property real head: 0.0
+
+                                    onHeadChanged: requestPaint()
+                                    onWidthChanged: requestPaint()
+                                    onHeightChanged: requestPaint()
+
+                                    onPaint: {
+                                        var ctx = getContext("2d")
+                                        ctx.clearRect(0, 0, width, height)
+                                        if (width <= 0 || height <= 0) return
+
+                                        const inset = 1.5
+                                        const r = Math.min(Kirigami.Units.smallSpacing, width / 2, height / 2)
+                                        const w = width - inset * 2
+                                        const h = height - inset * 2
+                                        const corner = Math.PI * r / 2
+                                        const topLen = w - 2 * r
+                                        const sideLen = h - 2 * r
+                                        const perimeter = 2 * topLen + 2 * sideLen + 4 * corner
+
+                                        // Map a distance along the perimeter to a point on
+                                        // the rounded rect. The modulo makes the loop
+                                        // perfectly continuous (no seam at the wrap).
+                                        function pointAt(d) {
+                                            d = ((d % perimeter) + perimeter) % perimeter
+                                            if (d < topLen) return { x: inset + r + d, y: inset }
+                                            d -= topLen
+                                            if (d < corner) {
+                                                const a = -Math.PI / 2 + d / r
+                                                return { x: inset + w - r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
+                                            }
+                                            d -= corner
+                                            if (d < sideLen) return { x: inset + w, y: inset + r + d }
+                                            d -= sideLen
+                                            if (d < corner) {
+                                                const a = d / r
+                                                return { x: inset + w - r + r * Math.cos(a), y: inset + h - r + r * Math.sin(a) }
+                                            }
+                                            d -= corner
+                                            if (d < topLen) return { x: inset + w - r - d, y: inset + h }
+                                            d -= topLen
+                                            if (d < corner) {
+                                                const a = Math.PI / 2 + d / r
+                                                return { x: inset + r + r * Math.cos(a), y: inset + h - r + r * Math.sin(a) }
+                                            }
+                                            d -= corner
+                                            if (d < sideLen) return { x: inset, y: inset + h - r - d }
+                                            d -= sideLen
+                                            const a = Math.PI + d / r
+                                            return { x: inset + r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
+                                        }
+
+                                        const tailLen = perimeter * 0.30
+                                        const steps = 64
+                                        const color = Kirigami.Theme.positiveTextColor
+
+                                        // Round caps: adjacent segments overlap in small
+                                        // semicircles. Because the per-segment gradients
+                                        // make the alpha continuous at every joint, the
+                                        // overlaps blend seamlessly (and cover the corner
+                                        // notches that butt caps would leave).
+                                        ctx.lineCap = "round"
+
+                                        // Draw one pass of the comet tail: each segment
+                                        // is stroked with a linear gradient between the
+                                        // alpha of its two ends, so the fade is
+                                        // continuous instead of stepped.
+                                        function drawPass(lineWidth, alphaScale) {
+                                            ctx.lineWidth = lineWidth
+                                            for (let i = 0; i < steps; i++) {
+                                                const t0 = i / steps
+                                                const t1 = (i + 1) / steps
+                                                const p0 = pointAt(head * perimeter - t0 * tailLen)
+                                                const p1 = pointAt(head * perimeter - t1 * tailLen)
+                                                const a0 = Math.pow(1.0 - t0, 1.6) * alphaScale
+                                                const a1 = Math.pow(1.0 - t1, 1.6) * alphaScale
+                                                const grad = ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y)
+                                                grad.addColorStop(0, Qt.rgba(color.r, color.g, color.b, a0))
+                                                grad.addColorStop(1, Qt.rgba(color.r, color.g, color.b, a1))
+                                                ctx.strokeStyle = grad
+                                                ctx.beginPath()
+                                                ctx.moveTo(p0.x, p0.y)
+                                                ctx.lineTo(p1.x, p1.y)
+                                                ctx.stroke()
+                                            }
+                                        }
+
+                                        // Wide faint glow underneath, then the bright core.
+                                        drawPass(6, 0.22)
+                                        drawPass(3, 1.0)
+
+                                        // Soft radial head so the tip blends into the tail.
+                                        const hp = pointAt(head * perimeter)
+                                        const headGlow = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, 5)
+                                        headGlow.addColorStop(0, Qt.rgba(color.r, color.g, color.b, 1.0))
+                                        headGlow.addColorStop(1, Qt.rgba(color.r, color.g, color.b, 0.0))
+                                        ctx.fillStyle = headGlow
+                                        ctx.beginPath()
+                                        ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2)
+                                        ctx.fill()
+                                    }
+
+                                    // Advance the head with a timer so the loop is
+                                    // perfectly continuous (no restart seam).
+                                    // ~5 s per full revolution at 60 fps.
+                                    Timer {
+                                        interval: 16
+                                        running: shimmerCanvas.visible
+                                        repeat: true
+                                        onTriggered: {
+                                            shimmerCanvas.head = (shimmerCanvas.head + 1.0 / 300.0) % 1.0
                                         }
                                     }
                                 }
