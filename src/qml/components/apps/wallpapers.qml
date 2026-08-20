@@ -508,41 +508,42 @@ Kirigami.Page {
                                     z: 11
                                     antialiasing: true
 
-                                    // ── Comet parameters ─────────────────────────────────
-                                    // All the knobs to tune the effect live here.
+                                    // ── Sweep parameters ─────────────────────────────────
+                                    // A soft, symmetric "searchlight" band that circles the
+                                    // perimeter endlessly. No pause, no fade-out-then-back-in:
+                                    // on a closed loop that stop/restart always reads as a
+                                    // seam, so instead the band just keeps travelling forever
+                                    // and the loop itself (going around and around) is what
+                                    // reads as continuous.
 
                                     // Speed: seconds for one full revolution around
                                     // the perimeter.
-                                    property real revolutionDuration: 3.0//4.8
+                                    property real revolutionDuration: 3.0
 
-                                    // Tail: length as a fraction of the perimeter
-                                    // (0.30 = 30%).
-                                    property real tailFraction: 0.30
-                                    // Tail: number of segments (higher = smoother,
-                                    // slightly slower).
-                                    property int tailSegments: 64
-                                    // Tail: fade curve. Higher = steeper fade
-                                    // (shorter visible tail).
-                                    property real tailFadeExponent: 1.6
-                                    // Tail: core line width in px.
-                                    property real coreWidth: 3.0
-                                    // Tail: color.
-                                    property color tailColor: Kirigami.Theme.positiveTextColor
+                                    // How many glowing bands travel the perimeter at
+                                    // once, evenly spaced around the loop (1 = the
+                                    // original single comet, 2 = two opposite lights,
+                                    // etc).
+                                    property int lightCount: 2
 
-                                    // Glow: width (px) and opacity of the wide faint
-                                    // halo drawn under the core.
-                                    property real glowWidth: 6.0
-                                    property real glowOpacity: 0.22
-
-                                    // Head: radius (px) of the soft radial tip.
-                                    property real headRadius: 2.0
-                                    // Head: hardness, 0..1. 0 = soft (fades
-                                    // immediately), 1 = hard (stays opaque until the
-                                    // edge).
-                                    property real headHardness: 0.6//0.3
-                                    // Head: color (lightened so the tip reads brighter
-                                    // than the tail).
-                                    property color headColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.6)//, 1.4)
+                                    // Band: width as a fraction of the perimeter
+                                    // (measured off the reference clip: ~90px of a
+                                    // ~670px edge, i.e. ~0.13-0.15).
+                                    property real bandFraction: 0.14
+                                    // Band: how peaked the glow is across its width.
+                                    // Higher = narrower, snappier band.
+                                    property real bandSharpness: 2.2
+                                    // Band: number of segments (higher = smoother).
+                                    property int bandSegments: 48
+                                    // Band: core line width in px.
+                                    property real coreWidth: 2.4
+                                    // Band: peak opacity of the core stroke.
+                                    property real coreOpacity: 0.9
+                                    // Band: soft blur radius (px) that gives the glow
+                                    // its diffuse, out-of-focus look.
+                                    property real glowBlur: 5.0
+                                    // Band: color.
+                                    property color glowColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.4) //Qt.lighter(Kirigami.Theme.highlightColor, 1.4)
 
                                     // Head position along the perimeter, 0..1 (loops).
                                     property real head: 0.0
@@ -597,33 +598,33 @@ Kirigami.Page {
                                             return { x: inset + r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
                                         }
 
-                                        const tailLen = perimeter * tailFraction
-                                        const steps = tailSegments
-                                        const color = tailColor
+                                        const bandLen = perimeter * bandFraction
+                                        const steps = bandSegments
 
-                                        // Round caps: adjacent segments overlap in small
-                                        // semicircles. Because the per-segment gradients
-                                        // make the alpha continuous at every joint, the
-                                        // overlaps blend seamlessly (and cover the corner
-                                        // notches that butt caps would leave).
-                                        ctx.lineCap = "round"
+                                        // Gaussian-ish cross-band weight: 1 at the centre,
+                                        // fading smoothly to ~0 at the edges of the band.
+                                        // This is what keeps the band itself soft — the
+                                        // travel around the loop never stops or resets.
+                                        function weight(t) {
+                                            const x = (t - 0.5) * 2.0 * bandSharpness
+                                            return Math.exp(-x * x)
+                                        }
 
-                                        // Draw one pass of the comet tail: each segment
-                                        // is stroked with a linear gradient between the
-                                        // alpha of its two ends, so the fade is
-                                        // continuous instead of stepped.
-                                        function drawPass(lineWidth, alphaScale) {
-                                            ctx.lineWidth = lineWidth
+                                        // Draw one glowing band centred at perimeter
+                                        // distance centerD.
+                                        function drawBand(centerD) {
                                             for (let i = 0; i < steps; i++) {
                                                 const t0 = i / steps
                                                 const t1 = (i + 1) / steps
-                                                const p0 = pointAt(head * perimeter - t0 * tailLen)
-                                                const p1 = pointAt(head * perimeter - t1 * tailLen)
-                                                const a0 = Math.pow(1.0 - t0, tailFadeExponent) * alphaScale
-                                                const a1 = Math.pow(1.0 - t1, tailFadeExponent) * alphaScale
+                                                const d0 = centerD - bandLen / 2 + t0 * bandLen
+                                                const d1 = centerD - bandLen / 2 + t1 * bandLen
+                                                const p0 = pointAt(d0)
+                                                const p1 = pointAt(d1)
+                                                const a0 = weight(t0) * coreOpacity
+                                                const a1 = weight(t1) * coreOpacity
                                                 const grad = ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y)
-                                                grad.addColorStop(0, Qt.rgba(color.r, color.g, color.b, a0))
-                                                grad.addColorStop(1, Qt.rgba(color.r, color.g, color.b, a1))
+                                                grad.addColorStop(0, Qt.rgba(glowColor.r, glowColor.g, glowColor.b, a0))
+                                                grad.addColorStop(1, Qt.rgba(glowColor.r, glowColor.g, glowColor.b, a1))
                                                 ctx.strokeStyle = grad
                                                 ctx.beginPath()
                                                 ctx.moveTo(p0.x, p0.y)
@@ -632,21 +633,19 @@ Kirigami.Page {
                                             }
                                         }
 
-                                        // Wide faint glow underneath, then the bright core.
-                                        drawPass(glowWidth, glowOpacity)
-                                        drawPass(coreWidth, 1.0)
+                                        ctx.lineCap = "round"
+                                        ctx.shadowBlur = glowBlur
+                                        ctx.shadowColor = Qt.rgba(glowColor.r, glowColor.g, glowColor.b, 0.85)
+                                        ctx.lineWidth = coreWidth
 
-                                        // Radial head: fully opaque up to headHardness,
-                                        // then fades to transparent at the edge.
-                                        const hp = pointAt(head * perimeter)
-                                        const headGlow = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, headRadius)
-                                        headGlow.addColorStop(0, Qt.rgba(headColor.r, headColor.g, headColor.b, 1.0))
-                                        headGlow.addColorStop(headHardness, Qt.rgba(headColor.r, headColor.g, headColor.b, 1.0))
-                                        headGlow.addColorStop(1, Qt.rgba(headColor.r, headColor.g, headColor.b, 0.0))
-                                        ctx.fillStyle = headGlow
-                                        ctx.beginPath()
-                                        ctx.arc(hp.x, hp.y, headRadius, 0, Math.PI * 2)
-                                        ctx.fill()
+                                        // One band per light, evenly spaced around the
+                                        // perimeter (spacing = 1 / lightCount).
+                                        for (let n = 0; n < lightCount; n++) {
+                                            const centerD = ((head + n / lightCount) % 1.0) * perimeter
+                                            drawBand(centerD)
+                                        }
+
+                                        ctx.shadowBlur = 0
                                     }
 
                                     // Advance the head with a timer so the loop is
