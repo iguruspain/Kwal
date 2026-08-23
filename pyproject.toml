@@ -55,7 +55,7 @@ include-package-data = true
 "share/icons/hicolor/scalable/apps" = ["src/resources/icon/kwal.svg"]
 
 [tool.setuptools.package-data]
-kwal = ["resources/templates/**/*", "resources/icon/*.svg", "qml/**/*.qml"]
+kwal = ["resources/templates/**/*", "resources/icon/*.svg", "qml/**/*.qml", "qml/**/*.frag", "qml/**/*.qsb"]
 
 
 [tool.mypy]

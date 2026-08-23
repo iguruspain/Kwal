@@ -500,13 +500,18 @@ Kirigami.Page {
                                 // the full perimeter of the cell while it is selected,
                                 // signalling the active state. The fixed border stays
                                 // in the subtle neutral color.
-                                Canvas {
+                                //
+                                // Rendered on the GPU with a fragment shader: the
+                                // rounded-rect border, the perimeter position and the
+                                // gaussian glow band are computed analytically per
+                                // pixel, so the CPU only updates the u_head uniform
+                                // per tick (no QPainter repaints, no shadowBlur).
+                                ShaderEffect {
                                     id: shimmerCanvas
                                     anchors.fill: parent
                                     anchors.margins: 2
                                     visible: isSelected
                                     z: 11
-                                    antialiasing: true
 
                                     // ── Sweep parameters ─────────────────────────────────
                                     // A soft, symmetric "searchlight" band that circles the
@@ -533,8 +538,6 @@ Kirigami.Page {
                                     // Band: how peaked the glow is across its width.
                                     // Higher = narrower, snappier band.
                                     property real bandSharpness: 2.2
-                                    // Band: number of segments (higher = smoother).
-                                    property int bandSegments: 48
                                     // Band: core line width in px.
                                     property real coreWidth: 2.4
                                     // Band: peak opacity of the core stroke.
@@ -543,110 +546,30 @@ Kirigami.Page {
                                     // its diffuse, out-of-focus look.
                                     property real glowBlur: 5.0
                                     // Band: color.
-                                    property color glowColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.4) //Qt.lighter(Kirigami.Theme.highlightColor, 1.4)
+                                    property color glowColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.4) //Kirigami.Theme.highlightColor
 
                                     // Head position along the perimeter, 0..1 (loops).
                                     property real head: 0.0
 
-                                    onHeadChanged: requestPaint()
-                                    onWidthChanged: requestPaint()
-                                    onHeightChanged: requestPaint()
+                                    // Precompiled shader package (baked from
+                                    // ../shaders/shimmer_border.frag with the qsb tool,
+                                    // see scripts/build_shaders.sh).
+                                    fragmentShader: "../shaders/shimmer_border.qsb"
 
-                                    onPaint: {
-                                        var ctx = getContext("2d")
-                                        ctx.clearRect(0, 0, width, height)
-                                        if (width <= 0 || height <= 0) return
-
-                                        const inset = 1.5
-                                        const r = Math.min(Kirigami.Units.smallSpacing, width / 2, height / 2)
-                                        const w = width - inset * 2
-                                        const h = height - inset * 2
-                                        const corner = Math.PI * r / 2
-                                        const topLen = w - 2 * r
-                                        const sideLen = h - 2 * r
-                                        const perimeter = 2 * topLen + 2 * sideLen + 4 * corner
-
-                                        // Map a distance along the perimeter to a point on
-                                        // the rounded rect. The modulo makes the loop
-                                        // perfectly continuous (no seam at the wrap).
-                                        function pointAt(d) {
-                                            d = ((d % perimeter) + perimeter) % perimeter
-                                            if (d < topLen) return { x: inset + r + d, y: inset }
-                                            d -= topLen
-                                            if (d < corner) {
-                                                const a = -Math.PI / 2 + d / r
-                                                return { x: inset + w - r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
-                                            }
-                                            d -= corner
-                                            if (d < sideLen) return { x: inset + w, y: inset + r + d }
-                                            d -= sideLen
-                                            if (d < corner) {
-                                                const a = d / r
-                                                return { x: inset + w - r + r * Math.cos(a), y: inset + h - r + r * Math.sin(a) }
-                                            }
-                                            d -= corner
-                                            if (d < topLen) return { x: inset + w - r - d, y: inset + h }
-                                            d -= topLen
-                                            if (d < corner) {
-                                                const a = Math.PI / 2 + d / r
-                                                return { x: inset + r + r * Math.cos(a), y: inset + h - r + r * Math.sin(a) }
-                                            }
-                                            d -= corner
-                                            if (d < sideLen) return { x: inset, y: inset + h - r - d }
-                                            d -= sideLen
-                                            const a = Math.PI + d / r
-                                            return { x: inset + r + r * Math.cos(a), y: inset + r + r * Math.sin(a) }
-                                        }
-
-                                        const bandLen = perimeter * bandFraction
-                                        const steps = bandSegments
-
-                                        // Gaussian-ish cross-band weight: 1 at the centre,
-                                        // fading smoothly to ~0 at the edges of the band.
-                                        // This is what keeps the band itself soft — the
-                                        // travel around the loop never stops or resets.
-                                        function weight(t) {
-                                            const x = (t - 0.5) * 2.0 * bandSharpness
-                                            return Math.exp(-x * x)
-                                        }
-
-                                        // Draw one glowing band centred at perimeter
-                                        // distance centerD.
-                                        function drawBand(centerD) {
-                                            for (let i = 0; i < steps; i++) {
-                                                const t0 = i / steps
-                                                const t1 = (i + 1) / steps
-                                                const d0 = centerD - bandLen / 2 + t0 * bandLen
-                                                const d1 = centerD - bandLen / 2 + t1 * bandLen
-                                                const p0 = pointAt(d0)
-                                                const p1 = pointAt(d1)
-                                                const a0 = weight(t0) * coreOpacity
-                                                const a1 = weight(t1) * coreOpacity
-                                                const grad = ctx.createLinearGradient(p0.x, p0.y, p1.x, p1.y)
-                                                grad.addColorStop(0, Qt.rgba(glowColor.r, glowColor.g, glowColor.b, a0))
-                                                grad.addColorStop(1, Qt.rgba(glowColor.r, glowColor.g, glowColor.b, a1))
-                                                ctx.strokeStyle = grad
-                                                ctx.beginPath()
-                                                ctx.moveTo(p0.x, p0.y)
-                                                ctx.lineTo(p1.x, p1.y)
-                                                ctx.stroke()
-                                            }
-                                        }
-
-                                        ctx.lineCap = "round"
-                                        ctx.shadowBlur = glowBlur
-                                        ctx.shadowColor = Qt.rgba(glowColor.r, glowColor.g, glowColor.b, 0.85)
-                                        ctx.lineWidth = coreWidth
-
-                                        // One band per light, evenly spaced around the
-                                        // perimeter (spacing = 1 / lightCount).
-                                        for (let n = 0; n < lightCount; n++) {
-                                            const centerD = ((head + n / lightCount) % 1.0) * perimeter
-                                            drawBand(centerD)
-                                        }
-
-                                        ctx.shadowBlur = 0
-                                    }
+                                    // Uniforms: property names must match the shader's
+                                    // uniform block members. QML types map to GLSL
+                                    // (real -> float, var QSize -> vec2, color -> vec4).
+                                    property real u_head: head
+                                    property real u_radius: Math.min(Kirigami.Units.smallSpacing, width / 2, height / 2)
+                                    property real u_bandFraction: bandFraction
+                                    property real u_bandSharpness: bandSharpness
+                                    property real u_coreWidth: coreWidth
+                                    property real u_coreOpacity: coreOpacity
+                                    property real u_glowBlur: glowBlur
+                                    property real u_lightCount: lightCount
+                                    property real u_inset: 1.5
+                                    property var u_size: Qt.size(width, height)
+                                    property color u_color: glowColor
 
                                     // Advance the head with a timer so the loop is
                                     // perfectly continuous (no restart seam). The step
