@@ -15,7 +15,7 @@ Built with **Python**, **PySide6**, and **Kirigami**, Kwal offers a native and f
   - **Starship**: Apply color themes to your terminal prompt.
   - **Ulauncher**: Generate matching themes for your application launcher.
 - **📂 Template System**: Customize how colors are applied to each tool.
-- **✨ KDE Integration**: Native Kirigami style with support for blur effects and dark mode.
+- **✨ KDE Integration**: Native Kirigami UI, follows your Plasma theme (light/dark).
 
 ---
 
@@ -32,6 +32,8 @@ These **must** be installed from your distribution's package manager — they ca
 | Qt6 WebEngine | `qt6-webengine` | `qt6-qtwebengine` | `qt6-webengine-dev` |
 | Kirigami | `kirigami` | `kf6-kirigami` | `kirigami2-dev` |
 
+> **Note:** On Debian/Ubuntu, `python3-pyside6` may not be available in older releases — check your distro's package repository or use the [PySide6 PPA](https://launchpad.net/~pyside6/+archive/ubuntu/ppa) on Ubuntu.
+
 **Arch Linux (one-liner):**
 ```bash
 sudo pacman -S python pyside6 qt6-webengine kirigami
@@ -47,6 +49,7 @@ These are pure Python libraries installed automatically during setup:
 
 | Tool | Purpose | Arch Linux |
 |---|---|---|
+| matugen | KDE color engine — preferred for wallpaper color extraction | `matugen` |
 | ImageMagick | Advanced image tinting & palette extraction | `imagemagick` |
 
 ### Target Applications (user-installed)
@@ -101,6 +104,7 @@ On first launch, Kwal automatically installs templates to `~/.config/kwal/templa
 
 ### Terminal Commands
 ```bash
+kwal --log-level DEBUG    # Verbose logging (also via LOG_LEVEL env var)
 kwal                      # Launch the graphical interface
 kwal --install-templates  # Force re-installation of original templates
 ```

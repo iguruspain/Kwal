@@ -59,6 +59,9 @@ Thumbs.db
 # Pyre / mypy
 .mypy_cache/
 
+# ruff
+.ruff_cache/
+
 # Jupyter
 .ipynb_checkpoints/
 
@@ -86,6 +89,7 @@ qmlcache/
 .agent/*
 .kilo/
 .kilo/*
+agents.zip
 
 # Run
 run.py

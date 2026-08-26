@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 name = "kwal"
 
-version = "0.1"
+version = "1.0"
 requires-python = ">=3.10"
 authors = [
     {name = "iguruspain", email = "iguruspain@example.com"}

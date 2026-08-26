@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 import threading
 from pathlib import Path
 from typing import Any, Optional, cast
+
+import tomlkit
 
 from PySide6.QtCore import Property, QCoreApplication, QObject, Signal, Slot
 from PySide6.QtGui import QColor
@@ -15,9 +18,10 @@ from PySide6.QtGui import QColor
 from ..models.common import SettingsApp
 from ..models.settings_models import SettingsAppModel
 from ..models.wallpaper_models import ImageModel
-from ..utils import color_utils
+from ..utils import color_utils, video_utils
 from ..utils.palette_worker import PaletteWorker
 from ..utils.xdg_paths import kwal_config_dir
+from .commands_controller import normalize_custom_commands
 
 
 class BaseMixin:
@@ -42,43 +46,121 @@ class BaseMixin:
     def _get_config_path_file(self) -> Path:
         cfg_dir = kwal_config_dir()
         cfg_dir.mkdir(parents=True, exist_ok=True)
-        return cfg_dir / "folders.json"
+        return cfg_dir / "config.toml"
+
+    @staticmethod
+    def _strip_jsonc_comments(text: str) -> str:
+        """Remove // line comments and /* block comments */ from a JSONC string."""
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"//[^\n]*", "", text)
+        return text
+
+    def _migrate_legacy_config(self) -> None:
+        """Silently migrate older config formats to config.toml.
+
+        Migration chain (oldest first):
+          folders.json  →  config.jsonc  →  config.toml
+        """
+        toml_path = self._config_path_file
+
+        # Step 1: folders.json → config.jsonc  (already done in a previous release)
+        jsonc_path = toml_path.parent / "config.jsonc"
+        old_json   = toml_path.parent / "folders.json"
+        if old_json.exists() and not jsonc_path.exists() and not toml_path.exists():
+            try:
+                old_json.rename(jsonc_path)
+                self._logger.info("Migrated folders.json → config.jsonc")
+            except Exception:
+                self._logger.exception("Could not rename folders.json → config.jsonc")
+
+        # Step 2: config.jsonc → config.toml
+        if jsonc_path.exists() and not toml_path.exists():
+            try:
+                raw  = jsonc_path.read_text(encoding="utf-8")
+                data = json.loads(self._strip_jsonc_comments(raw))
+
+                doc = tomlkit.document()
+                doc.add(tomlkit.comment("Kwal configuration — comments are preserved on save"))
+                doc.add(tomlkit.comment("Do not edit while Kwal is running."))
+                doc.add(tomlkit.nl())
+                doc["selected_folder"]  = data.get("selected_folder", "")
+                doc["last_set_wallpaper"] = data.get("last_set_wallpaper", "")
+
+                for f in data.get("folders", []):
+                    tbl = tomlkit.table()
+                    tbl["name"] = f.get("name", "")
+                    tbl["path"] = f.get("path", "")
+                    doc.append("folders", tbl)
+
+                for cmd in data.get("custom_commands", []):
+                    tbl = tomlkit.table()
+                    tbl["command"] = cmd.get("command", "")
+                    tbl["enabled"] = bool(cmd.get("enabled", True))
+                    doc.append("custom_commands", tbl)
+
+                toml_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
+                jsonc_path.unlink()
+                self._logger.info("Migrated config.jsonc → config.toml")
+            except Exception:
+                self._logger.exception("Could not migrate config.jsonc → config.toml")
 
     def _load_config(self) -> dict[str, Any]:
-        """Load persisted config."""
+        """Load persisted config from config.toml, migrating legacy formats if needed."""
         default_config: dict[str, Any] = {"folders": [], "selected_folder": ""}
+
+        self._migrate_legacy_config()
+
         if not self._config_path_file.exists():
             return default_config
 
         try:
-            with open(self._config_path_file, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-                if isinstance(data, list):
-                    # Migration from old list-only format
-                    return {"folders": data, "selected_folder": ""}
-                if isinstance(data, dict):
-                    return data
-                return default_config
+            raw  = self._config_path_file.read_text(encoding="utf-8")
+            data = tomlkit.loads(raw)
+            return dict(data)
         except Exception:
             self._logger.exception("Failed reading config file %s", self._config_path_file)
             return default_config
 
     def _save_config(self) -> None:
-        """Save current state into config file."""
-        data = {
-            "folders": [{"name": f.name, "path": f.path} for f in self._model._folders],
-            "selected_folder": self._selected_folder,
-            "custom_commands": self._custom_commands
-        }
-        if self._last_set_wallpaper:
-            data["last_set_wallpaper"] = self._last_set_wallpaper
-
+        """Save current state into config.toml, preserving existing comments and formatting."""
         try:
-            with open(self._config_path_file, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, ensure_ascii=False, indent=2)
+            # Load existing document to preserve comments; fall back to a fresh one
+            if self._config_path_file.exists():
+                raw = self._config_path_file.read_text(encoding="utf-8")
+                doc = tomlkit.loads(raw)
+            else:
+                doc = tomlkit.document()
+                doc.add(tomlkit.comment("Kwal configuration — comments are preserved on save"))
+                doc.add(tomlkit.comment("Do not edit while Kwal is running."))
+                doc.add(tomlkit.nl())
+
+            # ── scalar values ────────────────────────────────────────────────
+            doc["selected_folder"]    = self._selected_folder
+            doc["last_set_wallpaper"] = self._last_set_wallpaper
+
+            # ── folders (array of tables) ────────────────────────────────────
+            folders_arr = tomlkit.aot()
+            for f in self._model._folders:
+                tbl = tomlkit.table()
+                tbl["name"] = f.name
+                tbl["path"] = f.path
+                folders_arr.append(tbl)
+            doc["folders"] = folders_arr
+
+            # ── custom_commands (array of tables) ────────────────────────────
+            cmds_arr = tomlkit.aot()
+            for cmd in self._custom_commands:
+                tbl = tomlkit.table()
+                tbl["command"] = cmd.get("command", "")
+                tbl["enabled"] = bool(cmd.get("enabled", True))
+                cmds_arr.append(tbl)
+            doc["custom_commands"] = cmds_arr
+
+            self._config_path_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
         except Exception as e:
             self._logger.exception("Failed saving config")
             self.notification.emit(f"Failed to save config: {e}", "error")
+
 
     def _restore_folder_selection(self, last_selected: str) -> None:
         initial_index = 0
@@ -226,7 +308,6 @@ class BaseMixin:
     def isVideoFile(self, file_path: str) -> bool:
         """Check if a file is a supported video format."""
         try:
-            from ..utils import video_utils
             return video_utils.is_video_file(file_path)
         except Exception:
             return False
@@ -333,7 +414,7 @@ class BaseMixin:
     def getCachedColorEntries(self) -> list[dict[str, Any]]:
         """Return every cached wallpaper's colors/categories for the editor panel."""
         try:
-            from ..utils import color_extractor, video_utils
+            from ..utils import color_extractor
             entries = color_extractor.list_cache_entries()
             for e in entries:
                 e["isVideo"] = video_utils.is_video_file(e["path"])
@@ -401,7 +482,7 @@ class BaseMixin:
         config = self._load_config()
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
         if "custom_commands" in config and isinstance(config["custom_commands"], list):
-            self._custom_commands = self._normalize_custom_commands(config["custom_commands"])
+            self._custom_commands = normalize_custom_commands(config["custom_commands"])
         else:
             self._custom_commands = []
         self._last_selected_folder = cast(str, config.get("selected_folder", ""))

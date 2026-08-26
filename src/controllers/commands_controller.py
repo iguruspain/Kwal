@@ -7,22 +7,32 @@ from typing import Any
 from PySide6.QtCore import Property, Signal, Slot
 
 
+def normalize_custom_commands(raw: list) -> list[dict[str, Any]]:
+    """Normalize custom commands to {"command": str, "enabled": bool}.
+
+    Extracted as a module-level function so that it can be imported by
+    other modules (e.g. base_controller) without depending on the MRO of
+    the mixin class.
+    """
+    normalized: list[dict[str, Any]] = []
+    for item in raw:
+        if isinstance(item, str):
+            normalized.append({"command": item, "enabled": True})
+        elif isinstance(item, dict):
+            normalized.append({
+                "command": str(item.get("command", "")),
+                "enabled": bool(item.get("enabled", True)),
+            })
+    return normalized
+
+
 class CommandsMixin:
     customCommandsChanged = Signal()
 
     @staticmethod
     def _normalize_custom_commands(raw: list) -> list[dict[str, Any]]:
-        """Normalize custom commands to {"command": str, "enabled": bool}."""
-        normalized: list[dict[str, Any]] = []
-        for item in raw:
-            if isinstance(item, str):
-                normalized.append({"command": item, "enabled": True})
-            elif isinstance(item, dict):
-                normalized.append({
-                    "command": str(item.get("command", "")),
-                    "enabled": bool(item.get("enabled", True)),
-                })
-        return normalized
+        """Delegate to the module-level ``normalize_custom_commands`` function."""
+        return normalize_custom_commands(raw)
 
     def _get_custom_commands(self) -> list[dict[str, Any]]:
         return self._custom_commands

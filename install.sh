@@ -158,6 +158,14 @@ echo "    Desktop entry → $USER_APPS_DIR/$DESKTOP_FILE"
 # ──────────────────────────────────────────────
 echo -e "${GREEN}[5/5] Checking optional dependencies...${NC}"
 
+if command -v matugen &>/dev/null; then
+    echo "    matugen — OK (preferred wallpaper color extraction)"
+else
+    echo -e "${YELLOW}    [OPTIONAL] matugen not found.${NC}"
+    echo "      Install it for KDE-native wallpaper color extraction:"
+    echo "      Arch: sudo pacman -S matugen"
+fi
+
 if command -v magick &>/dev/null || command -v convert &>/dev/null; then
     echo "    ImageMagick — OK (advanced tinting & palette extraction)"
 else
@@ -165,6 +173,14 @@ else
     echo "      Install it for advanced image tinting features:"
     echo "      Arch: sudo pacman -S imagemagick"
 fi
+
+for tool in fastfetch starship ulauncher; do
+    if command -v "$tool" &>/dev/null; then
+        echo "    $tool — OK (tinting target)"
+    else
+        echo -e "${YELLOW}    [OPTIONAL] $tool not found (tinting target).${NC}"
+    fi
+done
 
 # ──────────────────────────────────────────────
 # Done

@@ -23,6 +23,7 @@ depends=(
 )
 makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
 optdepends=(
+    'matugen: KDE color engine (preferred for wallpaper color extraction)'
     'imagemagick: Advanced image tinting and palette extraction'
     'fastfetch: Terminal fetch tool (tinting target)'
     'starship: Terminal prompt (tinting target)'
