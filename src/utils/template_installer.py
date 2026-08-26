@@ -1,7 +1,7 @@
-from importlib import resources
-from pathlib import Path
 import shutil
 import sys
+from importlib import resources
+from pathlib import Path
 
 from .xdg_paths import xdg_config_home
 
@@ -26,7 +26,9 @@ def install_templates_to_user(config_home: Path | None = None, force: bool = Fal
     The function searches for templates in several candidate locations:
     1. Packaged resources inside the `kwal` package (`resources/templates`).
     2. Repository path `src/resources/templates` (useful in development).
-    3. System share paths under the installation prefix (`sys.prefix/share/kwal/templates`), `/usr/share/kwal/templates`, or `/usr/local/share/kwal/templates`.
+    3. System share paths under the installation prefix
+       (`sys.prefix/share/kwal/templates`), `/usr/share/kwal/templates`,
+       or `/usr/local/share/kwal/templates`.
 
     The directory structure is copied recursively into `XDG_CONFIG_HOME/kwal/templates`.
     """

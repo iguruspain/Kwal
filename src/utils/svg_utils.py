@@ -10,7 +10,7 @@ from xml.dom import minidom
 from .xdg_paths import kwal_cache_dir
 
 if TYPE_CHECKING:
-    from xml.dom.minidom import Document, Element
+    from xml.dom.minidom import Document
 
 logger = logging.getLogger(__name__)
 

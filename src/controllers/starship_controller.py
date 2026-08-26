@@ -5,9 +5,13 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from PySide6.QtCore import QObject, Property, Signal, Slot
-from ..models.models import StarshipTemplateModel
-from ..utils import file_utils
+
+from PySide6.QtCore import Property, QObject, Signal, Slot
+
+from ..models.starship_models import StarshipModel, StarshipTemplateModel
+from ..utils import file_utils, starship_config
+from ..utils.xdg_paths import kwal_config_dir
+
 
 class StarshipMixin:
     starshipDraftColorChanged = Signal()
@@ -31,7 +35,10 @@ class StarshipMixin:
             self._starship_draft_color = val
             self.starshipDraftColorChanged.emit()
 
-    starshipDraftColor = Property(str, _get_starship_draft_color, _set_starship_draft_color, notify=starshipDraftColorChanged)
+    starshipDraftColor = Property(
+        str, _get_starship_draft_color, _set_starship_draft_color,
+        notify=starshipDraftColorChanged,
+    )
 
     def _get_starship_is_file_mode(self) -> bool:
         return self._starship_is_file_mode
@@ -41,7 +48,10 @@ class StarshipMixin:
             self._starship_is_file_mode = val
             self.starshipIsFileModeChanged.emit()
 
-    starshipIsFileMode = Property(bool, _get_starship_is_file_mode, _set_starship_is_file_mode, notify=starshipIsFileModeChanged)
+    starshipIsFileMode = Property(
+        bool, _get_starship_is_file_mode, _set_starship_is_file_mode,
+        notify=starshipIsFileModeChanged,
+    )
 
     def _get_starship_template_index(self) -> int:
         return self._starship_template_index
@@ -51,7 +61,10 @@ class StarshipMixin:
             self._starship_template_index = val
             self.starshipTemplateIndexChanged.emit()
 
-    starshipTemplateIndex = Property(int, _get_starship_template_index, _set_starship_template_index, notify=starshipTemplateIndexChanged)
+    starshipTemplateIndex = Property(
+        int, _get_starship_template_index, _set_starship_template_index,
+        notify=starshipTemplateIndexChanged,
+    )
 
     @Property(QObject, constant=True)
     def starshipTemplateModel(self) -> StarshipTemplateModel:
@@ -94,7 +107,10 @@ class StarshipMixin:
 
         # Ensure template model is refreshed from the StarshipModel's template folder
         try:
-            if hasattr(self, "_starship_template_model") and hasattr(self, "_starship_model") and getattr(self._starship_model, "_template_folder", None):
+            has_tm = hasattr(self, "_starship_template_model")
+            has_model = hasattr(self, "_starship_model")
+            has_folder = getattr(self._starship_model, "_template_folder", None) if has_model else None
+            if has_tm and has_model and has_folder:
                 self._starship_template_model.refresh(self._starship_model._template_folder)
             elif hasattr(self, "_starship_template_model"):
                 # Fallback: try refreshing with None (model should handle missing path)
@@ -110,17 +126,17 @@ class StarshipMixin:
     def restoreStarshipBackup(self) -> None:
         """Restore the starship config backup."""
         try:
-            ok = file_utils.restore_starship_config_backup(None)
+            ok = starship_config.restore_starship_config_backup(None)
             if ok:
                 msg = "Restored starship config from backup"
                 self._show_result_dialog(msg)
                 self.starshipBackupExistsChanged.emit()
-                
+
                 # Refresh model
                 self._starship_model.refresh()
                 # Reload current preview since we changed disk state
                 self._starship_model.reloadCurrentConfigPreview()
-                
+
                 # Clear selection
                 self.starshipClearSelection()
             else:
@@ -133,7 +149,7 @@ class StarshipMixin:
     @Slot()
     def applyStarshipConfig(self) -> None:
         """Apply the current starship configuration state to ~/.config/starship.toml."""
-        from ..utils.file_utils import apply_starship_palettes_atomic
+        from ..utils.starship_config import apply_starship_palettes_atomic
         try:
             # Determine Source
             source_path = ""
@@ -191,7 +207,7 @@ class StarshipMixin:
             names = self._starship_model._palette_names
             values = self._starship_model._palette_values
             keys = self._starship_model._palette_keys
-            
+
             if not names:
                  self._show_result_dialog("No palette data available to apply.")
                  return
@@ -202,7 +218,7 @@ class StarshipMixin:
                 if idx < len(values) and idx < len(keys):
                     pvals = values[idx]
                     pkeys = keys[idx]
-                    
+
                     palette_dict = {}
                     # Single value check logic preserved from original, though rare for starship palettes
                     if len(pkeys) == 1 and pkeys[0] == "value":
@@ -218,7 +234,10 @@ class StarshipMixin:
             # overwrites and duplicated log entries. Move first palette to the end
             # so the original index 0 becomes the active palette.
             if palettes_to_save:
-                ordered = palettes_to_save[1:] + [palettes_to_save[0]] if len(palettes_to_save) > 1 else palettes_to_save
+                if len(palettes_to_save) > 1:
+                    ordered = palettes_to_save[1:] + [palettes_to_save[0]]
+                else:
+                    ordered = palettes_to_save
                 active_name = ordered[-1][0]
             else:
                 ordered = []
@@ -229,11 +248,11 @@ class StarshipMixin:
                     self._logger.error("Atomic update failed for starship config")
                     self._show_result_dialog("Failed writing to config file (Atomic Error).")
                     return
-            
+
               # success path continues
 
             self._show_result_dialog("Starship configuration applied successfully.")
-            
+
             # Refresh to reflect disk state
             self._starship_model.refresh(str(dest_path))
             # Force reload of current preview
@@ -242,3 +261,21 @@ class StarshipMixin:
         except Exception as e:
             self._logger.exception("Failed processing starship config")
             self._show_result_dialog(f"Error applying config: {e}")
+
+    def _init_starship(self) -> None:
+        """Initialize starship draft state and models."""
+        self._starship_draft_color: str = "transparent"
+        self._starship_is_file_mode: bool = False
+        self._starship_template_index: int = -1
+
+        try:
+            default_starship_templates = str(kwal_config_dir() / "templates" / "starship")
+            self._starship_model = StarshipModel(template_folder=default_starship_templates)
+            self._starship_template_model = StarshipTemplateModel()
+            self._starship_template_model.refresh(default_starship_templates)
+            try:
+                self._starship_model.refresh()
+            except Exception:
+                self._logger.debug("Initial starship model refresh failed or file missing")
+        except Exception:
+            self._logger.exception("Failed initializing StarshipModel")

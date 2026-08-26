@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import (
+    Property,
     QAbstractListModel,
     QModelIndex,
     QObject,
-    Property,
     Qt,
     Signal,
     Slot,
@@ -67,7 +67,7 @@ class StarshipTemplateModel(QAbstractListModel):
                 return
 
             # Import here to avoid circular dependencies if utils imports models
-            from ..utils.file_utils import list_starship_templates
+            from ..utils.starship_config import list_starship_templates
 
             startship_files = list_starship_templates(folder_path)
 
@@ -106,7 +106,12 @@ class StarshipModel(PreviewModelBase):
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
 
-    def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        config_path: str | None = None,
+        template_folder: str | None = None,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(default_scale=1.0, default_width=800, render_interval_ms=100, parent=parent)
         from pathlib import Path
 
@@ -164,29 +169,21 @@ class StarshipModel(PreviewModelBase):
     def reloadCurrentConfigPreview(self) -> None:
         """Reads the actual config file from disk and triggers background rendering."""
         try:
-            from ..utils import file_utils
             import json
+
+            from ..utils import starship_config
 
             if not os.path.exists(self._config_path):
                 self._current_config_preview_html = ""
                 self.currentConfigPreviewChanged.emit()
                 return
 
-            json_str, _ = file_utils.read_starship_config(self._config_path)
+            json_str, _ = starship_config.read_starship_config(self._config_path)
             data = json.loads(json_str)
 
-            # Use background worker instead of synchronous generate_preview_html
-            # We don't want to use the same self._worker if one is already running for previewHtml
-            # OR we can just manage a second thread. For simplicity, let's allow overlapping.
-            # Actually, let's just use a dedicated worker instance for this.
-
-            # For now, let's just make it backgroundable via the same cleanup logic
-            # but maybe a different thread reference if we want them concurrent.
-            # Given they are light, sequential or replacing is usually fine, but
-            # if we are resizing, we want BOTH.
-
+            # Render in a background worker to keep the UI responsive.
             self._start_worker(
-                starship_preview.generate_preview_html,
+                starship_preview.generate_starship_preview_html,
                 (data, None, self._preview_scale, self._preview_width),
                 "currentConfigPreviewHtml"
             )
@@ -233,7 +230,7 @@ class StarshipModel(PreviewModelBase):
                 out["palettes"][name] = mapping
 
             self._start_worker(
-                starship_preview.generate_preview_html,
+                starship_preview.generate_starship_preview_html,
                 (out, None, self._preview_scale, self._preview_width),
                 "previewHtml"
             )
@@ -252,16 +249,17 @@ class StarshipModel(PreviewModelBase):
     @Slot(result="QVariantMap")
     @Slot(str, result="QVariantMap")
     def refresh(self, path: str | None = None) -> dict:
-        """Read starship config (using utils.file_utils.read_starship_config) and update properties.
+        """Read starship config (using utils.starship_config.read_starship_config) and update properties.
 
         Returns a small map for QML with `config_path` and `palettes_count` for convenience.
         """
         try:
             # Import inside method to avoid circular imports
-            from ..utils import file_utils
             import json
 
-            json_str, display = file_utils.read_starship_config(path or self._config_path)
+            from ..utils import starship_config
+
+            json_str, display = starship_config.read_starship_config(path or self._config_path)
             data = json.loads(json_str)
 
             # Store full data for preview generation

@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import (
+    Property,
     QAbstractListModel,
     QModelIndex,
     QObject,
-    Property,
     Qt,
     Signal,
     Slot,
@@ -72,7 +72,7 @@ class UlauncherTemplateModel(QAbstractListModel):
         3. User themes (~/.config/ulauncher/user-themes/) -> is_template=False
         """
         try:
-            from ..utils.file_utils import list_ulauncher_templates
+            from ..utils.ulauncher_theme import list_ulauncher_templates
 
             new_items: list[dict[str, Any]] = []
             seen_paths: set[str] = set()
@@ -152,7 +152,12 @@ class UlauncherModel(PreviewModelBase):
     paletteValuesChanged = Signal()
     paletteKeysChanged = Signal()
 
-    def __init__(self, config_path: str | None = None, template_folder: str | None = None, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        config_path: str | None = None,
+        template_folder: str | None = None,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(default_scale=0.4, default_width=650, render_interval_ms=50, parent=parent)
         from pathlib import Path
 
@@ -273,16 +278,19 @@ class UlauncherModel(PreviewModelBase):
 
             # 1. Check user themes (Priority)
             found = find_in_root(Path.home() / ".config" / "ulauncher" / "user-themes")
-            if found: return found
+            if found:
+                return found
 
             # 2. Check system themes (Standard locations)
             # ~/.local/share/ulauncher/themes
             found = find_in_root(Path.home() / ".local" / "share" / "ulauncher" / "themes")
-            if found: return found
+            if found:
+                return found
 
             # /usr/share/ulauncher/themes
             found = find_in_root(Path("/usr/share/ulauncher/themes"))
-            if found: return found
+            if found:
+                return found
 
             # Fallback: check if directory exists with that name directly (old behavior/fallback)
             for p in [
@@ -324,25 +332,18 @@ class UlauncherModel(PreviewModelBase):
 
             # 1. Update Live Preview
             self._start_worker(
-                ulauncher_preview.generate_preview_html,
+                ulauncher_preview.generate_ulauncher_preview_html,
                 (target_path, live, self._preview_scale, self._preview_width),
                 "previewHtml"
             )
 
-            # 2. Update Current Config Preview (if missing or if we just switched/resized)
-            # For simplicity, we refresh it whenever _refresh_previews is called (timer/resize)
-            # if they are different paths or if it's empty.
+            # 2. Refresh the current-config preview when the paths differ.
             if actual_current_path:
                 self._start_worker(
-                    ulauncher_preview.generate_preview_html,
+                    ulauncher_preview.generate_ulauncher_preview_html,
                     (actual_current_path, {}, self._preview_scale, self._preview_width),
                     "currentConfigPreviewHtml"
                 )
-
-            # Also trigger current config preview if needed
-            # For simplicity we could run another worker or just do it sequentially if they are light.
-            # But let's stick to one worker for now to avoid too much overhead.
-            # We will only background the "active" preview which is what feels laggy.
         except Exception:
             logger.exception("Failed starting Ulauncher background preview task")
 
@@ -360,7 +361,7 @@ class UlauncherModel(PreviewModelBase):
     def refresh(self, path: str | None = None) -> dict:
         """Read ulauncher theme at path (or resolve current if None)."""
         try:
-            from ..utils import file_utils
+            from ..utils import ulauncher_theme
 
             target_path = path
             if not target_path:
@@ -380,7 +381,7 @@ class UlauncherModel(PreviewModelBase):
                 self.paletteKeysChanged.emit()
                 return {"config_path": "", "palettes_count": 0}
 
-            data = file_utils.read_ulauncher_theme(target_path)
+            data = ulauncher_theme.read_ulauncher_theme(target_path)
             self._full_data = data
 
             # Convert to lists for QML
@@ -550,7 +551,7 @@ class UlauncherModel(PreviewModelBase):
                     if "provisional" in val:
                          return "Theme contains provisional values. Please customize all colors."
 
-            from ..utils import file_utils
+            from ..utils import ulauncher_theme
 
             data_to_write = {"manifest": {}, "theme": {}}
 
@@ -572,7 +573,7 @@ class UlauncherModel(PreviewModelBase):
                     data_to_write["theme"] = combined
 
             # Write to save_to
-            if file_utils.write_ulauncher_theme(save_to, data_to_write, skip_backup=False):
+            if ulauncher_theme.write_ulauncher_theme(save_to, data_to_write, skip_backup=False):
                  return ""
             else:
                  return "Failed to write theme files."
@@ -653,5 +654,5 @@ class UlauncherModel(PreviewModelBase):
 
              return "" # Already applied
 
-        except Exception as e:
+        except Exception:
             logger.exception("UlauncherModel.apply failed")

@@ -17,8 +17,8 @@ specialised sub-components:
 
 Public API
 ----------
-:func:`generate_preview_html` is the entry point.  Call it with a theme path
-and optional live colour overrides to obtain a complete HTML string.
+:func:`generate_ulauncher_preview_html` is the entry point.  Call it with a
+theme path and optional live colour overrides to obtain a complete HTML string.
 """
 
 import json
@@ -81,7 +81,7 @@ _INVALID_COLORS = {"provisional_rgba_color", "provisional_hex_color", "transpare
 # Public API
 # ---------------------------------------------------------------------------
 
-def generate_preview_html(
+def generate_ulauncher_preview_html(
     theme_path: str | Path,
     live_colors: dict[str, str] | None = None,
     scale: float = 0.75,
@@ -117,7 +117,10 @@ def generate_preview_html(
         A self-contained HTML document (``<!DOCTYPE html>...``) ready to be
         injected into a ``QWebEngineView``.
     """
-    renderer = UlauncherRendererV2(theme_path, live_colors, window_width=window_width, manifest=manifest, css_content=css_content)
+    renderer = UlauncherRendererV2(
+        theme_path, live_colors, window_width=window_width,
+        manifest=manifest, css_content=css_content,
+    )
     return renderer.render(scale=scale)
 
 
@@ -398,19 +401,19 @@ class UlauncherRendererV2:
     @property
     def calced(self) -> dict[str, int | str]:
         """Expose layout values as ready-to-use CSS values (absolute pixels)."""
-        l = self.layout
+        layout = self.layout
         return {
-            "results_padding_bottom": l["results_padding_bottom"],
-            "input_padding": f"{l['input_padding_v']}px {l['input_padding_h']}px",
-            "item_padding": f"{l['item_padding_v']}px {l['item_padding_h']}px",
-            "item_margin": f"0 {l['item_margin_h']}px",
-            "icon_container_width": l["icon_container_width"],
-            "icon_size": l["icon_size"],
-            "text_padding_left": l["text_padding_left"],
-            "input_font_size": l["input_font_size"],
-            "item_name_font_size": l["item_name_font_size"],
-            "item_text_font_size": l["item_text_font_size"],
-            "shortcut_font_size": l["shortcut_font_size"],
+            "results_padding_bottom": layout["results_padding_bottom"],
+            "input_padding": f"{layout['input_padding_v']}px {layout['input_padding_h']}px",
+            "item_padding": f"{layout['item_padding_v']}px {layout['item_padding_h']}px",
+            "item_margin": f"0 {layout['item_margin_h']}px",
+            "icon_container_width": layout["icon_container_width"],
+            "icon_size": layout["icon_size"],
+            "text_padding_left": layout["text_padding_left"],
+            "input_font_size": layout["input_font_size"],
+            "item_name_font_size": layout["item_name_font_size"],
+            "item_text_font_size": layout["item_text_font_size"],
+            "shortcut_font_size": layout["shortcut_font_size"],
         }
 
     @property
@@ -708,24 +711,24 @@ class UlauncherRendererV2:
         """
 
 if __name__ == "__main__":
-    import sys
     import argparse
+    import sys
 
     parser = argparse.ArgumentParser(description="Generate a standalone Ulauncher theme preview.")
     parser.add_argument("theme_path", help="Path to the Ulauncher theme directory")
     parser.add_argument("--output", default="preview.html", help="Path to the output HTML file")
     parser.add_argument("--scale", type=float, default=1.0, help="Scaling factor (e.g. 0.8)")
-    
+
     args = parser.parse_args()
-    
+
     theme_dir = Path(args.theme_path).expanduser().resolve()
     if not theme_dir.is_dir():
         print(f"Error: {theme_dir} is not a directory.")
         sys.exit(1)
-        
+
     renderer = UlauncherRendererV2(theme_dir)
     html_content = renderer.render(scale=args.scale)
-    
+
     output_file = Path(args.output).resolve()
     output_file.write_text(html_content, encoding="utf-8")
     print(f"Preview generated successfully: {output_file}")

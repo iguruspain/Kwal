@@ -45,19 +45,19 @@ def get_frame_cache_path(video_path: str, timestamp: float = 0.0) -> Path:
 def extract_video_frame(video_path: str, output_path: str, timestamp: float = 0.0) -> bool:
     """
     Extract a single frame from a video file using ffmpeg.
-    
+
     Args:
         video_path: Path to video file
         output_path: Path where to save the extracted frame
         timestamp: Timestamp in seconds (default 0.0 for first frame)
-    
+
     Returns:
         True if successful, False otherwise
     """
     if not Path(video_path).exists():
         logger.warning(f"Video file not found: {video_path}")
         return False
-    
+
     try:
         # Use ffmpeg to extract first frame
         cmd = [
@@ -70,16 +70,16 @@ def extract_video_frame(video_path: str, output_path: str, timestamp: float = 0.
             output_path,
             "-loglevel", "error"
         ]
-        
+
         result = subprocess.run(cmd, capture_output=True, timeout=10)
-        
+
         if result.returncode == 0 and Path(output_path).exists():
             logger.debug(f"Successfully extracted frame from {video_path}")
             return True
         else:
             logger.warning(f"ffmpeg failed for {video_path}: {result.stderr.decode()}")
             return False
-            
+
     except subprocess.TimeoutExpired:
         logger.warning(f"ffmpeg timeout extracting frame from {video_path}")
         return False
@@ -102,7 +102,7 @@ def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: 
         video_path: Path to video file
         timestamp: Timestamp in seconds (default 0.0 for first frame)
         max_size: Maximum dimension for thumbnail (default 256)
-    
+
     Returns:
         PIL Image object or None if extraction fails
     """
@@ -121,7 +121,7 @@ def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: 
         except Exception as e:
             logger.warning(f"Failed to load cached frame: {e}")
             cache_path.unlink()  # Remove corrupted cache
-    
+
     # Extract frame and cache it (native resolution, left untouched on disk)
     if extract_video_frame(video_path, str(cache_path), timestamp):
         try:
@@ -130,7 +130,7 @@ def get_video_frame_as_image(video_path: str, timestamp: float = 0.0, max_size: 
         except Exception as e:
             logger.exception(f"Failed to process extracted frame: {e}")
             return None
-    
+
     return None
 
 
@@ -177,44 +177,6 @@ def get_video_resolution(video_path: str) -> tuple[int, int] | None:
         return None
 
 
-def get_video_duration(video_path: str) -> float:
-    """
-    Get the duration of a video file in seconds.
-    
-    Args:
-        video_path: Path to video file
-    
-    Returns:
-        Duration in seconds, or 0.0 if unable to determine
-    """
-    if not Path(video_path).exists():
-        return 0.0
-    
-    try:
-        cmd = [
-            "ffprobe",
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1:noprint_names=1",
-            video_path
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, timeout=5, text=True)
-        
-        if result.returncode == 0 and result.stdout.strip():
-            return float(result.stdout.strip())
-        else:
-            logger.warning(f"Could not determine duration for {video_path}")
-            return 0.0
-            
-    except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
-        logger.warning(f"Error getting duration for {video_path}")
-        return 0.0
-    except Exception as e:
-        logger.exception(f"Error getting video duration: {e}")
-        return 0.0
-
-
 def is_video_file(file_path: str) -> bool:
     """Check if a file is a supported video file."""
     return Path(file_path).suffix.lower() in VIDEO_EXTENSIONS
@@ -230,28 +192,18 @@ def get_video_frame_path(video_path: str, timestamp: float = 0.0) -> str | None:
     Args:
         video_path: Path to video file
         timestamp: Timestamp in seconds (default 0.0 for first frame)
-    
+
     Returns:
         Path to cached frame PNG file, or None if extraction fails
     """
     cache_path = get_frame_cache_path(video_path, timestamp)
-    
+
     # If already cached, return it
     if cache_path.exists():
         return str(cache_path)
-    
+
     # Extract frame and cache it
     if extract_video_frame(video_path, str(cache_path), timestamp):
         return str(cache_path)
-    
+
     return None
-
-def is_image_file(file_path: str) -> bool:
-    """Check if a file is a supported image file."""
-    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
-    return Path(file_path).suffix.lower() in IMAGE_EXTENSIONS
-
-
-def is_media_file(file_path: str) -> bool:
-    """Check if a file is either a supported image or video file."""
-    return is_image_file(file_path) or is_video_file(file_path)

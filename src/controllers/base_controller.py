@@ -7,13 +7,18 @@ import logging
 import shutil
 import threading
 from pathlib import Path
-from typing import Optional, Any
-from PySide6.QtCore import QCoreApplication, QObject, Property, Signal, Slot
+from typing import Any, Optional, cast
+
+from PySide6.QtCore import Property, QCoreApplication, QObject, Signal, Slot
 from PySide6.QtGui import QColor
-from ..models.models import ImageModel, SettingsApp, SettingsAppModel
+
+from ..models.common import SettingsApp
+from ..models.settings_models import SettingsAppModel
+from ..models.wallpaper_models import ImageModel
 from ..utils import color_utils
 from ..utils.palette_worker import PaletteWorker
 from ..utils.xdg_paths import kwal_config_dir
+
 
 class BaseMixin:
     templatesInstalledChanged = Signal()
@@ -32,8 +37,6 @@ class BaseMixin:
 
     showExtensionBadgeChanged = Signal()
 
-    customCommandsChanged = Signal()
-
     notification = Signal(str, str)
 
     def _get_config_path_file(self) -> Path:
@@ -41,31 +44,12 @@ class BaseMixin:
         cfg_dir.mkdir(parents=True, exist_ok=True)
         return cfg_dir / "folders.json"
 
-    @staticmethod
-    def _normalize_custom_commands(raw: list) -> list[dict[str, Any]]:
-        """Normalize custom commands to {"command": str, "enabled": bool}.
-
-        Accepts the legacy format (plain list of command strings, all
-        implicitly enabled) as well as the current dict format, so existing
-        config files keep working after upgrading.
-        """
-        normalized: list[dict[str, Any]] = []
-        for item in raw:
-            if isinstance(item, str):
-                normalized.append({"command": item, "enabled": True})
-            elif isinstance(item, dict):
-                normalized.append({
-                    "command": str(item.get("command", "")),
-                    "enabled": bool(item.get("enabled", True)),
-                })
-        return normalized
-
     def _load_config(self) -> dict[str, Any]:
         """Load persisted config."""
         default_config: dict[str, Any] = {"folders": [], "selected_folder": ""}
         if not self._config_path_file.exists():
             return default_config
-        
+
         try:
             with open(self._config_path_file, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
@@ -88,7 +72,7 @@ class BaseMixin:
         }
         if self._last_set_wallpaper:
             data["last_set_wallpaper"] = self._last_set_wallpaper
-            
+
         try:
             with open(self._config_path_file, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, ensure_ascii=False, indent=2)
@@ -103,7 +87,7 @@ class BaseMixin:
                 if f.path == last_selected:
                     initial_index = i
                     break
-        
+
         if self._model.rowCount() > 0 and QCoreApplication.instance() is not None:
             self.selectFolder(initial_index)
 
@@ -128,7 +112,10 @@ class BaseMixin:
             self._result_dialog_visible = v_bool
             self.resultDialogVisibleChanged.emit()
 
-    resultDialogVisible = Property(bool, _get_result_dialog_visible, _set_result_dialog_visible, notify=resultDialogVisibleChanged)
+    resultDialogVisible = Property(
+        bool, _get_result_dialog_visible, _set_result_dialog_visible,
+        notify=resultDialogVisibleChanged,
+    )
 
     def _get_result_dialog_text(self) -> str:
         return self._result_dialog_text
@@ -140,70 +127,6 @@ class BaseMixin:
             self.resultDialogTextChanged.emit()
 
     resultDialogText = Property(str, _get_result_dialog_text, _set_result_dialog_text, notify=resultDialogTextChanged)
-
-    def _get_custom_commands(self) -> list[dict[str, Any]]:
-            return self._custom_commands
-
-    def _set_custom_commands(self, cmds: list) -> None:
-        normalized = self._normalize_custom_commands(cmds)
-        if self._custom_commands != normalized:
-            self._custom_commands = normalized
-            self._save_config()
-            self.customCommandsChanged.emit()
-
-    customCommands = Property("QVariantList", _get_custom_commands, _set_custom_commands, notify=customCommandsChanged)
-
-    @Slot(str)
-    def addCustomCommand(self, cmd: str) -> None:
-        """Añade un comando nuevo al final de la lista (activado por defecto)."""
-        self._custom_commands.append({"command": cmd, "enabled": True})
-        self._save_config()
-        self.customCommandsChanged.emit()
-
-    @Slot(int, str)
-    def updateCustomCommand(self, index: int, cmd: str) -> None:
-        """Actualiza el texto del comando en un índice específico, preservando su estado enabled."""
-        if 0 <= index < len(self._custom_commands):
-            self._custom_commands[index]["command"] = cmd
-            self._save_config()
-            self.customCommandsChanged.emit()
-
-    @Slot(int, bool)
-    def setCustomCommandEnabled(self, index: int, enabled: bool) -> None:
-        """Activa/desactiva un comando sin tocar su texto."""
-        if 0 <= index < len(self._custom_commands):
-            self._custom_commands[index]["enabled"] = enabled
-            self._save_config()
-            self.customCommandsChanged.emit()
-
-    @Slot(int, int)
-    def moveCustomCommand(self, from_index: int, to_index: int) -> None:
-        """Mueve un comando dentro de la lista.
-
-        La posición dentro de la lista determina su prioridad de ejecución.
-        """
-        if not (0 <= from_index < len(self._custom_commands)):
-            return
-
-        if not (0 <= to_index < len(self._custom_commands)):
-            return
-
-        if from_index == to_index:
-            return
-
-        command = self._custom_commands.pop(from_index)
-        self._custom_commands.insert(to_index, command)
-
-        self._save_config()
-        self.customCommandsChanged.emit()
-
-    @Slot(int)
-    def removeCustomCommand(self, index: int) -> None:
-        """Elimina el comando de la lista según su posición."""
-        if 0 <= index < len(self._custom_commands):
-            self._custom_commands.pop(index)
-            self._save_config()
-            self.customCommandsChanged.emit()
 
     @Property(bool, notify=compositingEnabledChanged)
     def compositingEnabled(self) -> bool:
@@ -292,7 +215,7 @@ class BaseMixin:
             # Calculate percent (0-100)
             val = alpha / 255.0
             perc = int(round(val * 100))
-             
+
             # If standard hex form is requested by QML tooltip style
             return f"#{c.red():02x}{c.green():02x}{c.blue():02x} alpha: {alpha} ({perc}%)"
         except Exception:
@@ -347,24 +270,24 @@ class BaseMixin:
         if not path:
             self.paletteGenerationError.emit("No image path provided")
             return
-            
+
         logging.info("Starting palette generation for %s with %s", path, backend)
-        
+
         # Increment request ID
         self._latest_palette_request_id += 1
         request_id = self._latest_palette_request_id
-        
+
         worker = PaletteWorker(path, backend, params)
         self._palette_workers.add(worker)
-        
+
         # Connect signals
         worker.dataReady.connect(lambda data: self._on_palette_ready(data, request_id))
         worker.error.connect(self.paletteGenerationError)
-        
+
         # Cleanup when thread finishes (using standard QThread.finished signal)
         # Using lambda allows proper closure over 'worker'
         worker.finished.connect(lambda: self._cleanup_palette_worker(worker))
-        
+
         worker.start()
 
     def _cleanup_palette_worker(self, worker: PaletteWorker):
@@ -379,7 +302,10 @@ class BaseMixin:
             self._current_palette_data = data
             self.currentPaletteDataChanged.emit()
         else:
-            logging.debug("Ignoring stale palette result (req %d, latest %d)", request_id, self._latest_palette_request_id)
+            logging.debug(
+                "Ignoring stale palette result (req %d, latest %d)",
+                request_id, self._latest_palette_request_id,
+            )
 
     @Slot()
     def clearPalette(self) -> None:
@@ -439,3 +365,53 @@ class BaseMixin:
                 thread.join(timeout=0.2)
             except Exception:
                 pass
+
+    def _init_base(self) -> None:
+        """Initialize base state, config, and shared models."""
+        self._current_palette_data: dict[str, Any] = {}
+
+        self._selected_folder: str = ""
+        self._selected_wallpaper: str = ""
+        self._last_set_wallpaper: str = ""
+        self._selected_wallpaper_resolution: str = ""
+        self._thumb_path: str = ""
+        self._selected_file: str = ""
+        self._fastfetch_tinted_preview: str = ""
+        self._fastfetch_tinting: bool = False
+        self._fastfetch_config_image: str = ""
+        self._result_dialog_visible: bool = False
+        self._result_dialog_text: str = ""
+        self._templates_installed: bool = False
+        self._custom_commands: list[dict[str, Any]] = []
+        self._wallpaper_colors: list[str] = []
+
+        self._compositing_enabled: bool = True
+        self._simulate_all_apps: bool = False
+        self._show_extension_badge: bool = True
+
+        self._tint_thread: Optional[threading.Thread] = None
+        self._apply_thread: Optional[threading.Thread] = None
+        self._color_extraction_thread: Optional[threading.Thread] = None
+        self._palette_workers: set[PaletteWorker] = set()
+        self._latest_palette_request_id: int = 0
+
+        self._home_path: str = str(Path.home()).rstrip("/") + "/"
+
+        self._config_path_file = self._get_config_path_file()
+        config = self._load_config()
+        self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
+        if "custom_commands" in config and isinstance(config["custom_commands"], list):
+            self._custom_commands = self._normalize_custom_commands(config["custom_commands"])
+        else:
+            self._custom_commands = []
+        self._last_selected_folder = cast(str, config.get("selected_folder", ""))
+        self._loaded_folders = config.get("folders", [])
+
+        self._optional_apps: list[tuple[str, SettingsApp]] = [
+            ("fastfetch", SettingsApp(app_name="fastfetch", section="Apps", qml_page="apps/fastfetch.qml")),
+            ("starship", SettingsApp(app_name="starship", section="Apps", qml_page="apps/starship.qml")),
+            ("ulauncher", SettingsApp(app_name="ulauncher", section="Apps", qml_page="apps/ulauncher.qml")),
+        ]
+        self._settings_app_model = SettingsAppModel(self._build_app_list())
+
+        self._templates_installed = self._check_templates_installed()

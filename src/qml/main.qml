@@ -18,17 +18,10 @@ Kirigami.ApplicationWindow {
     // Depends on the compositing state:
     // - Enabled: Semi-transparent (80%) for modern look.
     // - Disabled: Solid Alternate Background Color for readability fallback.
-    readonly property color overlayBackgroundColor: controller.compositingEnabled 
+    readonly property color overlayBackgroundColor: controller.compositingEnabled
         ? Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
         : Kirigami.Theme.backgroundColor
 
-    function notifyClipboard(text) {
-        root.showPassiveNotification(qsTr("Copied: %1").arg(text), "short")
-    }
-    function notifyOther(text) {
-        root.showPassiveNotification(text, "short")
-    }
-    
     // Enable transparency for the main window
     color: "transparent"
 
@@ -124,13 +117,6 @@ Kirigami.ApplicationWindow {
                     }
 
                     Item { Layout.fillWidth: true }
-
-                    // ToolButton {
-                    //     icon.name: "color-picker"
-                    //     ToolTip.text: qsTr("Open Color Palette")
-                    //     ToolTip.visible: hovered
-                    //     onClicked: globalPaletteDialog.open()
-                    // }
                 }
 
                 MenuSeparator {
@@ -217,12 +203,5 @@ Kirigami.ApplicationWindow {
             leftPadding: Kirigami.Units.smallSpacing
             rightPadding: Kirigami.Units.smallSpacing
         }
-    }
-
-    Components.DialogPalette {
-        id: globalPaletteDialog
-        // Can be opened from anywhere, doesn't need to apply to a specific field.
-        // It's just a reference/generator tool globally.
-        anchors.centerIn: parent
     }
 }

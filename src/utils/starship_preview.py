@@ -10,9 +10,8 @@ shell prompt. The module delegates work to four specialised classes:
 
 Public API
 ----------
-``generate_preview_html(toml_content, ...)`` – top-level convenience function
-used by the rest of the application. The signature is stable and should not
-change.
+``generate_starship_preview_html(toml_content, ...)`` – top-level convenience
+function used by the rest of the application.
 """
 import getpass
 import logging
@@ -436,7 +435,8 @@ class StarshipSegmentParser:
             text = text.replace("((", "(").replace("))", ")")
             text = text.replace("()", "").replace("( )", "")
             text = text.replace("( )", " ")
-            text = text.replace(f"( {python_ver})", f"{python_ver} (.venv)").replace(f"({python_ver} )", f" {python_ver} (.venv)")
+            text = text.replace(f"( {python_ver})", f"{python_ver} (.venv)")
+            text = text.replace(f"({python_ver} )", f" {python_ver} (.venv)")
         return text
 
     def clean_final_content(self, text: str) -> str:
@@ -497,11 +497,23 @@ def _build_preview_css(scale: float, width: int) -> str:
                     white-space: nowrap;
                     overflow: hidden;
                 }}
-                .prompt-line {{ display: flex; align-items: center; height: {CSS_PROMPT_LINE_HEIGHT}px; line-height: {CSS_PROMPT_LINE_HEIGHT}px; }}
+                .prompt-line {{
+                    display: flex; align-items: center;
+                    height: {CSS_PROMPT_LINE_HEIGHT}px; line-height: {CSS_PROMPT_LINE_HEIGHT}px;
+                }}
                 span {{ display: inline-flex; align-items: center; justify-content: center; height: 100%; }}
-                .text-node {{ padding: 0 4px; font-size: {CSS_TEXT_NODE_FONT_SIZE}px; white-space: pre; line-height: 1; }}
-                .glyph:not(.glyph2) {{ display: inline-flex; align-items: center; justify-content: center; font-size: {CSS_GLYPH_FONT_SIZE}px; margin: 0px -0.5px 0 -0.5px; line-height: 1; }}
-                .glyph2 {{ display: inline-flex; align-items: center; justify-content: center; font-size: {CSS_GLYPH_FONT_SIZE}px; margin: 0 -0.5px; line-height: 1; }}
+                .text-node {{
+                    padding: 0 4px; font-size: {CSS_TEXT_NODE_FONT_SIZE}px;
+                    white-space: pre; line-height: 1;
+                }}
+                .glyph:not(.glyph2) {{
+                    display: inline-flex; align-items: center; justify-content: center;
+                    font-size: {CSS_GLYPH_FONT_SIZE}px; margin: 0px -0.5px 0 -0.5px; line-height: 1;
+                }}
+                .glyph2 {{
+                    display: inline-flex; align-items: center; justify-content: center;
+                    font-size: {CSS_GLYPH_FONT_SIZE}px; margin: 0 -0.5px; line-height: 1;
+                }}
             </style>"""
 
 
@@ -814,7 +826,7 @@ class StarshipRenderer:
 # Module entry point
 # ---------------------------------------------------------------------------
 
-def generate_preview_html(
+def generate_starship_preview_html(
     data: str | dict[str, object],
     palette_index: int | None = None,
     scale: float = 1.0,

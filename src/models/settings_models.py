@@ -10,7 +10,6 @@ from PySide6.QtCore import (
     QModelIndex,
     QObject,
     Qt,
-    Signal,
     Slot,
 )
 

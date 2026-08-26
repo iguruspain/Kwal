@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QObject, Property, QThread, QTimer, Signal, Slot
 import shiboken6 as shiboken
+from PySide6.QtCore import Property, QObject, QThread, QTimer, Signal, Slot
 
 from ..utils.worker_thread import start_worker_thread
 

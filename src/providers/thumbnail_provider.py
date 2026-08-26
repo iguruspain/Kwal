@@ -1,9 +1,8 @@
 import hashlib
 import logging
-from pathlib import Path
 from urllib.parse import quote
 
-from PySide6.QtCore import QSize, Qt, QRunnable, QThreadPool
+from PySide6.QtCore import QRunnable, QSize, Qt, QThreadPool
 from PySide6.QtGui import QImage
 from PySide6.QtQuick import QQuickAsyncImageProvider, QQuickImageResponse, QQuickTextureFactory
 
@@ -28,7 +27,7 @@ class ThumbnailRunnable(QRunnable):
                 file_uri = "file://" + quote(req_id)
             else:
                 file_uri = req_id
-                
+
             hash_md5 = hashlib.md5(file_uri.encode('utf-8')).hexdigest()
             thumbnail_path = cache_root / f"{hash_md5}.png"
 
@@ -39,7 +38,7 @@ class ThumbnailRunnable(QRunnable):
             if thumbnail_path.exists():
                 if img.load(str(thumbnail_path)):
                     texture = QQuickTextureFactory.textureFactoryForImage(img)
-            
+
             if texture is None:
                 # 2. Cache miss or corrupt cache: Generate thumbnail
                 original_path = req_id
@@ -49,10 +48,10 @@ class ThumbnailRunnable(QRunnable):
                 if img.load(original_path):
                     # FreeDesktop 'large' thumbnails are up to 256x256
                     scaled_img = img.scaled(256, 256, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    
+
                     # Save to cache
                     scaled_img.save(str(thumbnail_path), "PNG")
-                    
+
                     texture = QQuickTextureFactory.textureFactoryForImage(scaled_img)
                 else:
                     logger.warning(f"ThumbnailProvider failed to load original image: {original_path}")
@@ -71,7 +70,7 @@ class ThumbnailResponse(QQuickImageResponse):
         self.requested_id = requested_id
         self.requested_size = requested_size
         self._texture = None
-        
+
         runnable = ThumbnailRunnable(self)
         QThreadPool.globalInstance().start(runnable)
 

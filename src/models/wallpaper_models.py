@@ -9,20 +9,20 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import shiboken6 as shiboken
 from PySide6.QtCore import (
+    Property,
     QAbstractListModel,
     QModelIndex,
     QObject,
-    Property,
     Qt,
     QThread,
     Signal,
     Slot,
 )
-import shiboken6 as shiboken
 
-from ..utils.xdg_paths import kwal_cache_dir
 from ..utils.worker_thread import start_worker_thread
+from ..utils.xdg_paths import kwal_cache_dir
 from .common import Folder
 
 # Logger

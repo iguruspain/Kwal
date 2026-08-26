@@ -71,4 +71,6 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
-ignore = []
+# N802/N815: Qt/PySide6 uses camelCase for slots, signals and properties.
+# N803: Qt image-provider overrides keep the framework's camelCase parameter names.
+ignore = ["N802", "N803", "N815"]

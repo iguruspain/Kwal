@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PySide6.QtCore import Property, QObject, Signal, Slot
+
+from ..models.ulauncher_models import UlauncherModel, UlauncherTemplateModel
+from ..utils.xdg_paths import kwal_config_dir
+
 
 class UlauncherMixin:
     ulauncherDraftColorChanged = Signal()
@@ -36,7 +40,10 @@ class UlauncherMixin:
             self._ulauncher_draft_color = val
             self.ulauncherDraftColorChanged.emit()
 
-    ulauncherDraftColor = Property(str, _get_ulauncher_draft_color, _set_ulauncher_draft_color, notify=ulauncherDraftColorChanged)
+    ulauncherDraftColor = Property(
+        str, _get_ulauncher_draft_color, _set_ulauncher_draft_color,
+        notify=ulauncherDraftColorChanged,
+    )
 
     def _get_ulauncher_is_file_mode(self) -> bool:
         return getattr(self, "_ulauncher_is_file_mode", False)
@@ -46,7 +53,10 @@ class UlauncherMixin:
             self._ulauncher_is_file_mode = val
             self.ulauncherIsFileModeChanged.emit()
 
-    ulauncherIsFileMode = Property(bool, _get_ulauncher_is_file_mode, _set_ulauncher_is_file_mode, notify=ulauncherIsFileModeChanged)
+    ulauncherIsFileMode = Property(
+        bool, _get_ulauncher_is_file_mode, _set_ulauncher_is_file_mode,
+        notify=ulauncherIsFileModeChanged,
+    )
 
     def _get_ulauncher_template_index(self) -> int:
         return getattr(self, "_ulauncher_template_index", -1)
@@ -56,7 +66,10 @@ class UlauncherMixin:
             self._ulauncher_template_index = val
             self.ulauncherTemplateIndexChanged.emit()
 
-    ulauncherTemplateIndex = Property(int, _get_ulauncher_template_index, _set_ulauncher_template_index, notify=ulauncherTemplateIndexChanged)
+    ulauncherTemplateIndex = Property(
+        int, _get_ulauncher_template_index, _set_ulauncher_template_index,
+        notify=ulauncherTemplateIndexChanged,
+    )
 
     def _get_ulauncher_new_theme_name(self) -> str:
         return getattr(self, "_ulauncher_new_theme_name", "")
@@ -66,7 +79,10 @@ class UlauncherMixin:
             self._ulauncher_new_theme_name = val
             self.ulauncherNewThemeNameChanged.emit()
 
-    ulauncherNewThemeName = Property(str, _get_ulauncher_new_theme_name, _set_ulauncher_new_theme_name, notify=ulauncherNewThemeNameChanged)
+    ulauncherNewThemeName = Property(
+        str, _get_ulauncher_new_theme_name, _set_ulauncher_new_theme_name,
+        notify=ulauncherNewThemeNameChanged,
+    )
 
     @Property(QObject, constant=True)
     def ulauncherModel(self) -> QObject:
@@ -120,11 +136,11 @@ class UlauncherMixin:
             if self.ulauncherTemplateIndex >= 0:
                 info = self._ulauncher_template_model.get(self.ulauncherTemplateIndex)
                 source_path = info.get("filePath", "")
-            
+
             if not source_path:
                  # Fallback to current config path if valid
                  source_path = self._ulauncher_model.configPath
-            
+
             if not source_path:
                 self._show_result_dialog("No source theme selected.")
                 return
@@ -133,14 +149,14 @@ class UlauncherMixin:
             if new_path:
                 self._show_result_dialog(f"Theme '{name}' created successfully.")
                 self.ulauncherNewThemeName = ""
-                
+
                 # Refresh templates list to show new theme
                 self._ulauncher_template_model.refresh(self._ulauncher_model.templateFolder)
                 self._increment_ulauncher_templates_gen()
-                
+
                 # Select the new theme
                 self._ulauncher_model.refresh(new_path)
-                
+
                 # Find index in template model
                 tm = self._ulauncher_template_model
                 for i in range(tm.rowCount()):
@@ -169,7 +185,8 @@ class UlauncherMixin:
                 self._show_result_dialog(f"Failed to save theme:\n{err}")
             else:
                 self._show_result_dialog("Theme saved successfully.")
-                self._ulauncher_model.refresh(self._ulauncher_model.configPath) # Reload to clear modified state, keeping selection
+                # Reload to clear modified state, keeping selection
+                self._ulauncher_model.refresh(self._ulauncher_model.configPath)
         except Exception as e:
              self._logger.exception("ulauncherSaveTheme failed")
              self._show_result_dialog(f"Error saving theme: {e}")
@@ -181,7 +198,7 @@ class UlauncherMixin:
              path = self._ulauncher_model.configPath
              if not path:
                  return
-             
+
              # Double check via model's logic
              if self._ulauncher_model.deleteTheme(path):
                  self._show_result_dialog("Theme deleted successfully.")
@@ -204,7 +221,7 @@ class UlauncherMixin:
                  self._show_result_dialog(f"Failed to apply theme:\n{err}")
             else:
                  self._show_result_dialog("Theme applied to Ulauncher configuration.")
-                 self._ulauncher_model.refresh() 
+                 self._ulauncher_model.refresh()
         except Exception as e:
             self._logger.exception("ulauncherApplyTheme failed")
             self._show_result_dialog(f"Error applying theme: {e}")
@@ -212,3 +229,18 @@ class UlauncherMixin:
     @Slot()
     def applyUlauncherConfig(self) -> None:
         self.ulauncherApplyTheme()
+
+    def _init_ulauncher(self) -> None:
+        """Initialize ulauncher models."""
+        try:
+            default_ulauncher_templates = str(kwal_config_dir() / "templates" / "ulauncher")
+            self._ulauncher_model = UlauncherModel(template_folder=default_ulauncher_templates)
+            self._ulauncher_template_model = UlauncherTemplateModel()
+            self._ulauncher_template_model.refresh(default_ulauncher_templates)
+            try:
+                self._ulauncher_model.refresh()
+            except Exception:
+                self._logger.debug("Initial ulauncher model refresh failed or no theme set")
+            self._ulauncher_model.configPathChanged.connect(self.ulauncherBackupExistsChanged)
+        except Exception:
+            self._logger.exception("Failed initializing UlauncherModel")

@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import shutil
 import threading
 from pathlib import Path
 from typing import Any
+
 from PySide6.QtCore import Property, Signal, Slot
 from PySide6.QtGui import QColor
-from ..utils import color_utils, file_utils
+
+from ..utils import color_utils, fastfetch_config, file_utils
 from ..utils.xdg_paths import fastfetch_config_path
+
 
 class FastfetchMixin:
     fastfetchTintedPreviewChanged = Signal()
@@ -48,7 +50,10 @@ class FastfetchMixin:
             self.fastfetchConfigImageChanged.emit()
             self._emit_fastfetch_config_image_path()
 
-    fastfetchConfigImage = Property(str, _get_fastfetch_config_image, _set_fastfetch_config_image, notify=fastfetchConfigImageChanged)
+    fastfetchConfigImage = Property(
+        str, _get_fastfetch_config_image, _set_fastfetch_config_image,
+        notify=fastfetchConfigImageChanged,
+    )
 
     def _get_fastfetch_config_image_path(self) -> str:
         """Return the clean file path (no file:// prefix, no cache-buster query)."""
@@ -93,7 +98,10 @@ class FastfetchMixin:
             self._fastfetch_draft_color = norm
             self.fastfetchDraftColorChanged.emit()
 
-    fastfetchDraftColor = Property(str, _get_fastfetch_draft_color, _set_fastfetch_draft_color, notify=fastfetchDraftColorChanged)
+    fastfetchDraftColor = Property(
+        str, _get_fastfetch_draft_color, _set_fastfetch_draft_color,
+        notify=fastfetchDraftColorChanged,
+    )
 
     @Slot(result=bool)
     def fastfetchTintedExists(self) -> bool:
@@ -101,7 +109,11 @@ class FastfetchMixin:
         try:
             if not self._selected_file:
                 return False
-            src_path = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
+            src_path = (
+                self._selected_file.replace("file://", "")
+                if self._selected_file.startswith("file://")
+                else self._selected_file
+            )
             tinted_path = self._get_tinted_path(src_path)
             return tinted_path.exists()
         except Exception:
@@ -109,7 +121,7 @@ class FastfetchMixin:
 
     def _get_tinted_path(self, src: str) -> Path:
         """Calculate the tinted image path next to the source image.
-        
+
         Always uses .png extension since tint_image always outputs PNG.
         """
         src_path = Path(src.replace("file://", "") if src.startswith("file://") else src)
@@ -131,10 +143,10 @@ class FastfetchMixin:
         try:
             self._fastfetch_tinting = True
             self.fastfetchTintingChanged.emit()
-            
+
             thr = threading.Thread(
-                target=self._tint_image_task, 
-                args=(src_path, tint_hex, float(strength)), 
+                target=self._tint_image_task,
+                args=(src_path, tint_hex, float(strength)),
                 daemon=True
             )
             thr.start()
@@ -156,6 +168,11 @@ class FastfetchMixin:
     def _clear_tinted_preview(self) -> None:
         self._fastfetch_tinted_preview = ""
         self.fastfetchTintedPreviewChanged.emit()
+
+    def clearTintState(self) -> None:
+        """Stop any running tint thread and clear the tinted preview."""
+        self._stop_bg_thread(self._tint_thread)
+        self._clear_tinted_preview()
 
     def _tint_image_task(self, src: str, tint_hex: str, strength: float) -> None:
         """Background task for tinting."""
@@ -180,7 +197,7 @@ class FastfetchMixin:
     @Slot()
     def refreshFastfetchConfigImage(self) -> None:
         """Re-detect the current fastfetch config image from disk.
-        
+
         Forces re-read and emits change signal with a cache-buster to ensure
         QML Image reloads even if the file path is the same but content changed.
         """
@@ -228,13 +245,13 @@ class FastfetchMixin:
         try:
             config_image = ""
             for key in ("config_image", "image", "source", "logo", "icon"):
-                val, _ = file_utils.read_config_fastfetch(key, None)
+                val, _ = fastfetch_config.read_config_fastfetch(key, None)
                 if val:
                     p = Path(str(val)).expanduser()
                     if p.exists():
                         config_image = str(p)
                         break
-            
+
             if not config_image:
                 fallback = Path.home() / ".config" / "fastfetch" / "chica-tinted.png"
                 if fallback.exists():
@@ -251,7 +268,11 @@ class FastfetchMixin:
             self._show_result_dialog("No image selected.")
             return False
 
-        src = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
+        src = (
+            self._selected_file.replace("file://", "")
+            if self._selected_file.startswith("file://")
+            else self._selected_file
+        )
 
         thr = threading.Thread(
             target=self._apply_tint_task,
@@ -296,7 +317,7 @@ class FastfetchMixin:
             self._backup_fastfetch_config()
 
             # Update fastfetch config with the tinted image path
-            ok = file_utils.set_fastfetch_source_inplace(None, str(tinted_path))
+            ok = fastfetch_config.set_fastfetch_source_inplace(None, str(tinted_path))
 
             if not ok:
                 msg = f"Generated tinted image at {tinted_path} but failed to update fastfetch config."
@@ -329,7 +350,11 @@ class FastfetchMixin:
             self._show_result_dialog("No image selected.")
             return False
 
-        src = self._selected_file.replace("file://", "") if self._selected_file.startswith("file://") else self._selected_file
+        src = (
+            self._selected_file.replace("file://", "")
+            if self._selected_file.startswith("file://")
+            else self._selected_file
+        )
 
         thr = threading.Thread(
             target=self._apply_original_task,
@@ -354,7 +379,7 @@ class FastfetchMixin:
             self._backup_fastfetch_config()
 
             # Update fastfetch config with the original image path
-            ok = file_utils.set_fastfetch_source_inplace(None, str(src_path))
+            ok = fastfetch_config.set_fastfetch_source_inplace(None, str(src_path))
 
             if not ok:
                 msg = "Failed to update fastfetch config with the selected image."
@@ -377,7 +402,7 @@ class FastfetchMixin:
         self.fastfetchTintedPreviewChanged.emit()
 
         try:
-            file_utils.clear_fastfetch_cache()
+            fastfetch_config.clear_fastfetch_cache()
         except Exception:
             self._logger.warning("Failed clearing fastfetch cache")
 
@@ -391,16 +416,16 @@ class FastfetchMixin:
     def restoreFastfetchBackup(self) -> dict[str, Any]:
         """Restore the fixed fastfetch config backup."""
         try:
-            ok = file_utils.restore_fastfetch_config_backup(None)
+            ok = fastfetch_config.restore_fastfetch_config_backup(None)
             if ok:
                 try:
-                    file_utils.clear_fastfetch_cache()
+                    fastfetch_config.clear_fastfetch_cache()
                 except Exception:
                     pass
-                
+
                 msg = "Restored fastfetch config from backup"
                 self._show_result_dialog(msg)
-                
+
                 # Update info
                 try:
                     info = self.getFastfetchInfo()
@@ -429,3 +454,13 @@ class FastfetchMixin:
         self._stop_bg_thread(self._tint_thread)
         self._fastfetch_tinting = False
         self.fastfetchTintingChanged.emit()
+
+    def _init_fastfetch(self) -> None:
+        """Initialize fastfetch tinting state and config image."""
+        self._fastfetch_draft_color: str = "transparent"
+
+        self.tintResult.connect(self._on_tint_done)
+
+        init_img = self._detect_current_fastfetch_image()
+        if init_img:
+            self._fastfetch_config_image = "file://" + init_img

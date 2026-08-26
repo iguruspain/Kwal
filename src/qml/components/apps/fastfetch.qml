@@ -14,15 +14,8 @@ Kirigami.Page {
         color: "transparent"
     }
 
-    TextEdit {
+    Components.ClipboardHelper {
         id: clipboardHelper
-        visible: false
-        function copyToClipboard(text) {
-            clipboardHelper.text = text
-            clipboardHelper.selectAll()
-            clipboardHelper.copy()
-            root.notifyClipboard(text)
-        }
     }
 
     // Signals Handling

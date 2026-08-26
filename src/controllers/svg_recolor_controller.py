@@ -5,10 +5,13 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+
 from PySide6.QtCore import Property, Signal, Slot
 from PySide6.QtWidgets import QFileDialog
-from ..models.models import SvgWorker
+
+from ..models.svg_worker import SvgWorker
 from ..utils.svg_utils import get_svg_preview_cache_dir
+
 
 class SvgMixin:
     svgDirectoryChanged = Signal()
@@ -232,7 +235,6 @@ class SvgMixin:
                 self.notification.emit("No preview directory available.", "error")
                 return
 
-            import time as _time
             import datetime as _datetime
             timestamp_str = _datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_dir = os.path.join(self._svg_directory, f"backup_{timestamp_str}")
@@ -373,3 +375,21 @@ class SvgMixin:
                 self._svg_worker.wait(2000)
             except Exception:
                 self._logger.exception("Error stopping SVG worker during shutdown")
+
+    def _init_svg(self) -> None:
+        """Initialize SVG recolor state."""
+        self._svg_directory: str = ""
+        self._svg_gradient_colors: list[str] = [
+            "#000000", "#464646", "#D81C4A", "#b6b6b6", "#FFFFFF", "#888888",
+        ]
+        self._svg_color_count: int = 5
+        self._svg_mono_color: str = "#ACACAC"
+        self._svg_preview_dir: str = ""
+        self._svg_backup_dir: str = ""
+        self._svg_preview_files: list[str] = []
+        self._svg_preview_index: int = 0
+        self._svg_processing: bool = False
+        self._svg_log: str = ""
+        self._svg_original_files: dict[str, str] = {}
+        self._svg_preview_timestamp: int = 0
+        self._svg_worker: SvgWorker | None = None

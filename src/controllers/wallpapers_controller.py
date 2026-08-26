@@ -7,11 +7,15 @@ import shutil
 import subprocess
 import threading
 from pathlib import Path
+
 from PySide6.QtCore import Property, QStandardPaths, Signal, Slot
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QColorDialog, QFileDialog
-from ..models.models import WallpaperFolderModel
-from ..utils import color_utils
+
+from ..models.common import Folder
+from ..models.wallpaper_models import ImageModel, WallpaperFolderModel
+from ..utils import color_utils, plasma_wallpaper
+
 
 class WallpapersMixin:
     selectedFolderChanged = Signal()
@@ -60,10 +64,10 @@ class WallpapersMixin:
         try:
             if self._selected_wallpaper != path:
                 self._selected_wallpaper = path
-                
+
                 if path:
-                    from ..utils import video_utils, color_extractor
-                    
+                    from ..utils import color_extractor, video_utils
+
                     # For videos, extract frame and use that for color extraction
                     # and as the thumbnail image (%vidimg%). For regular images,
                     # the thumbnail is simply the wallpaper itself.
@@ -86,7 +90,10 @@ class WallpapersMixin:
                             # videos: it can be a downscaled thumbnail shared
                             # with the grid preview cache. Ask the video itself.
                             res = video_utils.get_video_resolution(path)
-                            self._selected_wallpaper_resolution = f"{res[0]}x{res[1]}" if res else f"{img.width()}x{img.height()}"
+                            if res:
+                                self._selected_wallpaper_resolution = f"{res[0]}x{res[1]}"
+                            else:
+                                self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
                         else:
                             self._selected_wallpaper_resolution = f"{img.width()}x{img.height()}"
 
@@ -106,7 +113,7 @@ class WallpapersMixin:
                     self._wallpaper_colors = []
                     self._thumb_path = ""
                     self.wallpaperColorsChanged.emit()
-                    
+
                 self.selectedWallpaperChanged.emit()
         except Exception:
             self._logger.exception("Error selecting wallpaper %r", path)
@@ -124,18 +131,19 @@ class WallpapersMixin:
 
     def _extract_colors_task(self, image_path: str) -> None:
         """Background task to extract colors using materialyoucolor.
-        
-        Like matugen, it resizes the image to 128x128 for speed, 
+
+        Like matugen, it resizes the image to 128x128 for speed,
         then uses Celebi algorithm to quantize colors, and scores them.
         """
         try:
-            from ..utils.color_utils import extract_wallpaper_top_colors
-            from ..utils import color_extractor
             import os
-            
+
+            from ..utils import color_extractor
+            from ..utils.color_utils import extract_wallpaper_top_colors
+
             hex_colors = extract_wallpaper_top_colors(image_path, count=8)
             self._logger.info(f"Extracted wallpaper colors: {hex_colors}")
-            
+
             if hex_colors:
                 try:
                     cache = color_extractor.load_color_cache()
@@ -146,7 +154,7 @@ class WallpapersMixin:
                             cats.append(cat)
                         if len(cats) > color_extractor.MAX_CATEGORIES:
                             break
-                            
+
                     cache[image_path] = {
                         "colors": hex_colors,
                         "categories": cats,
@@ -155,11 +163,11 @@ class WallpapersMixin:
                     color_extractor.save_color_cache(cache)
                 except Exception as cache_err:
                     self._logger.warning("Failed to save extracted colors to cache: %s", cache_err)
-            
+
             # Only update if the selection hasn't changed while we were processing
             if self._selected_wallpaper == image_path:
                 self._colorsExtracted.emit(hex_colors)
-                
+
         except Exception as e:
             self._logger.error("Failed to extract wallpaper colors: %s", e)
             self._colorsExtracted.emit([])
@@ -177,7 +185,7 @@ class WallpapersMixin:
         if not path:
             self._logger.warning("setAsWallpaper called with empty path")
             return
-            
+
         abs_path = os.path.abspath(path)
         if not os.path.exists(abs_path):
             self._logger.error("Wallpaper path does not exist: %s", abs_path)
@@ -185,33 +193,10 @@ class WallpapersMixin:
 
         self._last_set_wallpaper = abs_path
         self._logger.info("Setting wallpaper to %s", abs_path)
-        
-        # KDE Plasma via qdbus 
-        qdbus_path = shutil.which("qdbus") or shutil.which("qdbus-qt6") or shutil.which("qdbus6")
-        if qdbus_path:
-            # Escape single quotes for JS string context
-            safe_path = abs_path.replace("'", r"\'")
-            script = (
-                "var allDesktops = desktops();\n"
-                "for (var i = 0; i < allDesktops.length; i++) {\n"
-                "  var d = allDesktops[i];\n"
-                "  d.wallpaperPlugin = 'org.kde.image';\n"
-                "  d.currentConfigGroup = Array('Wallpaper','org.kde.image','General');\n"
-                f"  d.writeConfig('Image', 'file://{safe_path}');\n"
-                "}\n"
-            )
-            try:
-                subprocess.run(
-                    [qdbus_path, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", script],
-                    capture_output=True, text=True, check=False
-                )
-            except Exception as e:
-                self._logger.exception("Failed to call qdbus")
-                self.notification.emit(f"Failed to apply wallpaper: {e}", "error")
-        else:
-            self._logger.warning("qdbus not found")
+
+        if not plasma_wallpaper.set_wallpaper(abs_path):
             self.notification.emit("qdbus executable not found (required for KDE Plasma)", "error")
-            
+
         self._save_config()
 
     @Slot(str)
@@ -229,7 +214,7 @@ class WallpapersMixin:
 
     @Slot(result=str)
     def getCurrentSystemWallpaper(self) -> str:
-        #NEVER TOUCH THIS getCurrentSystemWallpaper FUNCTION ITS CORRECT 
+        #NEVER TOUCH THIS getCurrentSystemWallpaper FUNCTION ITS CORRECT
         """Retrieve current wallpaper from KDE Plasma via config file directly (more reliable than qdbus parsing)."""
         # Prefer qdbus / PlasmaShell evaluateScript parsing (uses Plasma's runtime state)
         try:
@@ -248,13 +233,14 @@ class WallpapersMixin:
                 )
                 try:
                     proc = subprocess.run(
-                        [qdbus_path, "org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", script],
+                        [qdbus_path, "org.kde.plasmashell", "/PlasmaShell",
+                         "org.kde.PlasmaShell.evaluateScript", script],
                         capture_output=True, text=True, check=False
                     )
                     out = (proc.stdout or "").strip()
                     if out:
                         # Filter empty lines and take first non-empty
-                        lines = [l.strip() for l in out.splitlines() if l.strip()]
+                        lines = [line.strip() for line in out.splitlines() if line.strip()]
                         if lines:
                             candidate = lines[0]
                             # If value looks like a file path and exists, return it
@@ -288,9 +274,9 @@ class WallpapersMixin:
                 if in_wallpaper_group and line.startswith("Image="):
                     val = line.split("=", 1)[1].strip()
                     if val.startswith("file://"):
-                        getPath = val[7:]
-                        if os.path.exists(getPath):
-                            found_image = getPath
+                        get_path = val[7:]
+                        if os.path.exists(get_path):
+                            found_image = get_path
                             break
 
             if found_image:
@@ -312,12 +298,12 @@ class WallpapersMixin:
                 return
 
         self._model.addFolder(name, norm_path)
-        
+
         # Use simple logic to select last
         count = self._model.rowCount()
         if count > 0:
             self.selectFolder(count - 1)
-            
+
         self._save_config()
 
     @Slot()
@@ -325,7 +311,7 @@ class WallpapersMixin:
         try:
             initial_dir = QStandardPaths.writableLocation(QStandardPaths.PicturesLocation) or os.path.expanduser("~")
             selected = QFileDialog.getExistingDirectory(None, "Select Folder", initial_dir)
-            
+
             if selected:
                 name = os.path.basename(selected) or selected
                 self.addFolder(name, selected)
@@ -347,7 +333,7 @@ class WallpapersMixin:
         was_selected = (folder_to_remove.path == self._selected_folder)
 
         self._model.removeFolder(idx)
-        
+
         if was_selected:
             new_count = self._model.rowCount()
             if new_count > 0:
@@ -356,7 +342,7 @@ class WallpapersMixin:
                 self._selected_folder = ""
                 self._image_model.setFolder("")
                 self.selectedFolderChanged.emit()
-        
+
         self._save_config()
 
     @Slot(int)
@@ -394,7 +380,7 @@ class WallpapersMixin:
                 if not initial_col.isValid():
                     initial_col = QColor("#ffffff")
                 initial_col.setAlpha(255)
-            
+
             # Show alpha channel in the dialog and return hex including alpha
             color = QColorDialog.getColor(initial_col, None, "Select color", QColorDialog.ShowAlphaChannel)
             if color.isValid():
@@ -428,8 +414,20 @@ class WallpapersMixin:
         try:
             if self._selected_file:
                 self._selected_file = ""
-                self._stop_bg_thread(self._tint_thread)
-                self._clear_tinted_preview()
+                self.clearTintState()
                 self.selectedFileChanged.emit()
         except Exception:
             self._logger.exception("Error clearing selected file")
+
+    def _init_wallpapers(self) -> None:
+        """Initialize wallpaper folder and image models."""
+        self._colorsExtracted.connect(self._update_colors_main_thread)
+
+        folders: list[Folder] = []
+        if self._loaded_folders:
+            folders = [Folder(name=f.get("name", ""), path=f.get("path", "")) for f in self._loaded_folders]
+        if not folders:
+            folders = [Folder(name="Local", path="/usr/share/wallpapers")]
+
+        self._model = WallpaperFolderModel(folders)
+        self._image_model = ImageModel()
