@@ -156,7 +156,10 @@ class BaseMixin:
                 cmds_arr.append(tbl)
             doc["custom_commands"] = cmds_arr
 
-            self._config_path_file.write_text(tomlkit.dumps(doc), encoding="utf-8")
+            text = tomlkit.dumps(doc)
+            # ensure a blank line before each AoT header
+            text = re.sub(r"(?<!\n)\n(\[\[)", r"\n\n\1", text)
+            self._config_path_file.write_text(text, encoding="utf-8")
         except Exception as e:
             self._logger.exception("Failed saving config")
             self.notification.emit(f"Failed to save config: {e}", "error")

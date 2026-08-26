@@ -80,6 +80,16 @@ class WallpaperFolderModel(QAbstractListModel):
         else:
             logger.warning("removeFolder: invalid index %s", index)
 
+    @Slot(int, str)
+    def renameFolder(self, index: int, new_name: str) -> None:
+        """Rename the folder at *index* to *new_name* and notify the view."""
+        if not new_name or not (0 <= index < self.rowCount()):
+            return
+        self._folders[index].name = new_name
+        model_index = self.index(index)
+        self.dataChanged.emit(model_index, model_index, [WallpaperFolderModel.NameRole])
+        logger.info("Renamed folder at index %d to '%s'", index, new_name)
+
     def _clear_cache_for_folder(self, folder_path: str) -> None:
         p = Path(folder_path)
         cache_root = kwal_cache_dir() / "thumbnails"

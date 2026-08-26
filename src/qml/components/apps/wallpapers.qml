@@ -109,12 +109,32 @@ Kirigami.Page {
                         required property string path
                         required property int index
 
-                        Layout.fillWidth: true
-                        // Visually indicate selection by comparing the folder path with controller.selectedFolder
-                        property bool isSelected: path === controller.selectedFolder
-                        property bool isHovered: mouseArea.containsMouse
+                        // ── Rename state ──────────────────────────────────────
+                        property bool editing: false
+                        property string pendingName: name
 
-                        // Selection border
+                        function startEditing() {
+                            if (name === "Local") return
+                            pendingName = name
+                            editing = true
+                            Qt.callLater(function() { nameField.forceActiveFocus(); nameField.selectAll() })
+                        }
+                        function confirmRename() {
+                            editing = false
+                            if (nameField.text.trim() !== "" && nameField.text.trim() !== name) {
+                                controller.renameFolder(index, nameField.text.trim())
+                            }
+                        }
+                        function cancelRename() {
+                            editing = false
+                        }
+
+                        Layout.fillWidth: true
+                        property bool isSelected: path === controller.selectedFolder
+
+                        HoverHandler { id: cardHover }
+                        property bool isHovered: cardHover.hovered
+
                         Rectangle {
                             anchors.fill: parent
                             color: "transparent"
@@ -131,25 +151,70 @@ Kirigami.Page {
                                 id: mouseArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                onClicked: controller.selectFolder(index)
-                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (!card.editing) controller.selectFolder(index)
+                                onDoubleClicked: card.startEditing()
+                                cursorShape: card.editing ? Qt.ArrowCursor : Qt.PointingHandCursor
                             }
-                            
+
                             GridLayout {
                                 id: delegateLayout
                                 anchors.fill: parent
                                 columns: 2
                                 columnSpacing: Kirigami.Units.smallSpacing
                                 rowSpacing: Kirigami.Units.smallSpacing
+
                                 ColumnLayout {
-                                    Kirigami.Heading {
-                                        level: 2
-                                        text: name.includes("/") ? name.split('/').filter(Boolean).pop() : name
+                                    Layout.fillWidth: true
+
+                                    // ── View mode: static heading + pencil ────
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: Kirigami.Units.smallSpacing
+                                        visible: !card.editing
+
+                                        Kirigami.Heading {
+                                            level: 2
+                                            Layout.fillWidth: true
+                                            text: name.includes("/") ? name.split('/').filter(Boolean).pop() : name
+                                            elide: Text.ElideRight
+                                        }
+
+                                        ToolButton {
+                                            icon.name: "edit-rename"
+                                            icon.width: Kirigami.Units.iconSizes.small
+                                            icon.height: Kirigami.Units.iconSizes.small
+                                            padding: Kirigami.Units.smallSpacing / 2
+                                            opacity: card.isHovered && name !== "Local" ? 1.0 : 0.0
+                                            Behavior on opacity { OpacityAnimator { duration: Kirigami.Units.shortDuration } }
+                                            ToolTip.text: qsTr("Rename folder")
+                                            ToolTip.visible: hovered
+                                            ToolTip.delay: Kirigami.Units.toolTipDelay
+                                            onClicked: card.startEditing()
+                                            // Prevent click from propagating to mouseArea (would also trigger selectFolder)
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: (mouse) => { mouse.accepted = true; card.startEditing() }
+                                                cursorShape: Qt.PointingHandCursor
+                                            }
+                                        }
                                     }
-                                    Kirigami.Separator {Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor}
+
+                                    // ── Edit mode: TextField ──────────────────
+                                    TextField {
+                                        id: nameField
+                                        Layout.fillWidth: true
+                                        visible: card.editing
+                                        text: card.pendingName
+                                        placeholderText: qsTr("Folder name...")
+                                        selectByMouse: true
+                                        onAccepted: card.confirmRename()
+                                        Keys.onEscapePressed: card.cancelRename()
+                                        onActiveFocusChanged: if (!activeFocus && card.editing) card.confirmRename()
+                                    }
+
+                                    Kirigami.Separator { Layout.fillWidth: true; color: Kirigami.Theme.alternateBackgroundColor }
                                     Label {
                                         Layout.fillWidth: true
-                                        // wrapMode: Text.WordWrap
                                         text: {
                                             if (name !== "Local") {
                                                 return path.replace(controller.homePath, "~\/")
@@ -169,8 +234,8 @@ Kirigami.Page {
                                     icon.width: Kirigami.Units.gridUnit
                                     icon.height: Kirigami.Units.gridUnit
                                     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                                    // Disable removal for the built-in Local folder
-                                    enabled: name !== "Local"
+                                    enabled: !card.editing && name !== "Local"
+                                    visible: !card.editing
                                     onClicked: {
                                         if (!enabled) return
                                         controller.removeFolder(index)
@@ -179,7 +244,7 @@ Kirigami.Page {
                                     ToolTip.text: qsTr("Remove this folder")
                                     ToolTip.visible: hovered
                                     ToolTip.delay: Kirigami.Units.toolTipDelay
-                                } 
+                                }
                             }
                         }
                     }

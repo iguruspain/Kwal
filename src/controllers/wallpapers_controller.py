@@ -345,6 +345,23 @@ class WallpapersMixin:
 
         self._save_config()
 
+    @Slot(int, str)
+    def renameFolder(self, index: int, new_name: str) -> None:
+        """Rename the folder at *index* to *new_name* and persist the change."""
+        new_name = new_name.strip()
+        if not new_name:
+            return
+        try:
+            idx = int(index)
+        except (ValueError, TypeError):
+            return
+        if not (0 <= idx < self._model.rowCount()):
+            return
+        if self._model._folders[idx].name == "Local":
+            return
+        self._model.renameFolder(idx, new_name)
+        self._save_config()
+
     @Slot(int)
     def selectFolder(self, index: int) -> None:
         try:
