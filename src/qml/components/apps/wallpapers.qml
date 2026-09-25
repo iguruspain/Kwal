@@ -293,7 +293,7 @@ Kirigami.Page {
                         icon.name: "view-list-details" 
                         checkable: true
                         checked: wallpaperPage.sidePaneOpen
-                        onToggled: wallpaperPage.sidePaneOpen = checked
+                        onClicked: wallpaperPage.sidePaneOpen = checked
                         ToolTip.text: qsTr("Toggle Folders Panel")
                         ToolTip.visible: hovered
                         display: AbstractButton.IconOnly
@@ -346,7 +346,7 @@ Kirigami.Page {
                         icon.name: "search-symbolic"
                         checkable: true
                         checked: rightPaneWallpapers.searchOpen
-                        onToggled: rightPaneWallpapers.searchOpen = checked
+                        onClicked: rightPaneWallpapers.searchOpen = checked
                         ToolTip.text: qsTr("Toggle Search Panel")
                         ToolTip.visible: hovered
                         display: AbstractButton.IconOnly
@@ -356,7 +356,7 @@ Kirigami.Page {
                         icon.name: "preferences-system-symbolic"
                         checkable: true
                         checked: rightPaneWallpapers.drawerOpen
-                        onToggled: rightPaneWallpapers.drawerOpen = checked
+                        onClicked: rightPaneWallpapers.drawerOpen = checked
                         ToolTip.text: qsTr("Toggle Custom Scripts")
                         ToolTip.visible: hovered
                         display: AbstractButton.IconOnly
@@ -437,6 +437,13 @@ Kirigami.Page {
                                     thumbnailGrid.positionViewAtIndex(idx, GridView.PositionViewCenter)
                                 })
                             }
+                        }
+                        // BUG-1: keep selWallpaper/selWallpaperThumb/isVideo in sync via
+                        // the controller signal instead of reading them synchronously right
+                        // after selectWallpaper() (the Python side updates them asynchronously).
+                        function onSelectedWallpaperChanged() {
+                            gridContainer.selWallpaper = controller.selectedWallpaper
+                            gridContainer.selWallpaperThumb = controller.thumbPath
                         }
                     }
 
@@ -640,7 +647,7 @@ Kirigami.Page {
                                     // per tick is derived from revolutionDuration.
                                     Timer {
                                         interval: 16
-                                        running: shimmerCanvas.visible
+                                        running: shimmerCanvas.visible && wallpaperPage.visible
                                         repeat: true
                                         onTriggered: {
                                             const step = interval / (shimmerCanvas.revolutionDuration * 1000.0)
@@ -660,14 +667,10 @@ Kirigami.Page {
                                     TapHandler {
                                         onTapped: {
                                             controller.selectWallpaper(filePath)
-                                            gridContainer.selWallpaper = controller.selectedWallpaper
-                                            gridContainer.selWallpaperThumb = controller.thumbPath
                                             gridContainer.isVideo = isVideo
                                         }
                                         onDoubleTapped: {
                                             controller.selectWallpaper(filePath)
-                                            gridContainer.selWallpaper = controller.selectedWallpaper
-                                            gridContainer.selWallpaperThumb = controller.thumbPath
                                             gridContainer.isVideo = isVideo
                                             lightboxPopup.open()
                                         }
@@ -734,7 +737,7 @@ Kirigami.Page {
                                         anchors.bottom: parent.bottom
                                         anchors.margins: Kirigami.Units.smallSpacing * 2
                                         radius: Kirigami.Units.cornerRadius
-                                        visible: controller.showExtensionBadge
+                                        visible: controller.showExtensionBadge && fileName.includes(".")
                                         color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.80)
                                         width: extLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
                                         height: extLabel.implicitHeight + Kirigami.Units.smallSpacing
@@ -744,7 +747,10 @@ Kirigami.Page {
                                         Label {
                                             id: extLabel
                                             anchors.centerIn: parent
-                                            text: fileName.split(".").pop().toUpperCase()
+                                            text: {
+                                                var dot = fileName.lastIndexOf(".")
+                                                return dot !== -1 ? fileName.substring(dot + 1).toUpperCase() : ""
+                                            }
                                             color: Kirigami.Theme.textColor
                                             font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.8
                                             font.bold: true
@@ -915,7 +921,7 @@ Kirigami.Page {
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
                 opacity: isOpen ? 1.0 : 0.0
-                visible: y < parent.height
+                visible: opacity > 0.001
                 enabled: visible // Stays interactive while visually reachable (incl. close animation)
 
                 Behavior on y { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
