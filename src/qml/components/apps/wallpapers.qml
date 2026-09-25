@@ -428,6 +428,18 @@ Kirigami.Page {
                     property string selWallpaperThumb: ""
                     property bool isVideo: false
 
+                    Connections {
+                        target: controller
+                        function onInitialWallpaperIndexChanged() {
+                            var idx = controller.initialWallpaperIndex
+                            if (idx >= 0) {
+                                Qt.callLater(function() {
+                                    thumbnailGrid.positionViewAtIndex(idx, GridView.PositionViewCenter)
+                                })
+                            }
+                        }
+                    }
+
                     ScrollView {
                         id: scrollView
                         anchors.fill: parent

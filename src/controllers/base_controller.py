@@ -457,6 +457,8 @@ class BaseMixin:
         self._selected_folder: str = ""
         self._selected_wallpaper: str = ""
         self._last_set_wallpaper: str = ""
+        self._initial_wallpaper_index: int = -1
+        self._pending_initial_wallpaper: str = ""
         self._selected_wallpaper_resolution: str = ""
         self._thumb_path: str = ""
         self._selected_file: str = ""

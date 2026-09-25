@@ -26,6 +26,8 @@ class WallpapersMixin:
 
     wallpaperColorsChanged = Signal()
 
+    initialWallpaperIndexChanged = Signal()
+
     def wallpaperModel(self) -> WallpaperFolderModel:
         return self._model
 
@@ -33,6 +35,11 @@ class WallpapersMixin:
         return self._selected_wallpaper
 
     selectedWallpaper = Property(str, _get_selected_wallpaper, notify=selectedWallpaperChanged)
+
+    def _get_initial_wallpaper_index(self) -> int:
+        return self._initial_wallpaper_index
+
+    initialWallpaperIndex = Property(int, _get_initial_wallpaper_index, notify=initialWallpaperIndexChanged)
 
     def _get_selected_wallpaper_resolution(self) -> str:
         return self._selected_wallpaper_resolution
@@ -448,3 +455,21 @@ class WallpapersMixin:
 
         self._model = WallpaperFolderModel(folders)
         self._image_model = ImageModel()
+        self._pending_initial_wallpaper = self._last_set_wallpaper
+        self._image_model.loadingChanged.connect(self._on_image_model_loading_changed)
+
+    @Slot()
+    def _on_image_model_loading_changed(self) -> None:
+        """Select and position the last-set wallpaper once the folder scan finishes."""
+        if self._image_model.loading:
+            return
+        if not self._pending_initial_wallpaper:
+            return
+        path = self._pending_initial_wallpaper
+        self._pending_initial_wallpaper = ""
+        for i, f in enumerate(self._image_model._files):
+            if str(f) == path:
+                self.selectWallpaper(path)
+                self._initial_wallpaper_index = i
+                self.initialWallpaperIndexChanged.emit()
+                break
