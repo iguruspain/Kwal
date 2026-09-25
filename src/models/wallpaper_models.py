@@ -243,6 +243,13 @@ class ImageModel(QAbstractListModel):
         self._color_worker_thread: QThread | None = None
         self._color_worker: ColorScannerWorker | None = None
 
+        self._rescan_worker: ImageScannerWorker | None = None
+        self._rescan_thread: QThread | None = None
+        self._rescanning: bool = False
+        self._rescan_generation: int = 0
+
+        self._folder_path: str = ""
+
         self._loading: bool = False
         self._filter_text: str = ""
         self._color_filter: list[str] = []
@@ -312,9 +319,9 @@ class ImageModel(QAbstractListModel):
 
     colorFilters = Property(list, _get_color_filters, _set_color_filters, notify=colorFilterChanged)
 
-    def _apply_filter(self) -> None:
-        self.beginResetModel()
-        self._files = []
+    def _compute_filtered_files(self) -> list[Path]:
+        """Return the subset of _all_files matching the text and color filters."""
+        result: list[Path] = []
         term = self._filter_text.lower() if self._filter_text else ""
 
         for f in self._all_files:
@@ -339,54 +346,144 @@ class ImageModel(QAbstractListModel):
                 if not has_all_colors:
                     continue
 
-            self._files.append(f)
+            result.append(f)
+        return result
 
+    def _apply_filter(self) -> None:
+        self.beginResetModel()
+        self._files = self._compute_filtered_files()
         self.endResetModel()
 
-    def _cleanup_worker(self) -> None:
-        if self._worker:
+    @Slot()
+    def rescan(self) -> None:
+        """Re-scan the current folder and update the grid incrementally.
+
+        Triggered by the file-system watcher when files are added, removed or
+        renamed on disk. Does not reset the model or touch the loading flag,
+        so the view keeps its scroll position and selection.
+        """
+        if self._rescanning or not self._folder_path:
+            return
+
+        self._rescanning = True
+        generation = self._rescan_generation
+        worker = ImageScannerWorker(self._folder_path)
+        worker.finished.connect(lambda files, gen=generation: self._on_rescan_done(files, gen))
+        thread = start_worker_thread(worker)
+        thread.finished.connect(lambda t=thread: self._release_thread_ref("_rescan_thread", t))
+
+        self._rescan_worker = worker
+        self._rescan_thread = thread
+
+    def _cleanup_rescan_worker(self) -> None:
+        self._stop_worker_pair("_rescan_worker", "_rescan_thread")
+        self._rescanning = False
+
+    @Slot(list, int)
+    def _on_rescan_done(self, files: list[str], generation: int) -> None:
+        try:
+            # A newer scan (or folder switch) superseded this one
+            if generation != self._rescan_generation:
+                return
+
+            new_all = [Path(x) for x in files]
+            old_set = {str(f) for f in self._all_files}
+            new_set = {str(f) for f in new_all}
+            added = [f for f in new_all if str(f) not in old_set]
+            removed = [f for f in self._all_files if str(f) not in new_set]
+
+            if not added and not removed:
+                return
+
+            self._all_files = new_all
+            # Drop color-cache entries of removed files so a re-added file
+            # with the same name is re-extracted instead of reusing stale data
+            for f in removed:
+                self._color_cache.pop(str(f), None)
+            # _files keeps the old list while _sync_view transforms it in place
+            self._sync_view(self._compute_filtered_files())
+
+            # Extract colors for newly added files so color filters work on them
+            if added:
+                self._start_color_scanner(added)
+
+            logger.debug("ImageModel rescan: +%d -%d files", len(added), len(removed))
+        finally:
+            self._rescanning = False
+            self._rescan_worker = None
+            # The thread reference is released by its finished signal
+
+    def _sync_view(self, target_files: list[Path]) -> None:
+        """Transform _files into target_files, notifying the view via a full reset.
+
+        A full reset is safe and correct: the previous LCS-based diff was
+        calling beginRemoveRows(0, n-1) while only deleting a subset of rows,
+        which violates the Qt model contract and caused the view to show
+        'No wallpapers found' after any on-disk deletion.
+        """
+        old = [str(f) for f in self._files]
+        new = [str(f) for f in target_files]
+        if old == new:
+            return
+
+        self.beginResetModel()
+        self._files = list(target_files)
+        self.endResetModel()
+
+    def _stop_worker_pair(self, worker_attr: str, thread_attr: str) -> None:
+        """Stop a worker and release its thread reference safely.
+
+        If the thread is still running after the wait (e.g. a slow color
+        extraction blocked its event loop), the reference is kept until the
+        thread's finished signal releases it, so the QThread is never
+        destroyed while its thread is still running.
+        """
+        worker = getattr(self, worker_attr)
+        if worker:
             try:
-                self._worker._stopped = True
+                worker._stopped = True
             except Exception:
                 pass
-            self._worker = None
+            setattr(self, worker_attr, None)
 
-        if self._worker_thread:
+        thread = getattr(self, thread_attr)
+        if thread:
             try:
-                if shiboken.isValid(self._worker_thread) and self._worker_thread.isRunning():
-                    self._worker_thread.quit()
-                    self._worker_thread.wait(1000)
+                if shiboken.isValid(thread) and thread.isRunning():
+                    thread.quit()
+                    thread.wait(1000)
             except RuntimeError:
                 pass
-            finally:
-                self._worker_thread = None
+            try:
+                still_running = shiboken.isValid(thread) and thread.isRunning()
+            except RuntimeError:
+                still_running = False
+            if not still_running:
+                setattr(self, thread_attr, None)
+
+    def _release_thread_ref(self, attr: str, thread: QThread) -> None:
+        """Drop a stored thread reference once its thread has actually finished."""
+        if getattr(self, attr) is thread:
+            setattr(self, attr, None)
+
+    def _cleanup_worker(self) -> None:
+        self._stop_worker_pair("_worker", "_worker_thread")
 
     def _cleanup_color_worker(self) -> None:
-        if self._color_worker:
-            try:
-                self._color_worker._stopped = True
-            except Exception:
-                pass
-            self._color_worker = None
-
-        if self._color_worker_thread:
-            try:
-                if shiboken.isValid(self._color_worker_thread) and self._color_worker_thread.isRunning():
-                    self._color_worker_thread.quit()
-                    self._color_worker_thread.wait(1000)
-            except RuntimeError:
-                pass
-            finally:
-                self._color_worker_thread = None
+        self._stop_worker_pair("_color_worker", "_color_worker_thread")
 
     def setFolder(self, folder_path: str) -> None:
         self._cleanup_worker()
         self._cleanup_color_worker()
+        self._cleanup_rescan_worker()
+        self._rescan_generation += 1
 
         self.beginResetModel()
         self._all_files.clear()
         self._files.clear()
         self.endResetModel()
+
+        self._folder_path = folder_path
 
         self._loading = True
         self.loadingChanged.emit()
@@ -399,6 +496,7 @@ class ImageModel(QAbstractListModel):
         worker = ImageScannerWorker(folder_path)
         worker.finished.connect(self._on_worker_done)
         thread = start_worker_thread(worker)
+        thread.finished.connect(lambda t=thread: self._release_thread_ref("_worker_thread", t))
 
         self._worker = worker
         self._worker_thread = thread
@@ -421,16 +519,18 @@ class ImageModel(QAbstractListModel):
             self._loading = False
             self.loadingChanged.emit()
 
-    def _start_color_scanner(self) -> None:
-        if not self._all_files:
+    def _start_color_scanner(self, files: list[Path] | None = None) -> None:
+        targets = files if files is not None else self._all_files
+        if not targets:
             return
 
         self._cleanup_color_worker()
 
-        worker = ColorScannerWorker(self._all_files)
+        worker = ColorScannerWorker(targets)
         worker.progress.connect(self._on_color_progress)
         worker.finished.connect(self._on_color_done)
         thread = start_worker_thread(worker)
+        thread.finished.connect(lambda t=thread: self._release_thread_ref("_color_worker_thread", t))
 
         self._color_worker = worker
         self._color_worker_thread = thread

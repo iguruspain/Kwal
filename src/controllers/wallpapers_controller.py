@@ -8,7 +8,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import Property, QStandardPaths, Signal, Slot
+from PySide6.QtCore import QFileSystemWatcher, Property, QStandardPaths, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QColorDialog, QFileDialog
 
@@ -348,6 +348,8 @@ class WallpapersMixin:
             else:
                 self._selected_folder = ""
                 self._image_model.setFolder("")
+                self._fs_debounce.stop()
+                self._fs_watcher.removePaths(self._fs_watcher.directories())
                 self.selectedFolderChanged.emit()
 
         self._save_config()
@@ -376,6 +378,7 @@ class WallpapersMixin:
                 folder = self._model._folders[index]
                 self._selected_folder = folder.path
                 self._image_model.setFolder(self._selected_folder)
+                self._update_watched_paths()
                 self.selectedFolderChanged.emit()
                 self._save_config()
         except Exception:
@@ -457,6 +460,40 @@ class WallpapersMixin:
         self._image_model = ImageModel()
         self._pending_initial_wallpaper = self._last_set_wallpaper
         self._image_model.loadingChanged.connect(self._on_image_model_loading_changed)
+
+        # Watch the selected folder for on-disk changes so the grid updates live
+        self._fs_watcher = QFileSystemWatcher(self)
+        self._fs_watcher.directoryChanged.connect(self._on_directory_changed)
+        self._fs_debounce = QTimer(self)
+        self._fs_debounce.setSingleShot(True)
+        self._fs_debounce.setInterval(500)
+        self._fs_debounce.timeout.connect(self._image_model.rescan)
+
+    def _update_watched_paths(self) -> None:
+        """(Re)register the selected folder and its subdirectories with the watcher.
+
+        QFileSystemWatcher is not recursive, so every subdirectory must be
+        registered individually (the scanner itself uses rglob).
+        """
+        self._fs_watcher.removePaths(self._fs_watcher.directories())
+        folder = self._selected_folder
+        if not folder:
+            return
+        root = Path(folder)
+        if not root.is_dir():
+            return
+        paths = [str(root)]
+        for sub in sorted(root.rglob("*")):
+            if sub.is_dir():
+                paths.append(str(sub))
+        self._fs_watcher.addPaths(paths)
+
+    @Slot(str)
+    def _on_directory_changed(self, path: str) -> None:
+        # Re-register to pick up newly created subdirectories, then debounce
+        # bursts of events (bulk copies, our own re-registration) into one rescan.
+        self._update_watched_paths()
+        self._fs_debounce.start()
 
     @Slot()
     def _on_image_model_loading_changed(self) -> None:
