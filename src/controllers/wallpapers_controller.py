@@ -186,9 +186,16 @@ class WallpapersMixin:
         self._wallpaper_colors = colors
         self.wallpaperColorsChanged.emit()
 
-    @Slot(str)
-    def setAsWallpaper(self, path: str) -> None:
-        """Call standard KDE mechanism to set wallpaper."""
+    @Slot(str, str)
+    def setAsWallpaper(self, path: str, wallpaper_image: str = "") -> None:
+        """Call standard KDE mechanism to set wallpaper.
+
+        Args:
+            path: The real wallpaper file path (video or image).
+            wallpaper_image: The image to actually display (for videos this is
+                the cached frame thumbnail; for images it can be empty, in
+                which case ``path`` itself is used).
+        """
         if not path:
             self._logger.warning("setAsWallpaper called with empty path")
             return
@@ -198,10 +205,13 @@ class WallpapersMixin:
             self._logger.error("Wallpaper path does not exist: %s", abs_path)
             return
 
+        image_path = os.path.abspath(wallpaper_image) if wallpaper_image else abs_path
+
         self._last_set_wallpaper = abs_path
+        self._last_videoframe_thumb = image_path if image_path != abs_path else ""
         self._logger.info("Setting wallpaper to %s", abs_path)
 
-        if not plasma_wallpaper.set_wallpaper(abs_path):
+        if not plasma_wallpaper.set_wallpaper(image_path):
             self.notification.emit("qdbus executable not found (required for KDE Plasma)", "error")
 
         self._save_config()

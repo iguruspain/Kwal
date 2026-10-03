@@ -267,7 +267,7 @@ Kirigami.Page {
             // Compartida por el botón del thumbnail y el del drawer.
             function applySelectedWallpaper(isVideo) {
                 var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
-                controller.setAsWallpaper(image)
+                controller.setAsWallpaper(controller.selectedWallpaper, image)
 
                 var commandsArray = []
                 for (var i = 0; i < controller.customCommands.length; i++) {

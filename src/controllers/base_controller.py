@@ -137,6 +137,7 @@ class BaseMixin:
             # ── scalar values ────────────────────────────────────────────────
             doc["selected_folder"]    = self._selected_folder
             doc["last_set_wallpaper"] = self._last_set_wallpaper
+            doc["last_videoframe_thumb"] = self._last_videoframe_thumb
 
             # ── folders (array of tables) ────────────────────────────────────
             folders_arr = tomlkit.aot()
@@ -457,6 +458,7 @@ class BaseMixin:
         self._selected_folder: str = ""
         self._selected_wallpaper: str = ""
         self._last_set_wallpaper: str = ""
+        self._last_videoframe_thumb: str = ""
         self._initial_wallpaper_index: int = -1
         self._pending_initial_wallpaper: str = ""
         self._selected_wallpaper_resolution: str = ""
@@ -486,6 +488,7 @@ class BaseMixin:
         self._config_path_file = self._get_config_path_file()
         config = self._load_config()
         self._last_set_wallpaper = cast(str, config.get("last_set_wallpaper", ""))
+        self._last_videoframe_thumb = cast(str, config.get("last_videoframe_thumb", ""))
         if "custom_commands" in config and isinstance(config["custom_commands"], list):
             self._custom_commands = normalize_custom_commands(config["custom_commands"])
         else:

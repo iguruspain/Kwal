@@ -365,11 +365,7 @@ Popup {
             onClicked: {
                 var image = lightboxPopup.isVideo ? lightboxPopup.selWallpaperThumb : lightboxPopup.selWallpaper
 
-                if (lightboxPopup.isVideo) {
-                    controller.setAsWallpaper(lightboxPopup.selWallpaperThumb)
-                } else {
-                    controller.setAsWallpaper(lightboxPopup.selWallpaper)
-                }
+                controller.setAsWallpaper(lightboxPopup.selWallpaper, image)
 
                 var commandsArray = []
                 for (var i = 0; i < controller.customCommands.length; i++) {
