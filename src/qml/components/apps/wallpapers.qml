@@ -263,6 +263,31 @@ Kirigami.Page {
             property int selectedScoreColorIndex: 0
             property bool searchOpen: false
 
+            // Aplica el wallpaper seleccionado y ejecuta los comandos personalizados.
+            // Compartida por el botón del thumbnail y el del drawer.
+            function applySelectedWallpaper(isVideo) {
+                var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
+                controller.setAsWallpaper(image)
+
+                var commandsArray = []
+                for (var i = 0; i < controller.customCommands.length; i++) {
+                    var cmdObj = controller.customCommands[i]
+                    if (!cmdObj || !cmdObj.enabled) continue
+                    var cmd = cmdObj.command
+                    if (!cmd || cmd.trim() === "") continue
+
+                    cmd = cmd.replace(/%sc%/g, selectedScoreColorIndex.toString())
+                             .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
+                             .replace(/%image%/g, '"' + image + '"')
+
+                    commandsArray.push(cmd.trim())
+                }
+
+                if (commandsArray.length > 0) {
+                    controller.runCMD(commandsArray.join(" && "))
+                }
+            }
+
             Connections {
                 target: controller
                 function onSelectedWallpaperChanged() {
@@ -814,33 +839,7 @@ Kirigami.Page {
                                         icon.color: Kirigami.Theme.positiveTextColor
                                         display: AbstractButton.IconOnly
                                         visible: isSelected
-                                        onClicked: {
-                                            var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
-                                            if (isVideo) {
-                                                controller.setAsWallpaper(controller.thumbPath)
-                                            } 
-                                            else {
-                                                controller.setAsWallpaper(controller.selectedWallpaper)
-                                            }
-
-                                            var commandsArray = []
-                                            for (var i = 0; i < controller.customCommands.length; i++) {
-                                                var cmdObj = controller.customCommands[i]
-                                                if (!cmdObj || !cmdObj.enabled) continue
-                                                var cmd = cmdObj.command
-                                                if (!cmd || cmd.trim() === "") continue
-                                                
-                                                cmd = cmd.replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
-                                                        .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
-                                                        .replace(/%image%/g, '"' + image + '"')
-                                                
-                                                commandsArray.push(cmd.trim())
-                                            }
-
-                                            if (commandsArray.length > 0) {
-                                                controller.runCMD(commandsArray.join(" && "))
-                                            }
-                                        }
+                                        onClicked: rightPaneWallpapers.applySelectedWallpaper(isVideo)
                                         ToolTip.text: qsTr("Set as Wallpaper")
                                         ToolTip.visible: hovered
                                     }
@@ -945,6 +944,16 @@ Kirigami.Page {
                             text: qsTr("Custom Commands")
                             font.bold: true
                             Layout.fillWidth: true
+                        }
+
+                        ToolButton {
+                            icon.name: "dialog-ok-apply"
+                            icon.color: Kirigami.Theme.positiveTextColor
+                            display: AbstractButton.IconOnly
+                            enabled: controller.selectedWallpaper !== ""
+                            onClicked: rightPaneWallpapers.applySelectedWallpaper(gridContainer.isVideo)
+                            ToolTip.text: qsTr("Set as Wallpaper")
+                            ToolTip.visible: hovered
                         }
 
                         ToolButton {
