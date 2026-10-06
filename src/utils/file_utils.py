@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,11 @@ def backup_config_file(path: Path) -> Path | None:
 
 
 def write_config_atomic(cfg_path: Path, content: str) -> bool:
-    """Write config content, creating a ``.bak`` backup first if none exists."""
+    """Atomically write config content (temp file + ``os.replace``).
+
+    Creates a ``.bak`` backup of the existing config first if none exists, so
+    an interrupted write never leaves a partially written target behind.
+    """
     try:
         bak = cfg_path.with_name(cfg_path.name + ".bak")
         # Keep the first backup so the original config is never overwritten.
@@ -44,7 +50,23 @@ def write_config_atomic(cfg_path: Path, content: str) -> bool:
             except Exception:
                 logger.warning("Failed creating backup %s", bak)
 
-        cfg_path.write_text(content, encoding="utf-8")
+        # Write to a temp file in the same directory, then atomically replace.
+        fd, tmp_name = tempfile.mkstemp(
+            dir=cfg_path.parent, prefix=f".{cfg_path.name}.", suffix=".tmp"
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+                tmp_file.write(content)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+            os.replace(tmp_path, cfg_path)
+        except Exception:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                logger.warning("Failed removing temp file %s", tmp_path)
+            raise
         logger.info("Updated config %s", cfg_path)
         return True
     except Exception:

@@ -12,6 +12,10 @@ Kirigami.Page {
     
     // State for sidebar
     property bool sidePaneOpen: false
+    // Theme mode: "light" or "dark", used by the custom commands panel.
+    property string themeMode: "dark"
+    // Custom color picked
+    property string customColor: ""
 
     // Shared category list (name/hex/label) used both by the color-filter
     // chips and the manual category editor panel.
@@ -263,8 +267,8 @@ Kirigami.Page {
             property int selectedScoreColorIndex: 0
             property bool searchOpen: false
 
-            // Aplica el wallpaper seleccionado y ejecuta los comandos personalizados.
-            // Compartida por el botón del thumbnail y el del drawer.
+            // Applies the selected wallpaper and runs the custom commands.
+            // Shared by the thumbnail button and the drawer button.
             function applySelectedWallpaper(isVideo) {
                 var image = isVideo ? controller.thumbPath : controller.selectedWallpaper
                 controller.setAsWallpaper(controller.selectedWallpaper, image)
@@ -276,9 +280,7 @@ Kirigami.Page {
                     var cmd = cmdObj.command
                     if (!cmd || cmd.trim() === "") continue
 
-                    cmd = cmd.replace(/%sc%/g, selectedScoreColorIndex.toString())
-                             .replace(/%path%/g, '"' + controller.selectedWallpaper + '"')
-                             .replace(/%image%/g, '"' + image + '"')
+                    cmd = expandPlaceholders(cmd, controller.selectedWallpaper, image)
 
                     commandsArray.push(cmd.trim())
                 }
@@ -288,6 +290,21 @@ Kirigami.Page {
                 }
             }
 
+
+            // Expands all placeholders in a command: %scolor%, %mode%, %ccolor%, %sc%, %path%, %image%.
+            function expandPlaceholders(cmd, path, image) {
+                var colors = controller.wallpaperColors
+                var scolor = (colors && colors.length > rightPaneWallpapers.selectedScoreColorIndex)
+                    ? colors[rightPaneWallpapers.selectedScoreColorIndex]
+                    : ""
+                cmd = cmd.replace(/%scolor%/g, scolor)
+                         .replace(/%mode%/g, wallpaperPage.themeMode)
+                         .replace(/%ccolor%/g, wallpaperPage.customColor)
+                         .replace(/%sc%/g, rightPaneWallpapers.selectedScoreColorIndex.toString())
+                         .replace(/%path%/g, '"' + path + '"')
+                         .replace(/%image%/g, '"' + image + '"')
+                return cmd
+            }
             Connections {
                 target: controller
                 function onSelectedWallpaperChanged() {
@@ -966,8 +983,15 @@ Kirigami.Page {
                         }
                     }
 
-                    RowLayout {
+                    GridLayout {
                         Layout.fillWidth: true
+                        id: drawerGridPlaceholder
+                        columns: 3
+                        columnSpacing: Kirigami.Units.largeSpacing
+                        rowSpacing: Kirigami.Units.smallSpacing
+
+                        //Row1: Labels
+
                         Label {
                             Layout.fillWidth: true
                             text: qsTr("Matugen source color index: %1").arg(rightPaneWallpapers.selectedScoreColorIndex)
@@ -975,55 +999,161 @@ Kirigami.Page {
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight
                         }
-                    }
 
-                    RowLayout {
-                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Select a custom color:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            elide: Text.ElideRight
+                        }
 
-                        Rectangle {
-                            id: colorDotsContainerCC
-                            color: "transparent"
-                            width: colorDotsCC.implicitWidth + Kirigami.Units.smallSpacing * 2
-                            height: colorDotsCC.implicitHeight + Kirigami.Units.smallSpacing
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Mode:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            elide: Text.ElideRight
+                        }
 
-                            RowLayout {
-                                id: colorDotsCC
-                                spacing: 2
+                        //Row2:
 
-                                Repeater {
-                                    model: controller.wallpaperColors
-                                    delegate: Rectangle {
-                                        required property string modelData
-                                        required property int index
-                                        width: Kirigami.Units.gridUnit * 0.8
-                                        height: width
-                                        radius: Kirigami.Units.smallSpacing 
-                                        color: modelData
-                                        border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
-                                        border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+                        // Color Dots for Matugen source color index
+                        RowLayout {
+                            Layout.fillWidth: true
 
-                                        HoverHandler { id: colorHover }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            hoverEnabled: false // El hover ya lo gestiona HoverHandler arriba
-                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                            propagateComposedEvents: false
-                                            preventStealing: true
-                                            onPressed: (mouse) => mouse.accepted = true
-                                            onClicked: (mouse) => {
-                                                if (mouse.button === Qt.LeftButton) {
-                                                    rightPaneWallpapers.selectedScoreColorIndex = index
-                                                } else if (mouse.button === Qt.RightButton) {
-                                                    clipboardHelper.copyToClipboard(modelData)
+                            Rectangle {
+                                id: colorDotsContainerCC
+                                color: "transparent"
+                                width: colorDotsCC.implicitWidth + Kirigami.Units.smallSpacing * 2
+                                height: colorDotsCC.implicitHeight + Kirigami.Units.smallSpacing
+
+                                RowLayout {
+                                    id: colorDotsCC
+                                    spacing: 2
+
+                                    Repeater {
+                                        model: controller.wallpaperColors
+                                        delegate: Rectangle {
+                                            required property string modelData
+                                            required property int index
+                                            width: Kirigami.Units.gridUnit * 0.8
+                                            height: width
+                                            radius: Kirigami.Units.smallSpacing 
+                                            color: modelData
+                                            border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
+                                            border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+
+                                            HoverHandler { id: colorHover }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                hoverEnabled: false // El hover ya lo gestiona HoverHandler arriba
+                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                propagateComposedEvents: false
+                                                preventStealing: true
+                                                onPressed: (mouse) => mouse.accepted = true
+                                                onClicked: (mouse) => {
+                                                    if (mouse.button === Qt.LeftButton) {
+                                                        rightPaneWallpapers.selectedScoreColorIndex = index
+                                                    } else if (mouse.button === Qt.RightButton) {
+                                                        clipboardHelper.copyToClipboard(modelData)
+                                                    }
+                                                    mouse.accepted = true
                                                 }
-                                                mouse.accepted = true
                                             }
+                                            ToolTip.text: modelData.toUpperCase()
+                                            ToolTip.visible: colorHover.hovered
+                                            ToolTip.delay: Kirigami.Units.toolTipDelay
                                         }
-                                        ToolTip.text: modelData.toUpperCase()
-                                        ToolTip.visible: colorHover.hovered
-                                        ToolTip.delay: Kirigami.Units.toolTipDelay
                                     }
                                 }
+                            }
+                        }
+
+                        // Color Picker for custom color picked stored in customColor
+                        RowLayout {
+                            Layout.fillWidth: true
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("Color:")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                color: Kirigami.Theme.disabledTextColor
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                id: colorPreview
+                                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                                width: Kirigami.Units.gridUnit * 0.8
+                                height: Kirigami.Units.gridUnit * 0.8
+
+                                //transparent if no color is selected
+                                color: customColor === "" ? "transparent" : customColor
+
+                                border.color: Kirigami.Theme.disabledTextColor
+                                border.width: 1
+                                radius: Kirigami.Units.smallSpacing
+
+                                ToolTip.text: {
+                                    if (!controller) return qsTr("Pick color")
+                                    var t = controller.formatColorWithAlpha(customColor)
+                                    return t && t !== "" ? t : qsTr("Pick color")
+                                }
+                                ToolTip.delay: Kirigami.Units.toolTipDelay
+                                ToolTip.visible: colorPreviewMouse.containsMouse
+
+                                MouseArea {
+                                    id: colorPreviewMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: (mouse) => {
+                                        if (mouse.button === Qt.RightButton) {
+                                            clipboardHelper.copyToClipboard(customColor !== "" ? customColor : colorPreview.color.toString())
+                                            return
+                                        }
+                                        if (!controller) return;
+                                        var currentColor = customColor;
+                                        var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
+                                        if (color) {
+                                            customColor = color;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Theme Mode Toggle
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label {
+                                text: qsTr("Light ⚪")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                color: Kirigami.Theme.disabledTextColor
+                                elide: Text.ElideRight
+                            }
+                            Switch {
+                                id: themeModeToggle //mode dark/light save in property themeMode
+                                checked: themeMode === "dark"
+
+                                ToolTip.text:
+                                    checked
+                                    ? qsTr("Dark")
+                                    : qsTr("Light")
+
+                                ToolTip.visible: hovered
+
+                                onToggled: {
+                                    themeMode = checked ? "dark" : "light"
+                                }
+                            }
+                            Label {
+                                text: qsTr("⚫ Dark")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                color: Kirigami.Theme.disabledTextColor
+                                elide: Text.ElideRight
                             }
                         }
                     }
@@ -1037,8 +1167,9 @@ Kirigami.Page {
                         Layout.fillWidth: true
 
                         Label {
+                            id: placeholdersLabel
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: \n%sc% for selected color, %path% for path, %image% for image/video thumb path")
+                            text: qsTr("Placeholders: \n%path% path, %image% image/video thumb path, %ccolor% custom color, %mode% theme mode (dark/light).\n%sc% selected color index, %scolor% selected color hex.")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
                             elide: Text.ElideRight
@@ -1165,7 +1296,7 @@ Kirigami.Page {
                             }
                         }
 
-                        // ── Elemento flotante para el arrastre (fuera del layout del ListView) ──
+                        // ── Floating element for the drag (outside the ListView layout) ──
                         Rectangle {
                             id: dragOverlay
                             parent: customCommandsList
@@ -1262,7 +1393,7 @@ Kirigami.Page {
 
                             property bool flashHighlight: false
 
-                            // El elemento activo se comporta como un hueco transparente en la lista
+                            // Active element behaves like a transparent hole in the list, allowing the drag overlay to show through.
                             opacity: commandDelegate.index === customCommandsList.draggedIndex ? 0.3 : 1.0
 
                             function triggerHighlight() {
@@ -1455,20 +1586,7 @@ Kirigami.Page {
 
                                         var cmd = cmdInput.text
 
-                                        cmd = cmd.replace(
-                                            /%sc%/g,
-                                            rightPaneWallpapers
-                                                .selectedScoreColorIndex
-                                                .toString()
-                                        ).replace(
-                                            /%path%/g,
-                                            '"' + controller.selectedWallpaper + '"'
-                                        ).replace(
-                                            /%image%/g,
-                                            '"' + image + '"'
-                                        )
-
-                                        controller.runCMD(cmd.trim())
+                                        controller.runCMD(expandPlaceholders(cmd, controller.selectedWallpaper, image).trim())
                                     }
                                 }
 

@@ -374,9 +374,7 @@ Popup {
                     var cmd = cmdObj.command
                     if (!cmd || cmd.trim() === "") continue
 
-                    cmd = cmd.replace(/%sc%/g, rightPane.selectedScoreColorIndex.toString())
-                            .replace(/%path%/g, '"' + lightboxPopup.selWallpaper + '"')
-                            .replace(/%image%/g, '"' + image + '"')
+                    cmd = rightPane.expandPlaceholders(cmd, lightboxPopup.selWallpaper, image)
 
                     commandsArray.push(cmd.trim())
                 }
