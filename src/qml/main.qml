@@ -11,7 +11,7 @@ Kirigami.ApplicationWindow {
     id: root
     visible: true
     width: 1000
-    height: 690
+    height: 700
     title: "Kwal"
     
     // Global Safe Overlay Color

@@ -930,9 +930,10 @@ Kirigami.Page {
                 z: 100 // Stays above the grid in hit-testing, not just visually
 
                 width: parent.width - Kirigami.Units.largeSpacing //* 4
-                height: drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2
+                height: (drawerContent.implicitHeight + Kirigami.Units.largeSpacing * 2 ) 
 
                 property bool isOpen: rightPaneWallpapers.drawerOpen
+                property int showNumCustCommands: 4
 
                 // Slide up from bottom
                 y: isOpen ? parent.height - height - Kirigami.Units.largeSpacing * 2 : parent.height
@@ -945,7 +946,7 @@ Kirigami.Page {
                 Behavior on opacity { NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic } }
 
                 radius: Kirigami.Units.largeSpacing
-                color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.95)
+                color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.80)
                 border.color: Kirigami.Theme.highlightColor
                 border.width: 1
 
@@ -1215,8 +1216,12 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.min(
                             contentHeight,
-                            Kirigami.Units.gridUnit * 18
+                            bottomDrawer.showNumCustCommands * rowHeight
+                                + Math.max(0, bottomDrawer.showNumCustCommands - 1) * spacing
                         )
+
+                        // Shared row height: the cap above and the delegate below derive from it.
+                        property real rowHeight: Kirigami.Units.gridUnit * 3
 
                         clip: true
                         spacing: Kirigami.Units.smallSpacing
@@ -1270,7 +1275,7 @@ Kirigami.Page {
                             id: dragOverlay
                             parent: customCommandsList
                             width: customCommandsList.width
-                            height: Kirigami.Units.gridUnit * 3
+                            height: customCommandsList.rowHeight
                             z: 999
                             visible: customCommandsList.draggedIndex !== -1
 
@@ -1358,7 +1363,7 @@ Kirigami.Page {
                             required property bool cmdEnabled
 
                             width: customCommandsList.width
-                            height: Kirigami.Units.gridUnit * 3
+                            height: customCommandsList.rowHeight
 
                             property bool flashHighlight: false
 
