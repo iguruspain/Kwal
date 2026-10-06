@@ -237,6 +237,30 @@ Kirigami.Page {
                     spacing: Kirigami.Units.largeSpacing
 
                     ToolButton {
+                        id: applyOriginalButton
+                        icon.name: "document-save"
+                        ToolTip.text: qsTr("Apply the selected image directly to fastfetch config (no tint)")
+                        ToolTip.visible: hovered
+                        ToolTip.delay: Kirigami.Units.toolTipDelay
+                        enabled: controller && controller.selectedFile && controller.selectedFile !== ""
+
+                        onClicked: {
+                            if (!controller) return;
+
+                            if (!controller.selectedFile || controller.selectedFile === "") {
+                                controller.resultDialogText = qsTr("No image selected.");
+                                controller.resultDialogVisible = true;
+                                return;
+                            }
+
+                            var started = controller.applyOriginalImage();
+                            if (!started) {
+                                controller.resultDialogText = qsTr("Failed to start apply operation.");
+                                controller.resultDialogVisible = true;
+                            }
+                        }
+                    }
+                    ToolButton {
                         id: applyTintedButton
                         icon.name: "dialog-ok-apply"
                         ToolTip.text: qsTr("Apply the tinted image to fastfetch config")
@@ -261,30 +285,6 @@ Kirigami.Page {
                                     controller.resultDialogText = qsTr("Failed to start apply operation.");
                                     controller.resultDialogVisible = true;
                                 }
-                            }
-                        }
-                    }
-                    ToolButton {
-                        id: applyOriginalButton
-                        icon.name: "document-save"
-                        ToolTip.text: qsTr("Apply the selected image directly to fastfetch config (no tint)")
-                        ToolTip.visible: hovered
-                        ToolTip.delay: Kirigami.Units.toolTipDelay
-                        enabled: controller && controller.selectedFile && controller.selectedFile !== ""
-
-                        onClicked: {
-                            if (!controller) return;
-
-                            if (!controller.selectedFile || controller.selectedFile === "") {
-                                controller.resultDialogText = qsTr("No image selected.");
-                                controller.resultDialogVisible = true;
-                                return;
-                            }
-
-                            var started = controller.applyOriginalImage();
-                            if (!started) {
-                                controller.resultDialogText = qsTr("Failed to start apply operation.");
-                                controller.resultDialogVisible = true;
                             }
                         }
                     }
