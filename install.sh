@@ -182,6 +182,9 @@ for tool in fastfetch starship ulauncher; do
     fi
 done
 
+# Update KDE application database if kbuildsycoca6 is available
+(which kbuildsycoca6 &>/dev/null) && kbuildsycoca6 --noincremental
+
 # ──────────────────────────────────────────────
 # Done
 # ──────────────────────────────────────────────
