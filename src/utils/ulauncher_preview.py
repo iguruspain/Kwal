@@ -48,30 +48,40 @@ ICON_SEARCH_PATHS = [
     "/usr/share/icons/hicolor/scalable/apps/",
 ]
 
+
+
+_SPOTIFY_SVG_TEMPLATE = (
+    '<svg xmlns="http://www.w3.org/2000/svg" style="color:#5ecf7d;fill:currentColor" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 512 511.992"><path fill-rule="nonzero" fill="currentColor" d="M255.998.004C114.617.004 0 114.616 0 255.998c0 141.385 114.617 255.994 255.998 255.994C397.395 511.992 512 397.387 512 255.998 512 114.624 397.395.015 255.994.015l.004-.015v.004zm117.4 369.22c-4.585 7.519-14.426 9.907-21.949 5.288-60.104-36.715-135.771-45.028-224.882-24.669-8.587 1.955-17.146-3.425-19.104-12.015-1.966-8.59 3.394-17.149 12.004-19.104 97.517-22.28 181.164-12.687 248.644 28.551 7.523 4.615 9.907 14.427 5.287 21.949zm31.335-69.704c-5.779 9.389-18.067 12.353-27.452 6.578-68.813-42.297-173.703-54.547-255.096-29.837-10.556 3.188-21.704-2.761-24.906-13.298-3.18-10.556 2.772-21.68 13.309-24.89 92.971-28.209 208.551-14.546 287.575 34.015 9.385 5.778 12.349 18.066 6.574 27.44v-.004l-.004-.004zm2.692-72.583c-82.51-49.006-218.635-53.511-297.409-29.603-12.649 3.836-26.027-3.302-29.859-15.955-3.833-12.657 3.302-26.024 15.959-29.868 90.428-27.452 240.753-22.149 335.747 34.015 11.401 6.755 15.133 21.447 8.375 32.809-6.728 11.378-21.462 15.13-32.802 8.372h-.011z"/></svg>'
+    )
+
 ICON_CANDIDATES_MAP: dict[str, list[str]] = {
     "spotify": ["spotify.png", "spotify-client.png"],
     "spectacle": ["spectacle.svg"],
 }
 
-# Gear SVG template for the settings button (hover state)
-# Placeholder: {prefs_bg_color}
 _GEAR_SVG_TEMPLATE = (
-    '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" '
-    'xmlns="http://www.w3.org/2000/svg">'
-    '<circle cx="12" cy="12" r="12" fill="{prefs_bg_color}"/>'
-    '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58'
-    'c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96'
-    'c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84'
-    'c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96'
-    'c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58'
-    'c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61'
-    'l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54'
-    'c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 '
-    '1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07'
-    '-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 '
-    '3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="#605c5a" opacity="0.95"/>'
-    '</svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" image-rendering="optimizeQuality" fill-rule="evenodd" clip-rule="evenodd" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="{prefs_bg_color}"/><path fill-rule="nonzero" fill="{prefs_fg_color}" opacity="0.95" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>'
 )
+
+# Gear SVG template for the settings button (hover state)
+# Placeholder: {prefs_bg_color} {prefs_fg_color}
+# _GEAR_SVG_TEMPLATE = (
+#     '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" '
+#     'xmlns="http://www.w3.org/2000/svg">'
+#     '<circle cx="12" cy="12" r="12" fill="{prefs_bg_color}"/>'
+#     '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58'
+#     'c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96'
+#     'c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84'
+#     'c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96'
+#     'c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58'
+#     'c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61'
+#     'l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54'
+#     'c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 '
+#     '1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07'
+#     '-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 '
+#     '3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="#605c5a" opacity="0.95"/>'
+#     '</svg>'
+# )
 
 # Provisional/transparent color sentinels
 _INVALID_COLORS = {"provisional_rgba_color", "provisional_hex_color", "transparent"}
@@ -627,25 +637,29 @@ class UlauncherRendererV2:
         spotify_path = self.resolve_system_icon("spotify")
         spectacle_path = self.resolve_system_icon("spectacle")
 
+        spotify_svg = _SPOTIFY_SVG_TEMPLATE
+        # Settings gear icon (using prefs_background as hover state for preview)
+        prefs_bg_color = self._get_color("prefs_background", "#555555")
+        prefs_fg_color = self._get_color("bg_color", "#1a1a1a")
+        gear_svg = _GEAR_SVG_TEMPLATE.format(prefs_bg_color=prefs_bg_color, prefs_fg_color=prefs_fg_color)
+
         spotify_img = (
             f'<img src="{spotify_path}" class="item-icon">'
             if spotify_path
-            else '<div class="item-icon" style="background:#1db954;border-radius:50%;"></div>'
+            else f'<div class="item-icon" style="background:transparent;border-radius:4px;">{spotify_svg}</div>'
         )
         spectacle_img = (
             f'<img src="{spectacle_path}" class="item-icon">'
             if spectacle_path
-            else '<div class="item-icon" style="background:#31363b;border-radius:4px;"></div>'
+            else '<div class="item-icon" style="background:transparent;border-radius:4px;"></div>'
         )
 
         # Highlighted labels
         query = "sptf"
         spotify_label = self._highlight_match("Spotify", query, color_sel)
         spectacle_label = self._highlight_match("Spectacle", query, color_nosel)
+        gear_label = self._highlight_match("Settings", query, color_nosel)
 
-        # Settings gear icon (using prefs_background as hover state for preview)
-        prefs_bg_color = self._get_color("prefs_background", "#555555")
-        gear_svg = _GEAR_SVG_TEMPLATE.format(prefs_bg_color=prefs_bg_color)
 
         # Build content sections
         input_section = self._build_input_section(query, gear_svg)

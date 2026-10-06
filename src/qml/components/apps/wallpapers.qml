@@ -587,7 +587,7 @@ Kirigami.Page {
                                     // highlight color is reserved for hover only.
                                     border.color: thumbDelegate.flashHighlight
                                         ? Qt.lighter(Kirigami.Theme.highlightColor, 1.35)
-                                        : (isSelected ? Qt.alpha(Kirigami.Theme.textColor, 0.30)
+                                        : (isSelected ? Qt.alpha(Kirigami.Theme.textColor, 0.80)
                                                       : (isHovered ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.30)))
                                     border.width: thumbDelegate.flashHighlight ? 4 : (isSelected ? 3 : 2)
                                     radius: Kirigami.Units.smallSpacing
@@ -659,7 +659,7 @@ Kirigami.Page {
                                     // its diffuse, out-of-focus look.
                                     property real glowBlur: 5.0
                                     // Band: color.
-                                    property color glowColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.4) //Kirigami.Theme.highlightColor
+                                    property color glowColor: Qt.lighter(Kirigami.Theme.positiveTextColor, 1.4) //Qt.lighter(Kirigami.Theme.highlightColor, 1.4)
 
                                     // Head position along the perimeter, 0..1 (loops).
                                     property real head: 0.0
@@ -962,7 +962,39 @@ Kirigami.Page {
                             font.bold: true
                             Layout.fillWidth: true
                         }
+                        Item { Layout.fillWidth: true } // Spacer
+                        
+                        // Theme Mode Toggle
+                        RowLayout {
+                            Layout.fillWidth: true
 
+                            Kirigami.Icon {
+                                source: "lighttable-symbolic"
+                                fallback: "dark-mode-symbolic"
+                                Layout.preferredWidth: Kirigami.Units.gridUnit
+                                Layout.preferredHeight: Kirigami.Units.gridUnit
+                                color: Kirigami.Theme.highlightColor
+                            }
+
+                            Switch {
+                                id: themeModeToggle //mode dark/light save in property themeMode
+                                checked: themeMode === "dark"
+
+                                ToolTip.text:
+                                    checked
+                                    ? qsTr("Dark")
+                                    : qsTr("Light")
+
+                                ToolTip.visible: hovered
+
+                                onToggled: {
+                                    themeMode = checked ? "dark" : "light"
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true } // Spacer
+                        
                         ToolButton {
                             icon.name: "dialog-ok-apply"
                             icon.color: Kirigami.Theme.positiveTextColor
@@ -983,184 +1015,121 @@ Kirigami.Page {
                         }
                     }
 
-                    GridLayout {
+                    RowLayout {
                         Layout.fillWidth: true
-                        id: drawerGridPlaceholder
-                        columns: 3
-                        columnSpacing: Kirigami.Units.largeSpacing
-                        rowSpacing: Kirigami.Units.smallSpacing
-
-                        //Row1: Labels
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Matugen source color index: %1").arg(rightPaneWallpapers.selectedScoreColorIndex)
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            color: Kirigami.Theme.disabledTextColor
-                            elide: Text.ElideRight
-                        }
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Select a custom color:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            color: Kirigami.Theme.disabledTextColor
-                            elide: Text.ElideRight
-                        }
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Mode:")
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            color: Kirigami.Theme.disabledTextColor
-                            elide: Text.ElideRight
-                        }
-
-                        //Row2:
-
-                        // Color Dots for Matugen source color index
+                        id: drawerPlaceholderOptions
+                        spacing: Kirigami.Units.smallSpacing
+                        
                         RowLayout {
-                            Layout.fillWidth: true
+                            //Layout.fillWidth: true
+                            // Matugen source color index label
+                            Label {
+                                //Layout.fillWidth: true
+                                text: qsTr("Matugen source color index: %1").arg(rightPaneWallpapers.selectedScoreColorIndex)
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                color: Kirigami.Theme.disabledTextColor
+                                //elide: Text.ElideRight
+                            }
 
-                            Rectangle {
-                                id: colorDotsContainerCC
-                                color: "transparent"
-                                width: colorDotsCC.implicitWidth + Kirigami.Units.smallSpacing * 2
-                                height: colorDotsCC.implicitHeight + Kirigami.Units.smallSpacing
+                            // Color Dots for Matugen source color index
+                            RowLayout {
+                                id: colorDotsCC
+                                spacing: 2
+                                Layout.alignment: Qt.AlignVCenter
 
-                                RowLayout {
-                                    id: colorDotsCC
-                                    spacing: 2
+                                Repeater {
+                                    model: controller.wallpaperColors
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+                                        width: Kirigami.Units.gridUnit * 0.8
+                                        height: width
+                                        radius: Kirigami.Units.smallSpacing 
 
-                                    Repeater {
-                                        model: controller.wallpaperColors
-                                        delegate: Rectangle {
-                                            required property string modelData
-                                            required property int index
-                                            width: Kirigami.Units.gridUnit * 0.8
-                                            height: width
-                                            radius: Kirigami.Units.smallSpacing 
-                                            color: modelData
-                                            border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
-                                            border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
+                                        color: modelData
+                                        border.color: rightPaneWallpapers.selectedScoreColorIndex === index ? Kirigami.Theme.positiveTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.5)
+                                        border.width: rightPaneWallpapers.selectedScoreColorIndex === index ? 2 : 1
 
-                                            HoverHandler { id: colorHover }
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                hoverEnabled: false // El hover ya lo gestiona HoverHandler arriba
-                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                                propagateComposedEvents: false
-                                                preventStealing: true
-                                                onPressed: (mouse) => mouse.accepted = true
-                                                onClicked: (mouse) => {
-                                                    if (mouse.button === Qt.LeftButton) {
-                                                        rightPaneWallpapers.selectedScoreColorIndex = index
-                                                    } else if (mouse.button === Qt.RightButton) {
-                                                        clipboardHelper.copyToClipboard(modelData)
-                                                    }
-                                                    mouse.accepted = true
+                                        HoverHandler { id: colorHoverCC }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: false // El hover ya lo gestiona HoverHandler arriba
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                            propagateComposedEvents: false
+                                            preventStealing: true
+                                            onPressed: (mouse) => mouse.accepted = true
+                                            onClicked: (mouse) => {
+                                                if (mouse.button === Qt.LeftButton) {
+                                                    rightPaneWallpapers.selectedScoreColorIndex = index
+                                                } else if (mouse.button === Qt.RightButton) {
+                                                    clipboardHelper.copyToClipboard(modelData)
                                                 }
+                                                mouse.accepted = true
                                             }
-                                            ToolTip.text: modelData.toUpperCase()
-                                            ToolTip.visible: colorHover.hovered
-                                            ToolTip.delay: Kirigami.Units.toolTipDelay
                                         }
+                                        ToolTip.text: modelData.toUpperCase()
+                                        ToolTip.visible: colorHoverCC.hovered
+                                        ToolTip.delay: Kirigami.Units.toolTipDelay
                                     }
                                 }
                             }
                         }
 
-                        // Color Picker for custom color picked stored in customColor
-                        RowLayout {
-                            Layout.fillWidth: true
-
-                            Label {
-                                Layout.fillWidth: true
-                                text: qsTr("Color:")
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                color: Kirigami.Theme.disabledTextColor
-                                elide: Text.ElideRight
-                            }
-
-                            Rectangle {
-                                id: colorPreview
-                                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                                width: Kirigami.Units.gridUnit * 0.8
-                                height: Kirigami.Units.gridUnit * 0.8
-
-                                //transparent if no color is selected
-                                color: customColor === "" ? "transparent" : customColor
-
-                                border.color: Kirigami.Theme.disabledTextColor
-                                border.width: 1
-                                radius: Kirigami.Units.smallSpacing
-
-                                ToolTip.text: {
-                                    if (!controller) return qsTr("Pick color")
-                                    var t = controller.formatColorWithAlpha(customColor)
-                                    return t && t !== "" ? t : qsTr("Pick color")
-                                }
-                                ToolTip.delay: Kirigami.Units.toolTipDelay
-                                ToolTip.visible: colorPreviewMouse.containsMouse
-
-                                MouseArea {
-                                    id: colorPreviewMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onClicked: (mouse) => {
-                                        if (mouse.button === Qt.RightButton) {
-                                            clipboardHelper.copyToClipboard(customColor !== "" ? customColor : colorPreview.color.toString())
-                                            return
-                                        }
-                                        if (!controller) return;
-                                        var currentColor = customColor;
-                                        var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
-                                        if (color) {
-                                            customColor = color;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Theme Mode Toggle
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Label {
-                                text: qsTr("Light ⚪")
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                color: Kirigami.Theme.disabledTextColor
-                                elide: Text.ElideRight
-                            }
-                            Switch {
-                                id: themeModeToggle //mode dark/light save in property themeMode
-                                checked: themeMode === "dark"
-
-                                ToolTip.text:
-                                    checked
-                                    ? qsTr("Dark")
-                                    : qsTr("Light")
-
-                                ToolTip.visible: hovered
-
-                                onToggled: {
-                                    themeMode = checked ? "dark" : "light"
-                                }
-                            }
-                            Label {
-                                text: qsTr("⚫ Dark")
-                                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                color: Kirigami.Theme.disabledTextColor
-                                elide: Text.ElideRight
-                            }
-                        }
+                        Item { Layout.fillWidth: true } // Spacer
                     }
+                    
+                    RowLayout {
+                        //Layout.fillWidth: true
+                        // Custom color picker
+                        Label {
+                            //Layout.fillWidth: true
+                            text: qsTr("Custom color:")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            color: Kirigami.Theme.disabledTextColor
+                            //elide: Text.ElideRight
+                        }
+                        // Color Picker for custom color picked stored in customColor
+                        Rectangle {
+                            id: colorPreview
+                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                            width: Kirigami.Units.gridUnit * 0.8
+                            height: Kirigami.Units.gridUnit * 0.8
 
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Kirigami.Units.largeSpacing
+                            //transparent if no color is selected
+                            color: customColor === "" ? "transparent" : customColor
+
+                            border.color: Kirigami.Theme.disabledTextColor
+                            border.width: 1
+                            radius: Kirigami.Units.smallSpacing
+
+                            ToolTip.text: {
+                                if (!controller) return qsTr("Pick color")
+                                var t = controller.formatColorWithAlpha(customColor)
+                                return t && t !== "" ? t : qsTr("Pick color")
+                            }
+                            ToolTip.delay: Kirigami.Units.toolTipDelay
+                            ToolTip.visible: colorPreviewMouse.containsMouse
+
+                            MouseArea {
+                                id: colorPreviewMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.RightButton) {
+                                        clipboardHelper.copyToClipboard(customColor !== "" ? customColor : colorPreview.color.toString())
+                                        return
+                                    }
+                                    if (!controller) return;
+                                    var currentColor = customColor;
+                                    var color = controller.openColorDialog(currentColor === "" ? "transparent" : currentColor);
+                                    if (color) {
+                                        customColor = color;
+                                    }
+                                }
+                            }
+                        }
                     }
                     
                     RowLayout {
@@ -1169,10 +1138,10 @@ Kirigami.Page {
                         Label {
                             id: placeholdersLabel
                             Layout.fillWidth: true
-                            text: qsTr("Placeholders: \n%path% path, %image% image/video thumb path, %ccolor% custom color, %mode% theme mode (dark/light).\n%sc% selected color index, %scolor% selected color hex.")
+                            textFormat: Text.RichText
+                            text: qsTr("Placeholders: <br><b>%path%</b> path, <b>%image%</b> image/video thumb path.<br><b>%ccolor%</b> custom color, <b>%mode%</b> theme mode (dark/light).<br><b>%sc%</b> selected color index, <b>%scolor%</b> selected color hex.<br>")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             color: Kirigami.Theme.disabledTextColor
-                            elide: Text.ElideRight
                         }
 
                         ToolButton {
@@ -1398,11 +1367,11 @@ Kirigami.Page {
 
                             function triggerHighlight() {
                                 flashHighlight = true
-                                flashTimer.restart()
+                                cmdFlashTimer.restart()
                             }
 
                             Timer {
-                                id: flashTimer
+                                id: cmdFlashTimer
                                 interval: 420
                                 repeat: false
                                 onTriggered: commandDelegate.flashHighlight = false
