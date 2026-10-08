@@ -411,13 +411,13 @@ Item {
 
             Kirigami.Separator {
                 Layout.fillWidth: true
-                visible: lightbox.paletteGenerationActive
+                visible: lightbox.paletteGenerationActive && lightbox.paletteCurrentBackend !== "imagemagick"
             }
 
             // Aux Controls (for Material You and pywal16)
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: lightbox.paletteGenerationActive
+                visible: lightbox.paletteGenerationActive && lightbox.paletteCurrentBackend !== "imagemagick"
                 spacing: Kirigami.Units.smallSpacing
 
                 Label {
